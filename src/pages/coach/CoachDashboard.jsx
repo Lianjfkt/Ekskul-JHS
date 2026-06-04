@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabaseClient'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import AnnouncementBanner from '../../components/shared/AnnouncementBanner'
 import { 
   Activity, CalendarDays, ClipboardCheck, GraduationCap, 
   ArrowRight, Users, PlayCircle, Clock
@@ -66,6 +67,7 @@ export default function CoachDashboard() {
 
   return (
     <div className="space-y-8">
+      <AnnouncementBanner />
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 md:p-8 rounded-2xl text-white shadow-lg relative overflow-hidden">
         <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-12 scale-150">

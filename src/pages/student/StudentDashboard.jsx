@@ -4,6 +4,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { useStudentProfile } from '../../hooks/useStudentProfile'
 import { supabase } from '../../lib/supabaseClient'
 import { Progress } from '@/components/ui/progress'
+import AnnouncementBanner from '../../components/shared/AnnouncementBanner'
 import { 
   Waves, CalendarDays, Clock, ChevronRight, 
   TrendingUp, AlertCircle, CheckCircle2, Loader2
@@ -172,6 +173,7 @@ export default function StudentDashboard() {
   if (!studentId && !loading) {
     return (
       <div className="space-y-6">
+        <AnnouncementBanner />
         <div className="relative overflow-hidden bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 rounded-2xl p-6 text-white shadow-xl shadow-violet-200">
           <div className="relative z-10">
             <p className="text-violet-200 text-sm font-medium mb-1">{greeting()} 👋</p>
@@ -191,6 +193,7 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-6">
+      <AnnouncementBanner />
       {/* Welcome Banner */}
       <div className="relative overflow-hidden bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 rounded-2xl p-6 text-white shadow-xl shadow-violet-200">
         <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/10 blur-2xl"></div>
