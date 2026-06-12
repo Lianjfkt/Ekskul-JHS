@@ -468,6 +468,107 @@ export default function RecapManagement() {
     exportToExcel(rows, headers, 'Laporan Sesi Pelatih', 'rekap_sesi_pelatih.xlsx')
   }
 
+  const exportCoachSessionsDetailToExcel = (rowGroup) => {
+    const { coachName, ekskulName, monthKey, sessionsList, ekskulId } = rowGroup
+
+    // Find total active students registered in this ekskul
+    const totalPeserta = enrollments.filter(en => en.extracurricular_id === ekskulId).length
+
+    // Extract academic year & semester from enrollments, default to 2025/2026 & Genap
+    const sampleEnroll = enrollments.find(en => en.extracurricular_id === ekskulId)
+    const academicYear = sampleEnroll?.academic_year || '2025/2026'
+    const semester = sampleEnroll?.semester || 'Genap'
+
+    const monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+    const [year, month] = monthKey.split('-')
+    const periodeLabel = `${monthsIndo[parseInt(month, 10) - 1]} ${year}`
+
+    // Construct the custom header structure like the image
+    const data = [
+      ['DAFTAR HADIR PEMBIMBING EKSTRAKURIKULER'],
+      ['SMP GLOBAL MADANI'],
+      [`SEMESTER ${semester.toUpperCase()} - TAHUN AKADEMIK ${academicYear}`],
+      [],
+      [`Periode: ${periodeLabel}`],
+      [],
+      [`Pembimbing : ${coachName}`, '', '', '', `Jenis Ekskul : ${ekskulName}`],
+      ['Kelas      : -', '', '', '', `Jumlah Peserta : ${totalPeserta} Siswa`],
+      [],
+      ['No', 'Hari/Tanggal', 'Waktu', '', 'Materi', 'Tanda Tangan', 'Siswa Tidak Hadir'],
+      ['', '', 'Mulai', 'Selesai', '', '', '']
+    ]
+
+    // Populate data rows for each session
+    sessionsList.forEach((s, index) => {
+      const dateObj = new Date(s.session_date)
+      const dayName = dateObj.toLocaleDateString('id-ID', { weekday: 'long' })
+      const dateStr = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      const formattedDate = `${dayName}, ${dateStr}`
+
+      // Find absent students
+      const absentList = attendances
+        .filter(a => a.session_id === s.id && a.status !== 'hadir')
+        .map(a => a.student?.full_name || '')
+        .filter(Boolean)
+        .join(', ')
+
+      data.push([
+        index + 1,
+        formattedDate,
+        '14.00', // Default Waktu Mulai
+        '15.30', // Default Waktu Selesai
+        s.topic || '-',
+        '', // Kolom Tanda Tangan
+        absentList || 'Nihil'
+      ])
+    })
+
+    // Create Worksheet & apply structural properties
+    const ws = XLSX.utils.aoa_to_sheet(data)
+
+    // Merges matching the layout in the image
+    ws['!merges'] = [
+      // Title merges
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }, // A1:G1
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }, // A2:G2
+      { s: { r: 2, c: 0 }, e: { r: 2, c: 6 } }, // A3:G3
+      { s: { r: 4, c: 0 }, e: { r: 4, c: 6 } }, // A5:G5
+
+      // Header Info merges (Pembimbing & Jenis Ekskul)
+      { s: { r: 6, c: 0 }, e: { r: 6, c: 3 } }, // A7:D7
+      { s: { r: 6, c: 4 }, e: { r: 6, c: 6 } }, // E7:G7
+      { s: { r: 7, c: 0 }, e: { r: 7, c: 3 } }, // A8:D8
+      { s: { r: 7, c: 4 }, e: { r: 7, c: 6 } }, // E8:G8
+
+      // Table Header merges
+      { s: { r: 9, c: 0 }, e: { r: 10, c: 0 } }, // No (A10:A11)
+      { s: { r: 9, c: 1 }, e: { r: 10, c: 1 } }, // Hari/Tanggal (B10:B11)
+      { s: { r: 9, c: 2 }, e: { r: 9, c: 3 } },  // Waktu (C10:D10)
+      { s: { r: 9, c: 4 }, e: { r: 10, c: 4 } }, // Materi (E10:E11)
+      { s: { r: 9, c: 5 }, e: { r: 10, c: 5 } }, // Tanda Tangan (F10:F11)
+      { s: { r: 9, c: 6 }, e: { r: 10, c: 6 } }  // Siswa Tidak Hadir (G10:G11)
+    ]
+
+    // Set Column Widths
+    ws['!cols'] = [
+      { wch: 6 },   // No
+      { wch: 22 },  // Hari/Tanggal
+      { wch: 10 },  // Mulai
+      { wch: 10 },  // Selesai
+      { wch: 32 },  // Materi
+      { wch: 15 },  // Tanda Tangan
+      { wch: 30 }   // Siswa Tidak Hadir
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Daftar Hadir')
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+    const sanitizedCoachName = coachName.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+    const sanitizedEkskulName = ekskulName.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+    saveAs(new Blob([wbout], { type: 'application/octet-stream' }), `daftar_hadir_${sanitizedCoachName}_${sanitizedEkskulName}_${monthKey}.xlsx`)
+  }
+
   const exportToExcel = (rows, headers, sheetName, filename) => {
     const wb = XLSX.utils.book_new()
     const data = [headers, ...rows]
@@ -982,8 +1083,8 @@ export default function RecapManagement() {
                         <td className="p-4 text-slate-500">{r.coachEmail}</td>
                         <td className="p-4 font-medium text-slate-700">{r.ekskulName}</td>
                         <td className="p-4 text-center text-slate-600 font-medium">{formatMonthYearIndo(r.monthKey)}</td>
-                        <td className="p-4 text-center font-bold text-indigo-600">{r.sessionsCount} Sesi</td>
-                        <td className="p-4 text-center pr-6">
+                        <td className="p-4 text-center pr-6 font-bold text-indigo-600">{r.sessionsCount} Sesi</td>
+                        <td className="p-4 text-center pr-6 space-x-2">
                           <Button 
                             variant="ghost" 
                             size="sm" 
@@ -991,6 +1092,15 @@ export default function RecapManagement() {
                             className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-semibold text-xs"
                           >
                             Lihat Detail
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => exportCoachSessionsDetailToExcel(r)}
+                            className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 hover:border-emerald-300 font-semibold text-xs gap-1"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Unduh Form
                           </Button>
                         </td>
                       </tr>
@@ -1050,7 +1160,14 @@ export default function RecapManagement() {
               </div>
             </div>
             
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+              <Button 
+                onClick={() => exportCoachSessionsDetailToExcel(selectedSessionGroup)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center gap-1.5"
+              >
+                <Download className="w-4 h-4" />
+                Unduh Form Excel
+              </Button>
               <Button onClick={() => setSelectedSessionGroup(null)} variant="outline">
                 Tutup
               </Button>
