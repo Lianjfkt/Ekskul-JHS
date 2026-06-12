@@ -20,7 +20,10 @@ import {
   Users, 
   Download,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Calendar,
+  X,
+  BookOpen
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
@@ -39,6 +42,7 @@ export default function RecapManagement() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [errorMsg, setErrorMsg] = useState('')
+  const [selectedSessionGroup, setSelectedSessionGroup] = useState(null)
 
   // Raw data from DB
   const [extracurriculars, setExtracurriculars] = useState([])
@@ -46,11 +50,14 @@ export default function RecapManagement() {
   const [grades, setGrades] = useState([])
   const [sessions, setSessions] = useState([])
   const [attendances, setAttendances] = useState([])
+  const [coaches, setCoaches] = useState([])
 
   // Filters state
   const [selectedEkskul, setSelectedEkskul] = useState('')
   const [selectedSemester, setSelectedSemester] = useState('')
   const [selectedAcademicYear, setSelectedAcademicYear] = useState('')
+  const [selectedCoach, setSelectedCoach] = useState('')
+  const [selectedMonth, setSelectedMonth] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
@@ -67,13 +74,15 @@ export default function RecapManagement() {
         { data: enrollmentsData, error: enErr },
         { data: gradesData, error: gErr },
         { data: sessionsData, error: sErr },
-        { data: attendancesData, error: aErr }
+        { data: attendancesData, error: aErr },
+        { data: coachesData, error: cErr }
       ] = await Promise.all([
         supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email)').order('name', { ascending: true }),
         supabase.from('enrollments').select('*, student:student_id (id, nis, full_name, class)').eq('status', 'active'),
         supabase.from('grades').select('*, student:student_id (id, nis, full_name, class), extracurricular:extracurricular_id (id, name)'),
-        supabase.from('sessions').select('*, extracurricular:extracurricular_id (id, name)').order('session_date', { ascending: false }),
-        supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)')
+        supabase.from('sessions').select('*, creator:created_by (id, full_name, email), extracurricular:extracurricular_id (id, name, coach:coach_id (id, full_name, email))').order('session_date', { ascending: false }),
+        supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)'),
+        supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true })
       ])
 
       if (eErr) throw eErr
@@ -81,12 +90,14 @@ export default function RecapManagement() {
       if (gErr) throw gErr
       if (sErr) throw sErr
       if (aErr) throw aErr
+      if (cErr) throw cErr
 
       setExtracurriculars(ekskulData || [])
       setEnrollments(enrollmentsData || [])
       setGrades(gradesData || [])
       setSessions(sessionsData || [])
       setAttendances(attendancesData || [])
+      setCoaches(coachesData || [])
     } catch (err) {
       console.error('Error fetching recap data:', err.message)
       setErrorMsg('Gagal memuat data laporan: ' + err.message)
@@ -111,6 +122,75 @@ export default function RecapManagement() {
     ])
     return Array.from(sem).filter(Boolean).sort()
   }, [enrollments, grades])
+
+  // Helpers & memoized hooks for Coach Sessions Recap
+  const availableMonths = useMemo(() => {
+    const months = new Set()
+    sessions.forEach(s => {
+      if (s.session_date) {
+        const yyyymm = s.session_date.substring(0, 7)
+        months.add(yyyymm)
+      }
+    })
+    return Array.from(months).sort().reverse()
+  }, [sessions])
+
+  const formatMonthYearIndo = (yyyymm) => {
+    if (!yyyymm || yyyymm === 'unknown') return 'Bulan Tidak Diketahui'
+    const [year, month] = yyyymm.split('-')
+    const monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+    return `${monthsIndo[parseInt(month, 10) - 1]} ${year}`
+  }
+
+  const getSessionCoach = (session) => {
+    if (session.creator) return session.creator
+    if (session.extracurricular?.coach) return session.extracurricular.coach
+    return { id: 'unknown', full_name: 'Tanpa Pelatih', email: '' }
+  }
+
+  const coachSessionReportRows = useMemo(() => {
+    const groups = {}
+
+    sessions.forEach(s => {
+      const coach = getSessionCoach(s)
+      const ekskul = s.extracurricular || { id: 'unknown', name: 'Ekskul Tidak Diketahui' }
+      const yyyymm = s.session_date ? s.session_date.substring(0, 7) : 'unknown'
+
+      const key = `${coach.id}_${ekskul.id}_${yyyymm}`
+      if (!groups[key]) {
+        groups[key] = {
+          coachId: coach.id,
+          coachName: coach.full_name,
+          coachEmail: coach.email || '-',
+          ekskulId: ekskul.id,
+          ekskulName: ekskul.name,
+          monthKey: yyyymm,
+          sessionsCount: 0,
+          sessionsList: []
+        }
+      }
+      groups[key].sessionsCount++
+      groups[key].sessionsList.push({
+        id: s.id,
+        session_date: s.session_date,
+        topic: s.topic,
+        notes: s.notes
+      })
+    })
+
+    return Object.values(groups).filter(row => {
+      const matchCoach = selectedCoach ? row.coachId === selectedCoach : true
+      const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
+      const matchMonth = selectedMonth ? row.monthKey === selectedMonth : true
+      const matchSearch = searchQuery
+        ? row.coachName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          row.ekskulName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          row.sessionsList.some(s => s.topic?.toLowerCase().includes(searchQuery.toLowerCase()))
+        : true
+
+      return matchCoach && matchEkskul && matchMonth && matchSearch
+    })
+  }, [sessions, selectedCoach, selectedEkskul, selectedMonth, searchQuery])
 
   // --- CORE COMPUTED METRICS ---
   const computedStats = useMemo(() => {
@@ -375,6 +455,19 @@ export default function RecapManagement() {
     exportToExcel(rows, headers, 'Laporan Nilai', 'rekap_nilai_siswa.xlsx')
   }
 
+  const exportCoachSessionsToExcel = () => {
+    const rows = coachSessionReportRows.map(r => [
+      r.coachName,
+      r.coachEmail,
+      r.ekskulName,
+      formatMonthYearIndo(r.monthKey),
+      r.sessionsCount,
+      r.sessionsList.map(s => `${s.session_date} (${s.topic || 'Sesi Latihan'})`).join('; ')
+    ])
+    const headers = ['Nama Pelatih', 'Email Pelatih', 'Ekstrakurikuler', 'Bulan & Tahun', 'Jumlah Sesi', 'Daftar Sesi']
+    exportToExcel(rows, headers, 'Laporan Sesi Pelatih', 'rekap_sesi_pelatih.xlsx')
+  }
+
   const exportToExcel = (rows, headers, sheetName, filename) => {
     const wb = XLSX.utils.book_new()
     const data = [headers, ...rows]
@@ -399,6 +492,18 @@ export default function RecapManagement() {
         'Persentase Absensi': e.attendanceRate
       }))
   }, [computedStats.ekskulSummaries])
+
+  const coachChartData = useMemo(() => {
+    const coachSessionCounts = {}
+    sessions.forEach(s => {
+      const coach = getSessionCoach(s)
+      coachSessionCounts[coach.full_name] = (coachSessionCounts[coach.full_name] || 0) + 1
+    })
+    return Object.entries(coachSessionCounts).map(([name, count]) => ({
+      name,
+      'Jumlah Sesi': count
+    }))
+  }, [sessions])
 
   if (loading) {
     return (
@@ -479,25 +584,48 @@ export default function RecapManagement() {
       {/* Main Recap Visual Chart */}
       <Card className="border-slate-100 shadow-sm bg-white overflow-hidden">
         <CardHeader className="p-6 pb-0">
-          <CardTitle className="text-lg font-bold text-slate-800">Perbandingan Nilai & Absensi Antar Ekskul</CardTitle>
-          <CardDescription>Grafik perbandingan rata-rata nilai akademik dan persentase kehadiran siswa per cabang ekskul</CardDescription>
+          <CardTitle className="text-lg font-bold text-slate-800">
+            {activeTab === 'coachSessions' ? 'Sesi Latihan per Pelatih' : 'Perbandingan Nilai & Absensi Antar Ekskul'}
+          </CardTitle>
+          <CardDescription>
+            {activeTab === 'coachSessions'
+              ? 'Grafik jumlah total sesi latihan yang telah dilaksanakan oleh masing-masing pelatih'
+              : 'Grafik perbandingan rata-rata nilai akademik dan persentase kehadiran siswa per cabang ekskul'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-6">
           <div className="w-full h-[320px]">
-            {chartData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-slate-400 text-sm">Belum ada data visualisasi yang cukup.</div>
+            {activeTab === 'coachSessions' ? (
+              coachChartData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-slate-400 text-sm">Belum ada data visualisasi sesi pelatih.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={coachChartData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} />
+                    <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
+                    <RechartsTooltip />
+                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                    <Bar dataKey="Jumlah Sesi" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} />
-                  <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 11 }} />
-                  <RechartsTooltip />
-                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                  <Bar dataKey="Rata-rata Nilai" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Persentase Absensi" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              chartData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-slate-400 text-sm">Belum ada data visualisasi yang cukup.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} />
+                    <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 11 }} />
+                    <RechartsTooltip />
+                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                    <Bar dataKey="Rata-rata Nilai" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Persentase Absensi" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )
             )}
           </div>
         </CardContent>
@@ -507,7 +635,7 @@ export default function RecapManagement() {
       <div className="space-y-6">
         <div className="flex border-b border-slate-200 gap-6 overflow-x-auto pb-px scrollbar-none">
           <button 
-            onClick={() => { setActiveTab('overview'); setSearchQuery(''); }}
+            onClick={() => { setActiveTab('overview'); setSearchQuery(''); setSelectedEkskul(''); }}
             className={`pb-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
               activeTab === 'overview' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
@@ -515,7 +643,7 @@ export default function RecapManagement() {
             Ringkasan Ekskul
           </button>
           <button 
-            onClick={() => { setActiveTab('attendance'); setSearchQuery(''); }}
+            onClick={() => { setActiveTab('attendance'); setSearchQuery(''); setSelectedEkskul(''); setSelectedSemester(''); setSelectedAcademicYear(''); }}
             className={`pb-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
               activeTab === 'attendance' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
@@ -523,12 +651,20 @@ export default function RecapManagement() {
             Laporan Absensi Siswa
           </button>
           <button 
-            onClick={() => { setActiveTab('grades'); setSearchQuery(''); }}
+            onClick={() => { setActiveTab('grades'); setSearchQuery(''); setSelectedEkskul(''); setSelectedSemester(''); setSelectedAcademicYear(''); }}
             className={`pb-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
               activeTab === 'grades' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             Laporan Nilai Siswa
+          </button>
+          <button 
+            onClick={() => { setActiveTab('coachSessions'); setSearchQuery(''); setSelectedCoach(''); setSelectedEkskul(''); setSelectedMonth(''); }}
+            className={`pb-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
+              activeTab === 'coachSessions' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Laporan Sesi Pelatih
           </button>
         </div>
 
@@ -540,7 +676,11 @@ export default function RecapManagement() {
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
               <input
                 type="text"
-                placeholder={activeTab === 'overview' ? "Cari ekskul atau pelatih..." : "Cari nama siswa atau NIS..."}
+                placeholder={
+                  activeTab === 'overview' ? "Cari ekskul atau pelatih..." : 
+                  activeTab === 'coachSessions' ? "Cari pelatih, ekskul atau materi..." : 
+                  "Cari nama siswa atau NIS..."
+                }
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="w-full text-sm pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
@@ -548,7 +688,7 @@ export default function RecapManagement() {
             </div>
 
             {/* Attendance & Grades Specific Filters */}
-            {activeTab !== 'overview' && (
+            {(activeTab === 'attendance' || activeTab === 'grades') && (
               <>
                 <select
                   value={selectedEkskul}
@@ -584,6 +724,44 @@ export default function RecapManagement() {
                 </select>
               </>
             )}
+
+            {/* Coach Sessions Specific Filters */}
+            {activeTab === 'coachSessions' && (
+              <>
+                <select
+                  value={selectedCoach}
+                  onChange={e => setSelectedCoach(e.target.value)}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                >
+                  <option value="">Semua Pelatih</option>
+                  {coaches.map(c => (
+                    <option key={c.id} value={c.id}>{c.full_name}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedEkskul}
+                  onChange={e => setSelectedEkskul(e.target.value)}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                >
+                  <option value="">Semua Ekskul</option>
+                  {extracurriculars.map(e => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedMonth}
+                  onChange={e => setSelectedMonth(e.target.value)}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                >
+                  <option value="">Semua Bulan</option>
+                  {availableMonths.map(m => (
+                    <option key={m} value={m}>{formatMonthYearIndo(m)}</option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
 
           {/* Export Action Button */}
@@ -591,12 +769,14 @@ export default function RecapManagement() {
             <Button
               onClick={
                 activeTab === 'overview' ? exportEkskulToExcel :
-                activeTab === 'attendance' ? exportAttendanceToExcel : exportGradesToExcel
+                activeTab === 'attendance' ? exportAttendanceToExcel :
+                activeTab === 'coachSessions' ? exportCoachSessionsToExcel : exportGradesToExcel
               }
               disabled={
                 (activeTab === 'overview' && filteredEkskulSummaries.length === 0) ||
                 (activeTab === 'attendance' && attendanceReportRows.length === 0) ||
-                (activeTab === 'grades' && gradeReportRows.length === 0)
+                (activeTab === 'grades' && gradeReportRows.length === 0) ||
+                (activeTab === 'coachSessions' && coachSessionReportRows.length === 0)
               }
               className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-2 w-full md:w-auto"
             >
@@ -774,7 +954,110 @@ export default function RecapManagement() {
             </div>
           </div>
         )}
+
+        {/* Tab 4 Content: Coach Sessions Report */}
+        {activeTab === 'coachSessions' && (
+          <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-500 font-semibold">
+                    <th className="p-4 pl-6">Nama Pelatih</th>
+                    <th className="p-4">Email Pelatih</th>
+                    <th className="p-4">Ekstrakurikuler</th>
+                    <th className="p-4 text-center">Bulan & Tahun</th>
+                    <th className="p-4 text-center">Total Sesi Pertemuan</th>
+                    <th className="p-4 text-center pr-6">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {coachSessionReportRows.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="p-8 text-center text-slate-400">Tidak ada data rekap sesi pelatih yang cocok dengan kriteria filter.</td>
+                    </tr>
+                  ) : (
+                    coachSessionReportRows.map((r, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
+                        <td className="p-4 pl-6 font-semibold text-slate-800">{r.coachName}</td>
+                        <td className="p-4 text-slate-500">{r.coachEmail}</td>
+                        <td className="p-4 font-medium text-slate-700">{r.ekskulName}</td>
+                        <td className="p-4 text-center text-slate-600 font-medium">{formatMonthYearIndo(r.monthKey)}</td>
+                        <td className="p-4 text-center font-bold text-indigo-600">{r.sessionsCount} Sesi</td>
+                        <td className="p-4 text-center pr-6">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setSelectedSessionGroup(r)}
+                            className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-semibold text-xs"
+                          >
+                            Lihat Detail
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Detail Sesi Pelatih Modal */}
+      {selectedSessionGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-100 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <div>
+                <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-indigo-600" />
+                  Detail Sesi Latihan
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pelatih: <span className="font-semibold text-slate-700">{selectedSessionGroup.coachName}</span> | Ekskul: <span className="font-semibold text-slate-700">{selectedSessionGroup.ekskulName}</span>
+                </p>
+              </div>
+              <Button onClick={() => setSelectedSessionGroup(null)} variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[400px] space-y-4">
+              <p className="text-sm font-semibold text-slate-800">
+                Riwayat Sesi untuk Bulan {formatMonthYearIndo(selectedSessionGroup.monthKey)}
+              </p>
+              
+              <div className="space-y-3">
+                {selectedSessionGroup.sessionsList.map((session, sIdx) => (
+                  <div key={session.id || sIdx} className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold font-mono">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {new Date(session.session_date).toLocaleDateString('id-ID', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">{session.topic || 'Sesi Umum'}</p>
+                      <p className="text-xs text-slate-500 mt-1 whitespace-pre-line">{session.notes || 'Tidak ada catatan evaluasi untuk sesi ini.'}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <Button onClick={() => setSelectedSessionGroup(null)} variant="outline">
+                Tutup
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
