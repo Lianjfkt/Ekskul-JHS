@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from '../components/shared/ProtectedRoute'
 import DashboardLayout from '../components/shared/DashboardLayout'
 import Login from '../pages/auth/Login'
+import Register from '../pages/auth/Register'
 import AdminDashboard from '../pages/admin/AdminDashboard'
 import UsersManagement from '../pages/admin/UsersManagement'
 import EkskulManagement from '../pages/admin/EkskulManagement'
@@ -27,6 +28,7 @@ export default function AppRouter() {
     <Routes>
       <Route path="/" element={<Navigate to="/auth/login" replace />} />
       <Route path="/auth/login" element={<Login />} />
+      <Route path="/auth/register" element={<Register />} />
       
       {/* Dashboard Layout Wrapper for Protected Routes */}
       <Route element={<DashboardLayout />}>

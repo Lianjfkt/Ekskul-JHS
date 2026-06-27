@@ -16,6 +16,9 @@ export default function EnrollmentManagement() {
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
 
+  // Tab State ('aktif' / 'pending')
+  const [activeTab, setActiveTab] = useState('aktif')
+
   // Filter States
   const [filterEkskul, setFilterEkskul] = useState('')
   const [filterSemester, setFilterSemester] = useState('')
@@ -72,7 +75,7 @@ export default function EnrollmentManagement() {
         .from('enrollments')
         .select(`
           *,
-          student:student_id (nis, full_name, class),
+          student:student_id (nis, full_name, class, gender, phone),
           extracurricular:extracurricular_id (name)
         `)
         .order('enrolled_at', { ascending: false })
@@ -136,7 +139,7 @@ export default function EnrollmentManagement() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus data pendaftaran ini?')) return
+    if (!confirm('Apakah Anda yakin ingin menghapus/menolak data pendaftaran ini?')) return
     setErrorMsg('')
     try {
       const { error } = await supabase
@@ -144,7 +147,7 @@ export default function EnrollmentManagement() {
         .delete()
         .eq('id', id)
       if (error) throw error
-      setSuccessMsg('Pendaftaran berhasil dihapus.')
+      setSuccessMsg('Pendaftaran berhasil dihapus/ditolak.')
       fetchData()
     } catch (err) {
       setErrorMsg(err.message)
@@ -159,7 +162,7 @@ export default function EnrollmentManagement() {
         .update({ status: newStatus })
         .eq('id', id)
       if (error) throw error
-      setSuccessMsg('Status pendaftaran berhasil diubah.')
+      setSuccessMsg(newStatus === 'active' ? 'Pendaftaran berhasil disetujui!' : 'Status pendaftaran berhasil diubah.')
       fetchData()
     } catch (err) {
       setErrorMsg(err.message)
@@ -182,6 +185,10 @@ export default function EnrollmentManagement() {
 
   // Filter List Pendaftaran
   const filteredEnrollments = enrollments.filter(en => {
+    // Filter berdasarkan tab aktif
+    if (activeTab === 'aktif' && en.status === 'pending') return false
+    if (activeTab === 'pending' && en.status !== 'pending') return false
+
     const matchSearch = 
       en.student?.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       en.student?.nis.includes(searchQuery) ||
@@ -192,6 +199,9 @@ export default function EnrollmentManagement() {
 
     return matchSearch && matchEkskul && matchSemester
   })
+
+  // Hitung jumlah pending approvals
+  const pendingCount = enrollments.filter(en => en.status === 'pending').length
 
   return (
     <div className="space-y-6">
@@ -223,6 +233,37 @@ export default function EnrollmentManagement() {
             <Plus className="w-4 h-4" /> Daftarkan Siswa
           </Button>
         </div>
+      </div>
+
+      {/* Tabs Navigasi */}
+      <div className="flex border-b border-slate-200 gap-2">
+        <button
+          onClick={() => setActiveTab('aktif')}
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all -mb-px ${
+            activeTab === 'aktif'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+          }`}
+        >
+          <Check className="w-4 h-4" />
+          Pendaftaran Aktif
+        </button>
+        <button
+          onClick={() => setActiveTab('pending')}
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all -mb-px relative ${
+            activeTab === 'pending'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          Permintaan Persetujuan
+          {pendingCount > 0 && (
+            <span className="ml-1.5 px-2 py-0.5 rounded-full bg-rose-500 text-[10px] font-bold text-white">
+              {pendingCount}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Filter and Search Bar */}
@@ -280,17 +321,20 @@ export default function EnrollmentManagement() {
                     <th className="px-6 py-4">NIS</th>
                     <th className="px-6 py-4">Nama Siswa</th>
                     <th className="px-6 py-4">Kelas</th>
+                    {activeTab === 'pending' && <th className="px-6 py-4">No. Telp</th>}
                     <th className="px-6 py-4">Ekstrakurikuler</th>
                     <th className="px-6 py-4">Semester</th>
                     <th className="px-6 py-4">Tahun Ajaran</th>
-                    <th className="px-6 py-4">Status</th>
+                    {activeTab === 'aktif' && <th className="px-6 py-4">Status</th>}
                     <th className="px-6 py-4 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
                   {filteredEnrollments.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-6 py-8 text-center text-slate-400">Tidak ada pendaftaran ditemukan.</td>
+                      <td colSpan={activeTab === 'pending' ? 8 : 8} className="px-6 py-8 text-center text-slate-400">
+                        Tidak ada pendaftaran ditemukan.
+                      </td>
                     </tr>
                   ) : (
                     filteredEnrollments.map(en => {
@@ -306,27 +350,52 @@ export default function EnrollmentManagement() {
                           <td className="px-6 py-4">
                             <span className="px-2.5 py-1 text-xs font-semibold bg-slate-100 text-slate-800 rounded-full">{en.student?.class}</span>
                           </td>
+                          {activeTab === 'pending' && (
+                            <td className="px-6 py-4 text-slate-500 font-mono text-xs">{en.student?.phone || '-'}</td>
+                          )}
                           <td className="px-6 py-4 font-bold text-slate-950 flex items-center gap-1.5 mt-2.5">
                             <Award className="w-4 h-4 text-primary" />
                             {en.extracurricular?.name}
                           </td>
                           <td className="px-6 py-4">{en.semester}</td>
                           <td className="px-6 py-4 text-slate-500 font-mono text-xs">{en.academic_year}</td>
-                          <td className="px-6 py-4">
-                            <select
-                              value={en.status}
-                              onChange={(e) => handleStatusChange(en.id, e.target.value)}
-                              className={`px-2.5 py-1 rounded-full text-xs font-medium border-0 cursor-pointer focus:ring-2 focus:ring-primary ${statusStyle}`}
-                            >
-                              <option value="active" className="bg-white text-slate-800">Aktif</option>
-                              <option value="inactive" className="bg-white text-slate-800">Non-aktif</option>
-                              <option value="completed" className="bg-white text-slate-800">Selesai</option>
-                            </select>
-                          </td>
+                          {activeTab === 'aktif' && (
+                            <td className="px-6 py-4">
+                              <select
+                                value={en.status}
+                                onChange={(e) => handleStatusChange(en.id, e.target.value)}
+                                className={`px-2.5 py-1 rounded-full text-xs font-medium border-0 cursor-pointer focus:ring-2 focus:ring-primary ${statusStyle}`}
+                              >
+                                <option value="active" className="bg-white text-slate-800">Aktif</option>
+                                <option value="inactive" className="bg-white text-slate-800">Non-aktif</option>
+                                <option value="completed" className="bg-white text-slate-800">Selesai</option>
+                              </select>
+                            </td>
+                          )}
                           <td className="px-6 py-4 text-right">
-                            <Button onClick={() => handleDelete(en.id)} variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {activeTab === 'aktif' ? (
+                              <Button onClick={() => handleDelete(en.id)} variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            ) : (
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  onClick={() => handleStatusChange(en.id, 'active')}
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1 h-8 text-xs"
+                                >
+                                  <Check className="w-3.5 h-3.5" /> Setujui
+                                </Button>
+                                <Button 
+                                  onClick={() => handleDelete(en.id)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-destructive border-destructive/20 hover:bg-destructive/10 gap-1 h-8 text-xs"
+                                >
+                                  <X className="w-3.5 h-3.5" /> Tolak
+                                </Button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       )

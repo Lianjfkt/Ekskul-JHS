@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -120,6 +120,9 @@ export default function Login() {
                   "Masuk ke Akun"
                 )}
               </Button>
+              <div className="text-center text-sm text-slate-400 mt-4">
+                Belum punya akun? <Link to="/auth/register" className="text-indigo-400 hover:text-indigo-300 font-bold transition-colors">Daftar sebagai Siswa</Link>
+              </div>
             </form>
           </CardContent>
 
