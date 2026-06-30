@@ -33,7 +33,7 @@ export default function BottomNavigation() {
   const currentMenu = menus[role] || []
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 lg:hidden z-50 pb-safe">
+    <div className="fixed bottom-0 left-0 right-0 bg-pixel-panel border-t-4 border-pixel-gray lg:hidden z-50 pb-safe">
       <div className="flex justify-around items-center h-16">
         {currentMenu.map((item) => {
           // Check if active (exact match for dashboard, startsWith for others)
@@ -48,12 +48,12 @@ export default function BottomNavigation() {
               key={item.path}
               to={item.path}
               className={cn(
-                "flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors",
-                isActive ? "text-primary" : "text-slate-500 hover:text-slate-800"
+                "flex flex-col items-center justify-center w-full h-full space-y-1",
+                isActive ? "text-pixel-blue" : "text-pixel-lavender hover:text-pixel-peach"
               )}
             >
-              <Icon className={cn("w-5 h-5", isActive && "fill-primary/20")} />
-              <span className="text-[10px] font-medium">{item.name}</span>
+              <Icon className={cn("w-5 h-5", isActive && "pixel-text-glow")} />
+              <span className="font-pixel text-[6px] uppercase tracking-wider">{item.name}</span>
             </Link>
           )
         })}

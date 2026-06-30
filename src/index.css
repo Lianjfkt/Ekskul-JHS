@@ -4,56 +4,276 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    /* ===== PIXEL ART COLOR PALETTE (PICO-8 Inspired) ===== */
+    --pixel-black: #1D2B53;
+    --pixel-dark-purple: #7E2553;
+    --pixel-red: #FF004D;
+    --pixel-orange: #FFA300;
+    --pixel-yellow: #FFEC27;
+    --pixel-green: #00E436;
+    --pixel-blue: #29ADFF;
+    --pixel-lavender: #83769C;
+    --pixel-pink: #FF77A8;
+    --pixel-peach: #FFCCAA;
+    --pixel-white: #FFF1E8;
+    --pixel-dark-gray: #5F574F;
+    --pixel-mid-gray: #C2C3C7;
+    --pixel-deep-navy: #0D1B2A;
+    --pixel-panel: #2A1F3D;
+    --pixel-panel-light: #3D2E56;
+
+    /* ===== SHADCN DESIGN TOKEN OVERRIDES ===== */
+    --background: 230 60% 12%;
+    --foreground: 30 80% 92%;
+    --card: 270 30% 18%;
+    --card-foreground: 30 80% 92%;
+    --popover: 270 30% 18%;
+    --popover-foreground: 30 80% 92%;
+    --primary: 203 100% 58%;
+    --primary-foreground: 230 60% 12%;
+    --secondary: 270 25% 25%;
+    --secondary-foreground: 30 80% 92%;
+    --muted: 270 20% 22%;
+    --muted-foreground: 260 12% 55%;
+    --accent: 330 100% 55%;
+    --accent-foreground: 30 80% 92%;
+    --destructive: 345 100% 50%;
+    --destructive-foreground: 30 80% 92%;
+    --border: 260 15% 30%;
+    --input: 260 15% 30%;
+    --ring: 203 100% 58%;
+    --radius: 0px;
   }
- 
+
+  /* Dark mode uses the same pixel palette — pixel art is always "dark" */
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --background: 230 60% 8%;
+    --foreground: 30 80% 92%;
+    --card: 270 30% 14%;
+    --card-foreground: 30 80% 92%;
+    --popover: 270 30% 14%;
+    --popover-foreground: 30 80% 92%;
+    --primary: 203 100% 58%;
+    --primary-foreground: 230 60% 8%;
+    --secondary: 270 25% 20%;
+    --secondary-foreground: 30 80% 92%;
+    --muted: 270 20% 18%;
+    --muted-foreground: 260 12% 50%;
+    --accent: 330 100% 55%;
+    --accent-foreground: 30 80% 92%;
+    --destructive: 345 100% 50%;
+    --destructive-foreground: 30 80% 92%;
+    --border: 260 15% 25%;
+    --input: 260 15% 25%;
+    --ring: 203 100% 58%;
   }
 }
- 
+
 @layer base {
   * {
-    @apply border-border transition-colors duration-200;
+    @apply border-border;
+    transition: none !important;
   }
+
   body {
-    @apply bg-background text-foreground transition-colors duration-200 antialiased;
+    @apply bg-background text-foreground;
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    line-height: 1.4;
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: unset;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  /* Pixel heading font */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Press Start 2P', cursive;
+    line-height: 1.6;
+  }
+
+  /* Pixel-style scrollbar */
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--pixel-deep-navy);
+    border: 2px solid var(--pixel-dark-gray);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--pixel-lavender);
+    border: 2px solid var(--pixel-dark-gray);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--pixel-blue);
+  }
+}
+
+@layer components {
+  /* ===== PIXEL BORDER UTILITIES ===== */
+  .pixel-border {
+    border: 3px solid var(--pixel-dark-gray);
+    box-shadow:
+      inset -3px -3px 0 0 rgba(0, 0, 0, 0.4),
+      inset 3px 3px 0 0 rgba(255, 255, 255, 0.15);
+  }
+
+  .pixel-border-light {
+    border: 2px solid var(--pixel-lavender);
+    box-shadow:
+      inset -2px -2px 0 0 rgba(0, 0, 0, 0.3),
+      inset 2px 2px 0 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .pixel-border-accent {
+    border: 3px solid var(--pixel-blue);
+    box-shadow:
+      inset -3px -3px 0 0 rgba(0, 0, 0, 0.3),
+      inset 3px 3px 0 0 rgba(255, 255, 255, 0.15);
+  }
+
+  /* ===== PIXEL BOX (raised panel) ===== */
+  .pixel-box {
+    background: var(--pixel-panel);
+    border: 3px solid var(--pixel-dark-gray);
+    box-shadow:
+      inset -3px -3px 0 0 rgba(0, 0, 0, 0.4),
+      inset 3px 3px 0 0 rgba(255, 255, 255, 0.12),
+      4px 4px 0 0 rgba(0, 0, 0, 0.5);
+  }
+
+  .pixel-box-flat {
+    background: var(--pixel-panel);
+    border: 3px solid var(--pixel-dark-gray);
+    box-shadow:
+      inset -3px -3px 0 0 rgba(0, 0, 0, 0.4),
+      inset 3px 3px 0 0 rgba(255, 255, 255, 0.12);
+  }
+
+  /* ===== PIXEL BUTTON STATES ===== */
+  .pixel-btn {
+    font-family: 'Press Start 2P', cursive;
+    border: 3px solid var(--pixel-dark-gray);
+    box-shadow:
+      inset -3px -3px 0 0 rgba(0, 0, 0, 0.4),
+      inset 3px 3px 0 0 rgba(255, 255, 255, 0.2),
+      3px 3px 0 0 rgba(0, 0, 0, 0.6);
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .pixel-btn:hover {
+    filter: brightness(1.15);
+  }
+
+  .pixel-btn:active {
+    transform: translate(3px, 3px) !important;
+    box-shadow:
+      inset -3px -3px 0 0 rgba(255, 255, 255, 0.1),
+      inset 3px 3px 0 0 rgba(0, 0, 0, 0.4) !important;
+  }
+
+  /* ===== PIXEL INPUT ===== */
+  .pixel-input {
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+    background: var(--pixel-deep-navy);
+    border: 3px solid var(--pixel-dark-gray);
+    color: var(--pixel-white);
+    box-shadow:
+      inset 3px 3px 0 0 rgba(0, 0, 0, 0.5),
+      inset -3px -3px 0 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .pixel-input:focus {
+    border-color: var(--pixel-blue);
+    outline: none;
+    box-shadow:
+      inset 3px 3px 0 0 rgba(0, 0, 0, 0.5),
+      inset -3px -3px 0 0 rgba(255, 255, 255, 0.05),
+      0 0 0 2px var(--pixel-blue);
+  }
+
+  .pixel-input::placeholder {
+    color: var(--pixel-lavender);
+    opacity: 0.6;
+  }
+
+  /* ===== PIXEL BACKGROUND PATTERN ===== */
+  .pixel-bg-grid {
+    background-image:
+      linear-gradient(to right, rgba(95, 87, 79, 0.15) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(95, 87, 79, 0.15) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+
+  .pixel-bg-dots {
+    background-image: radial-gradient(circle, rgba(131, 118, 156, 0.15) 1px, transparent 1px);
+    background-size: 8px 8px;
+  }
+
+  /* ===== PIXEL ANIMATIONS (stepped, not smooth) ===== */
+  @keyframes pixel-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+
+  @keyframes pixel-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  @keyframes pixel-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(41, 173, 255, 0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(41, 173, 255, 0); }
+  }
+
+  @keyframes pixel-slide-in {
+    from { transform: translateY(-8px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .pixel-blink {
+    animation: pixel-blink 1s steps(2) infinite;
+  }
+
+  .pixel-bounce {
+    animation: pixel-bounce 0.6s steps(4) infinite;
+  }
+
+  .pixel-pulse {
+    animation: pixel-pulse 1.5s steps(4) infinite;
+  }
+
+  .pixel-slide-in {
+    animation: pixel-slide-in 0.3s steps(4) forwards;
+  }
+
+  /* ===== PIXEL TEXT SHADOW ===== */
+  .pixel-text-shadow {
+    text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .pixel-text-glow {
+    text-shadow: 0 0 8px currentColor;
+  }
+
+  /* ===== PIXEL BADGE ===== */
+  .pixel-badge {
+    font-family: 'Press Start 2P', cursive;
+    font-size: 8px;
+    padding: 4px 8px;
+    border: 2px solid;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ===== SELECT DROPDOWN PIXEL ===== */
+  select option {
+    font-family: 'VT323', monospace;
+    background: var(--pixel-panel);
+    color: var(--pixel-white);
   }
 }

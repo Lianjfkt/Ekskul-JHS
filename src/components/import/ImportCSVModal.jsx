@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { X, FileSpreadsheet, ChevronRight, ChevronLeft, Upload, Download, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, FileSpreadsheet, ChevronRight, ChevronLeft, Upload, Download } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 
 import { parseFile } from '../../utils/excelParser'
@@ -20,21 +20,12 @@ const STEP_IMPORT   = 3
 const STEP_RESULT   = 4
 
 const STEP_LABELS = {
-  [STEP_UPLOAD]:  'Upload File',
-  [STEP_PREVIEW]: 'Preview & Validasi',
-  [STEP_IMPORT]:  'Proses Import',
-  [STEP_RESULT]:  'Hasil Import',
+  [STEP_UPLOAD]:  'Upload',
+  [STEP_PREVIEW]: 'Validasi',
+  [STEP_IMPORT]:  'Proses',
+  [STEP_RESULT]:  'Hasil',
 }
 
-/**
- * ImportCSVModal – Full-featured 4-step import modal.
- *
- * Props:
- *  isOpen   – boolean
- *  onClose  – () => void – called after import done or cancelled
- *  type     – 'students' | 'enrollments'
- *  onSuccess – () => void – called to refresh parent table
- */
 export default function ImportCSVModal({ isOpen, onClose, type = 'students', onSuccess }) {
   const [step, setStep] = useState(STEP_UPLOAD)
 
@@ -63,7 +54,7 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
 
   const activeImport = type === 'students' ? studentImport : enrollmentImport
 
-  // ── Load reference data from DB ──────────────────────────────────────────────
+  // Load reference data from DB
   useEffect(() => {
     if (!isOpen) return
     loadReferenceData()
@@ -72,14 +63,12 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
   async function loadReferenceData() {
     setIsLoadingRef(true)
     try {
-      // Always fetch students (for NIS lookup)
       const { data: students } = await supabase
         .from('students')
         .select('id, nis')
       const nis = (students || []).map((s) => s.nis)
       setExistingNis(nis)
 
-      // Map NIS → student UUID for enrollment import
       const map = {}
       ;(students || []).forEach((s) => { map[s.nis] = s.id })
       setNisToStudentId(map)
@@ -95,7 +84,7 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
     setIsLoadingRef(false)
   }
 
-  // ── Reset on close ───────────────────────────────────────────────────────────
+  // Reset on close
   function handleClose() {
     setStep(STEP_UPLOAD)
     setFile(null)
@@ -110,7 +99,7 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
     onClose()
   }
 
-  // ── Step 1 → 2: Parse file ───────────────────────────────────────────────────
+  // Step 1 → 2: Parse file
   async function handleFileSelected(selectedFile) {
     setFile(selectedFile)
     setParseError('')
@@ -133,7 +122,7 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
     setStep(STEP_PREVIEW)
   }
 
-  // ── Validation ───────────────────────────────────────────────────────────────
+  // Validation
   async function runValidation(rows) {
     setIsValidating(true)
     let result
@@ -151,7 +140,7 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
     setIsValidating(false)
   }
 
-  // ── Step 3: Start import ─────────────────────────────────────────────────────
+  // Step 3: Start import
   async function handleStartImport() {
     setStep(STEP_IMPORT)
 
@@ -168,74 +157,66 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
     }
   }
 
-  // ── Derived ──────────────────────────────────────────────────────────────────
   const errorIndices  = new Set(errorRows.map((e) => e._index))
   const updateIndices = new Set(updateRows.map((r) => r._index))
   const canImport     = (validRows.length + updateRows.length) > 0 && missingCols.length === 0
   const totalRows     = rawRows.length
 
-  // ── Render ───────────────────────────────────────────────────────────────────
   if (!isOpen) return null
 
   const isStudents    = type === 'students'
-  const modalTitle    = isStudents ? 'Import Data Siswa' : 'Import Data Enrollment Ekskul'
+  const modalTitle    = isStudents ? 'IMPORT DATA SISWA' : 'IMPORT PENDAFTARAN'
   const modalSubtitle = isStudents
     ? 'Format: .csv / .xlsx dengan kolom nis, full_name, class, gender, phone'
     : 'Format: .csv / .xlsx dengan kolom nis, extracurricular_name, semester, academic_year'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
+      <div className="pixel-box bg-pixel-panel w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden pixel-slide-in">
 
-        {/* ── Header ─────────────────────────────────────────────────────────── */}
-        <div className="flex items-start justify-between px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex-shrink-0">
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 py-5 border-b-3 border-pixel-gray bg-pixel-navy flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <FileSpreadsheet className="w-5 h-5 text-primary" />
+            <div className="w-10 h-10 bg-pixel-blue/15 border-2 border-pixel-blue flex items-center justify-center">
+              <FileSpreadsheet className="w-5 h-5 text-pixel-blue" />
             </div>
             <div>
-              <h2 className="font-bold text-slate-900 text-lg leading-tight">{modalTitle}</h2>
-              <p className="text-xs text-slate-500 mt-0.5">{modalSubtitle}</p>
+              <h2 className="font-pixel text-[10px] text-pixel-white pixel-text-shadow leading-relaxed">{modalTitle}</h2>
+              <p className="font-retro text-base text-pixel-lavender mt-1">{modalSubtitle}</p>
             </div>
           </div>
-          <button onClick={handleClose} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors mt-0.5">
+          <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center text-pixel-lavender hover:text-pixel-red border-2 border-transparent hover:border-pixel-red">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* ── Step Indicator ─────────────────────────────────────────────────── */}
-        <div className="flex items-center px-6 py-3 border-b border-slate-100 bg-slate-50/70 gap-1 flex-shrink-0">
+        {/* Step Indicator */}
+        <div className="flex items-center px-6 py-3 border-b-3 border-pixel-gray bg-pixel-navy/40 gap-2 flex-shrink-0 font-pixel text-[8px]">
           {[STEP_UPLOAD, STEP_PREVIEW, STEP_IMPORT, STEP_RESULT].map((s, i) => (
-            <div key={s} className="flex items-center gap-1">
-              {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-slate-300" />}
-              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
+            <div key={s} className="flex items-center gap-2">
+              {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-pixel-lavender" />}
+              <div className={`flex items-center gap-1.5 px-2 py-1 border-2 ${
                 step === s
-                  ? 'bg-primary text-white shadow-sm'
+                  ? 'border-pixel-blue text-pixel-blue bg-pixel-blue/10'
                   : step > s
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'text-slate-400'
+                  ? 'border-pixel-green text-pixel-green bg-pixel-green/10'
+                  : 'border-transparent text-pixel-lavender'
               }`}>
-                <span className={`w-4 h-4 rounded-full text-[10px] flex items-center justify-center font-bold ${
-                  step > s ? 'bg-emerald-500 text-white' : step === s ? 'bg-white/30' : 'bg-slate-200 text-slate-500'
-                }`}>
-                  {step > s ? '✓' : s}
-                </span>
                 {STEP_LABELS[s]}
               </div>
             </div>
           ))}
         </div>
 
-        {/* ── Body (scrollable) ──────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-5 font-retro text-lg">
 
-          {/* STEP 1 – Upload */}
+          {/* STEP 1 */}
           {step === STEP_UPLOAD && (
             <div className="space-y-4">
               {isLoadingRef && (
-                <div className="flex items-center gap-2 text-sm text-slate-500 p-3 bg-slate-50 rounded-lg">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Memuat data referensi dari database...
+                <div className="flex items-center gap-2 text-pixel-lavender p-3 bg-pixel-navy border-2 border-pixel-gray">
+                  <span className="pixel-blink">MEMUAT DATA REFERENSI...</span>
                 </div>
               )}
               <FileDropzone
@@ -248,72 +229,66 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
                 }
               />
               {isParsing && (
-                <div className="flex items-center gap-2 text-sm text-slate-500 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                  Membaca dan memproses file...
+                <div className="flex items-center gap-2 text-pixel-blue p-3 bg-pixel-blue/10 border-2 border-pixel-blue">
+                  <span className="pixel-blink">MEMPROSES FILE...</span>
                 </div>
               )}
               {parseError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                <div className="p-3 bg-pixel-red/10 border-2 border-pixel-red text-pixel-red">
                   ❌ {parseError}
                 </div>
               )}
             </div>
           )}
 
-          {/* STEP 2 – Preview & Validasi */}
+          {/* STEP 2 */}
           {step === STEP_PREVIEW && (
             <div className="space-y-4">
-              {/* Missing columns error */}
               {missingCols.length > 0 && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 space-y-1">
-                  <p className="font-bold">❌ Kolom wajib tidak ditemukan dalam file:</p>
-                  <p className="font-mono bg-red-100 rounded px-2 py-1 text-red-800">
+                <div className="p-4 bg-pixel-red/10 border-3 border-pixel-red text-pixel-red space-y-1">
+                  <p className="font-pixel text-[8px] uppercase">❌ KOLOM WAJIB TIDAK DITEMUKAN:</p>
+                  <p className="font-mono bg-pixel-navy p-2 border border-pixel-red">
                     {missingCols.join(', ')}
                   </p>
-                  <p className="text-xs text-red-500 mt-1">
-                    Pastikan header file sesuai dengan template. Gunakan tombol "Download Template" untuk panduan.
+                  <p className="text-sm mt-1">
+                    Gunakan tombol "Download Template" untuk panduan struktur kolom.
                   </p>
                 </div>
               )}
 
-              {/* Summary badges */}
               {missingCols.length === 0 && (
                 <div className="flex flex-wrap gap-2">
-                  <div className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 font-medium">
-                    📊 Total data: <strong>{totalRows} baris</strong>
+                  <div className="pixel-badge border-pixel-gray text-pixel-peach">
+                    TOTAL: {totalRows}
                   </div>
-                  <div className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">
-                    ✅ Siap diimport: <strong>{validRows.length} baris baru</strong>
+                  <div className="pixel-badge border-pixel-green text-pixel-green bg-pixel-green/5">
+                    BARU: {validRows.length}
                   </div>
                   {updateRows.length > 0 && (
-                    <div className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 font-medium">
-                      🔄 Akan diperbarui: <strong>{updateRows.length} baris</strong>
+                    <div className="pixel-badge border-pixel-orange text-pixel-orange bg-pixel-orange/5">
+                      UPDATE: {updateRows.length}
                     </div>
                   )}
                   {errorRows.length > 0 && (
-                    <div className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full bg-red-100 text-red-700 font-medium">
-                      ❌ Error: <strong>{errorRows.length} baris</strong>
+                    <div className="pixel-badge border-pixel-red text-pixel-red bg-pixel-red/5">
+                      ERROR: {errorRows.length}
                     </div>
                   )}
                 </div>
               )}
 
               {isValidating && (
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Memvalidasi data...
+                <div className="flex items-center gap-2 text-pixel-lavender">
+                  <span className="pixel-blink">MEMVALIDASI DATA...</span>
                 </div>
               )}
 
-              {/* Validation errors */}
               <ValidationErrors errors={errorRows} />
 
-              {/* Preview table */}
               {missingCols.length === 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                    Preview 10 Baris Pertama
+                  <p className="font-pixel text-[8px] text-pixel-lavender uppercase mb-2">
+                    PREVIEW 10 BARIS PERTAMA
                   </p>
                   <PreviewTable
                     rows={rawRows}
@@ -326,7 +301,7 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
             </div>
           )}
 
-          {/* STEP 3 – Import in progress */}
+          {/* STEP 3 */}
           {step === STEP_IMPORT && (
             <div className="py-4">
               <ImportProgress
@@ -337,7 +312,7 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
             </div>
           )}
 
-          {/* STEP 4 – Result */}
+          {/* STEP 4 */}
           {step === STEP_RESULT && (
             <div className="py-2">
               <ImportProgress
@@ -349,17 +324,15 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
           )}
         </div>
 
-        {/* ── Footer Actions ─────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex-shrink-0">
-          {/* Left */}
+        {/* Footer Actions */}
+        <div className="flex items-center justify-between px-6 py-4 border-t-3 border-pixel-gray bg-pixel-navy/40 flex-shrink-0">
           <div>
             {step === STEP_PREVIEW && (
               <button
                 onClick={() => { setStep(STEP_UPLOAD); setFile(null); setRawRows([]) }}
-                className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                className="flex items-center gap-1 text-pixel-lavender hover:text-pixel-peach border-2 border-transparent hover:border-pixel-gray px-3 py-1 font-retro text-lg"
               >
-                <ChevronLeft className="w-4 h-4" />
-                Ganti File
+                <ChevronLeft className="w-4 h-4" /> GANTI FILE
               </button>
             )}
             {step === STEP_RESULT && activeImport.result?.failed?.length > 0 && (
@@ -367,34 +340,30 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
                 onClick={() => downloadErrorLog(errorRows.concat(
                   (activeImport.result?.failed || []).map(f => ({ row: f.row, nis: f.nis, errors: [f.error], _raw: {} }))
                 ), type)}
-                className="flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-800 border border-amber-200 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 border-2 border-pixel-orange bg-pixel-orange/10 text-pixel-orange px-3 py-1.5 font-retro text-lg"
               >
-                <Download className="w-4 h-4" />
-                Download Log Error
+                <Download className="w-4 h-4" /> DOWNLOAD LOG ERROR
               </button>
             )}
           </div>
 
-          {/* Right */}
           <div className="flex gap-2">
             {step !== STEP_IMPORT && (
-              <button
+              <Button
+                variant="outline"
                 onClick={handleClose}
-                className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-100 transition-colors"
               >
-                {step === STEP_RESULT ? 'Selesai' : 'Batal'}
-              </button>
+                {step === STEP_RESULT ? 'SELESAI' : 'BATAL'}
+              </Button>
             )}
 
             {step === STEP_PREVIEW && (
-              <button
+              <Button
                 onClick={handleStartImport}
                 disabled={!canImport || isValidating}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
               >
-                <Upload className="w-4 h-4" />
-                Import Sekarang ({validRows.length + updateRows.length} baris)
-              </button>
+                <Upload className="w-4 h-4 mr-2" /> IMPORT SEKARANG
+              </Button>
             )}
           </div>
         </div>

@@ -21,17 +21,17 @@ export default function ParentLayout() {
   const [showChildDropdown, setShowChildDropdown] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-sky-50">
+    <div className="min-h-screen bg-pixel-navy pixel-bg-grid">
       {/* Top Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-blue-100 shadow-sm">
+      <header className="sticky top-0 z-50 bg-pixel-panel border-b-4 border-pixel-gray">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           {/* Logo */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-200">
-              <Shield className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-none bg-pixel-blue border-2 border-pixel-gray flex items-center justify-center shadow-pixel-sm">
+              <Shield className="w-4 h-4 text-pixel-white" />
             </div>
-            <span className="font-bold text-slate-800 hidden sm:block text-sm tracking-tight">
-              Orang Tua <span className="text-blue-600">Portal</span>
+            <span className="font-pixel text-[9px] text-pixel-peach hidden sm:block tracking-tight">
+              Orang Tua <span className="text-pixel-blue">Portal</span>
             </span>
           </div>
 
@@ -40,32 +40,32 @@ export default function ParentLayout() {
             <div className="flex-1 max-w-xs relative">
               <button
                 onClick={() => setShowChildDropdown(!showChildDropdown)}
-                className="w-full flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-left hover:bg-blue-100 transition-colors"
+                className="w-full flex items-center gap-2 bg-pixel-navy border-2 border-pixel-gray rounded-none px-3 py-2 text-left hover:bg-pixel-panel-light"
               >
-                <Users className="w-4 h-4 text-blue-500 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-blue-400 leading-none">Anda melihat data:</p>
-                  <p className="text-sm font-semibold text-slate-800 truncate leading-tight">
+                <Users className="w-4 h-4 text-pixel-blue shrink-0" />
+                <div className="flex-1 min-w-0 font-retro text-lg">
+                  <p className="text-base text-pixel-lavender leading-none">Melihat data:</p>
+                  <p className="font-semibold text-pixel-white truncate leading-tight">
                     {selectedChild?.full_name || 'Pilih anak'}
                   </p>
                 </div>
                 {children.length > 1 && (
-                  <ChevronDown className={`w-4 h-4 text-blue-400 transition-transform shrink-0 ${showChildDropdown ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 text-pixel-lavender transition-transform shrink-0 ${showChildDropdown ? 'rotate-180' : ''}`} />
                 )}
               </button>
 
               {showChildDropdown && children.length > 1 && (
-                <div className="absolute top-full mt-1 left-0 right-0 bg-white rounded-xl shadow-lg border border-blue-100 overflow-hidden z-50">
+                <div className="absolute top-full mt-1 left-0 right-0 bg-pixel-panel border-3 border-pixel-gray rounded-none shadow-pixel z-50 divide-y-2 divide-pixel-gray/25">
                   {children.map(child => (
                     <button
                       key={child.id}
                       onClick={() => { setSelectedChild(child); setShowChildDropdown(false) }}
-                      className={`w-full text-left px-4 py-3 text-sm hover:bg-blue-50 transition-colors ${
-                        selectedChild?.id === child.id ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-700'
+                      className={`w-full text-left px-4 py-3 font-retro text-lg hover:bg-pixel-panel-light ${
+                        selectedChild?.id === child.id ? 'bg-pixel-blue/20 font-semibold text-pixel-blue' : 'text-pixel-peach'
                       }`}
                     >
                       <p className="font-medium">{child.full_name}</p>
-                      <p className="text-xs text-slate-500">{child.class} · NIS: {child.nis}</p>
+                      <p className="text-base text-pixel-lavender">{child.class} · NIS: {child.nis}</p>
                     </button>
                   ))}
                 </div>
@@ -75,13 +75,13 @@ export default function ParentLayout() {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2 shrink-0">
-            <button className="relative p-2 rounded-xl hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition-colors">
+            <button className="relative p-2 rounded-none hover:bg-pixel-panel-light border-2 border-transparent hover:border-pixel-gray text-pixel-lavender hover:text-pixel-blue">
               <Bell className="w-5 h-5" />
             </button>
             <button
               onClick={logout}
               title="Logout"
-              className="p-2 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors"
+              className="p-2 rounded-none hover:bg-pixel-panel-light border-2 border-transparent hover:border-pixel-red text-pixel-lavender hover:text-pixel-red"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -101,10 +101,10 @@ export default function ParentLayout() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-none border-2 font-retro text-lg ${
                   isActive
-                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-200'
-                    : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700'
+                    ? 'bg-pixel-blue/20 text-pixel-blue border-pixel-blue pixel-text-shadow'
+                    : 'text-pixel-peach border-transparent hover:bg-pixel-panel-light hover:border-pixel-gray'
                 }`}
               >
                 <Icon className="w-4 h-4 shrink-0" />
@@ -121,7 +121,7 @@ export default function ParentLayout() {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-blue-100 shadow-lg z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-pixel-panel border-t-4 border-pixel-gray z-50">
         <div className="grid grid-cols-4 h-16 max-w-sm mx-auto">
           {navItems.map(item => {
             const isActive = location.pathname === item.path ||
@@ -131,14 +131,14 @@ export default function ParentLayout() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center justify-center gap-0.5 transition-all ${
-                  isActive ? 'text-blue-600' : 'text-slate-400'
+                className={`flex flex-col items-center justify-center gap-0.5 ${
+                  isActive ? 'text-pixel-blue' : 'text-pixel-lavender'
                 }`}
               >
-                <div className={`p-1.5 rounded-xl transition-all duration-200 ${isActive ? 'bg-blue-100 scale-110' : ''}`}>
+                <div className={`p-1.5 rounded-none ${isActive ? 'bg-pixel-blue/20 border-2 border-pixel-blue scale-110' : ''}`}>
                   <Icon className="w-5 h-5" />
                 </div>
-                <span className="text-[10px] font-semibold">{item.name}</span>
+                <span className="font-pixel text-[6px] uppercase tracking-wider">{item.name}</span>
               </Link>
             )
           })}

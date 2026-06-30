@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Menu, LogOut, User as UserIcon, Bell, Sun, Moon } from 'lucide-react'
+import { Menu, LogOut, User as UserIcon, Bell } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useParentChildren } from '../../hooks/useParentChildren'
 import { Button } from '../ui/button'
@@ -17,20 +17,6 @@ export default function Navbar({ onMenuClick }) {
   const { user, role, logout } = useAuthStore()
   const { children, selectedChild, setSelectedChild, fetchChildren } = useParentChildren()
   const [userData, setUserData] = useState(null)
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
-
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-    localStorage.setItem('theme', theme)
-  }, [theme])
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light')
-  }
 
   useEffect(() => {
     if (user && role === 'parent') {
@@ -52,18 +38,18 @@ export default function Navbar({ onMenuClick }) {
   }, [user, role, fetchChildren])
 
   return (
-    <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 h-16 flex items-center justify-between px-4 lg:px-8 shadow-sm shrink-0">
+    <header className="bg-pixel-panel border-b-4 border-pixel-gray h-16 flex items-center justify-between px-4 lg:px-8 shrink-0">
       <div className="flex items-center gap-4">
         <button 
           onClick={onMenuClick}
-          className="p-2 -ml-2 mr-2 lg:hidden rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+          className="p-2 -ml-2 mr-2 lg:hidden rounded-none text-pixel-peach hover:bg-pixel-panel-light border-2 border-transparent hover:border-pixel-gray"
         >
           <Menu className="w-6 h-6" />
         </button>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 capitalize hidden sm:block">
+        <h2 className="font-pixel text-[9px] text-pixel-peach pixel-text-shadow capitalize hidden sm:block leading-relaxed">
           {role === 'parent' ? (
             <div className="flex items-center gap-2">
-              <span className="text-slate-500 dark:text-slate-400 text-sm font-normal">Anda melihat data:</span>
+              <span className="text-pixel-lavender font-retro text-base">Data:</span>
               {children.length > 1 ? (
                 <Select
                   value={selectedChild?.id || ''}
@@ -72,7 +58,7 @@ export default function Navbar({ onMenuClick }) {
                     if (child) setSelectedChild(child)
                   }}
                 >
-                  <SelectTrigger className="h-8 border-none bg-slate-50 dark:bg-slate-800 font-semibold shadow-none focus:ring-0 w-[180px] text-slate-800 dark:text-slate-100">
+                  <SelectTrigger className="h-8 border-2 border-pixel-gray bg-pixel-navy font-retro text-base w-[180px] text-pixel-blue">
                     <SelectValue placeholder="Pilih Anak" />
                   </SelectTrigger>
                   <SelectContent>
@@ -82,7 +68,7 @@ export default function Navbar({ onMenuClick }) {
                   </SelectContent>
                 </Select>
               ) : (
-                <span className="font-semibold text-violet-600 dark:text-violet-400">{selectedChild?.full_name || '...'}</span>
+                <span className="font-retro text-lg text-pixel-blue">{selectedChild?.full_name || '...'}</span>
               )}
             </div>
           ) : (
@@ -99,7 +85,7 @@ export default function Navbar({ onMenuClick }) {
                 if (child) setSelectedChild(child)
               }}
             >
-              <SelectTrigger className="h-8 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold text-xs shadow-none focus:ring-0 max-w-[140px] truncate text-slate-800 dark:text-slate-100">
+              <SelectTrigger className="h-8 border-2 border-pixel-gray bg-pixel-navy font-retro text-sm max-w-[140px] truncate text-pixel-blue">
                 <SelectValue placeholder="Pilih Anak" />
               </SelectTrigger>
               <SelectContent>
@@ -109,44 +95,34 @@ export default function Navbar({ onMenuClick }) {
               </SelectContent>
             </Select>
           ) : role === 'parent' ? (
-             <span className="font-semibold text-violet-600 dark:text-violet-400 text-sm truncate max-w-[150px]">{selectedChild?.full_name || '...'}</span>
+             <span className="font-retro text-lg text-pixel-blue truncate max-w-[150px]">{selectedChild?.full_name || '...'}</span>
           ) : null}
         </div>
       </div>
 
       <div className="flex items-center gap-3">
         {(role === 'student' || role === 'parent') && (
-          <button className="p-2 relative text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+          <button className="p-2 relative text-pixel-lavender hover:text-pixel-yellow rounded-none border-2 border-transparent hover:border-pixel-gray hover:bg-pixel-panel-light">
             <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+            <span className="absolute top-1 right-1 w-2 h-2 bg-pixel-red"></span>
           </button>
         )}
-
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleTheme}
-          className="rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-          title="Ubah Tema"
-        >
-          {theme === 'light' ? <Moon className="w-5.5 h-5.5" /> : <Sun className="w-5.5 h-5.5 text-amber-500" />}
-        </Button>
         
-        <div className="hidden sm:flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-100 dark:border-slate-700">
-          <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center">
-            <UserIcon className="w-3.5 h-3.5 text-primary" />
+        <div className="hidden sm:flex items-center gap-2 font-retro text-lg text-pixel-peach bg-pixel-navy px-3 py-1.5 border-2 border-pixel-gray">
+          <div className="w-6 h-6 bg-pixel-blue/20 flex items-center justify-center border border-pixel-blue">
+            <UserIcon className="w-3.5 h-3.5 text-pixel-blue" />
           </div>
-          <span className="font-medium text-xs max-w-[120px] truncate">{userData?.full_name || user?.email}</span>
+          <span className="max-w-[120px] truncate">{userData?.full_name || user?.email}</span>
         </div>
         
         <Button 
           variant="outline" 
           size="sm" 
           onClick={logout}
-          className="gap-2 text-slate-600 dark:text-slate-300 hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 border-slate-200 dark:border-slate-700"
+          className="gap-2 text-pixel-peach hover:text-pixel-red hover:border-pixel-red"
         >
           <LogOut className="w-4 h-4" />
-          <span className="hidden sm:inline">Logout</span>
+          <span className="hidden sm:inline font-retro text-base">Logout</span>
         </Button>
       </div>
     </header>

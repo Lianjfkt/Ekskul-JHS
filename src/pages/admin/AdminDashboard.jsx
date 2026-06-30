@@ -171,108 +171,97 @@ export default function AdminDashboard() {
     log.details?.toLowerCase().includes(searchLogQuery.toLowerCase())
   )
 
-  // Card items config
+  // Card items config — pixel colors
   const statCards = [
     {
       title: 'Total Siswa',
       value: stats.totalStudents,
       description: 'Siswa terdaftar di database',
       icon: GraduationCap,
-      color: 'text-indigo-600 dark:text-indigo-400',
-      bgColor: 'bg-indigo-50 dark:bg-indigo-950/40'
+      color: 'text-pixel-blue',
+      bgColor: 'bg-pixel-blue/15'
     },
     {
       title: 'Total Ekskul',
       value: stats.totalEkskul,
       description: 'Ekstrakurikuler aktif & non-aktif',
       icon: Activity,
-      color: 'text-sky-600 dark:text-sky-400',
-      bgColor: 'bg-sky-50 dark:bg-sky-950/40'
+      color: 'text-pixel-green',
+      bgColor: 'bg-pixel-green/15'
     },
     {
       title: 'Pelatih Aktif',
       value: stats.totalCoaches,
       description: 'Pengajar ekskul terdaftar',
       icon: UserCheck,
-      color: 'text-emerald-600 dark:text-emerald-400',
-      bgColor: 'bg-emerald-50 dark:bg-emerald-950/40'
+      color: 'text-pixel-yellow',
+      bgColor: 'bg-pixel-yellow/15'
     },
     {
       title: 'Pendaftaran Aktif',
       value: stats.totalEnrollments,
       description: 'Siswa aktif mengikuti ekskul',
       icon: BookOpen,
-      color: 'text-rose-600 dark:text-rose-400',
-      bgColor: 'bg-rose-50 dark:bg-rose-950/40'
+      color: 'text-pixel-pink',
+      bgColor: 'bg-pixel-pink/15'
     }
   ]
 
   return (
     <div className="space-y-8">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 p-6 md:p-8 rounded-2xl text-white shadow-lg border border-slate-800 dark:border-slate-700 relative overflow-hidden">
+      {/* Header Banner — Pixel Style */}
+      <div className="pixel-box bg-pixel-navy p-6 md:p-8 text-pixel-white relative overflow-hidden">
         <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-12 scale-150">
           <Activity className="w-80 h-80" />
         </div>
         <div className="relative z-10 space-y-2">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Selamat Datang di Portal Admin</h1>
-          <p className="text-slate-300 max-w-xl text-sm md:text-base">
-            Gunakan panel ini untuk mengelola siswa, pendidik/pelatih, ekstrakurikuler sekolah, dan laporan absensi secara real-time.
+          <h1 className="font-pixel text-sm md:text-base text-pixel-blue pixel-text-shadow leading-loose">
+            ADMIN PORTAL
+          </h1>
+          <p className="font-retro text-xl text-pixel-peach max-w-xl">
+            Gunakan panel ini untuk mengelola siswa, pendidik/pelatih, ekstrakurikuler sekolah, dan laporan absensi.
           </p>
         </div>
       </div>
 
-      {/* Tabs Selector */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6">
-        <button
-          onClick={() => setActiveTab('dashboard')}
-          className={`pb-3 font-semibold text-sm transition-all relative ${
-            activeTab === 'dashboard'
-              ? 'text-primary dark:text-indigo-400 border-b-2 border-primary dark:border-indigo-400'
-              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-          }`}
-        >
-          Ringkasan Dashboard
-        </button>
-        <button
-          onClick={() => setActiveTab('announcements')}
-          className={`pb-3 font-semibold text-sm transition-all relative ${
-            activeTab === 'announcements'
-              ? 'text-primary dark:text-indigo-400 border-b-2 border-primary dark:border-indigo-400'
-              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-          }`}
-        >
-          Kelola Pengumuman
-        </button>
-        <button
-          onClick={() => setActiveTab('logs')}
-          className={`pb-3 font-semibold text-sm transition-all relative ${
-            activeTab === 'logs'
-              ? 'text-primary dark:text-indigo-400 border-b-2 border-primary dark:border-indigo-400'
-              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-          }`}
-        >
-          Log Audit & Keamanan
-        </button>
+      {/* Pixel Tabs Selector */}
+      <div className="flex border-b-4 border-pixel-gray gap-1">
+        {[
+          { key: 'dashboard', label: 'DASHBOARD' },
+          { key: 'announcements', label: 'PENGUMUMAN' },
+          { key: 'logs', label: 'AUDIT LOG' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-3 font-pixel text-[8px] uppercase tracking-wider border-3 border-b-0 ${
+              activeTab === tab.key
+                ? 'bg-pixel-panel text-pixel-blue border-pixel-gray -mb-[4px] pb-4'
+                : 'bg-pixel-navy text-pixel-lavender border-transparent hover:text-pixel-peach'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Tab: Dashboard */}
       {activeTab === 'dashboard' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {statCards.map((card, idx) => {
               const Icon = card.icon
               return (
-                <Card key={idx} className="border-slate-100 dark:border-slate-800 hover:shadow-md transition-all shadow-sm overflow-hidden bg-white dark:bg-slate-900">
-                  <CardContent className="p-6 flex items-center justify-between">
+                <Card key={idx} className="overflow-hidden">
+                  <CardContent className="p-5 flex items-center justify-between">
                     <div className="space-y-1">
-                      <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">{card.title}</p>
-                      <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white">
-                        {loading ? '...' : card.value}
+                      <p className="font-retro text-lg text-pixel-lavender">{card.title}</p>
+                      <h3 className="font-pixel text-xl text-pixel-white pixel-text-shadow">
+                        {loading ? <span className="pixel-blink">...</span> : card.value}
                       </h3>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">{card.description}</p>
+                      <p className="font-retro text-base text-pixel-lavender/60">{card.description}</p>
                     </div>
-                    <div className={`p-4 rounded-xl ${card.bgColor} ${card.color}`}>
+                    <div className={`p-3 ${card.bgColor} ${card.color} border-2 border-current`}>
                       <Icon className="w-6 h-6" />
                     </div>
                   </CardContent>
@@ -281,80 +270,82 @@ export default function AdminDashboard() {
             })}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1 space-y-6">
-              <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Aksi Cepat</h2>
-              <Card className="border-slate-100 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
-                <CardContent className="p-4 space-y-3">
-                  <Link to="/admin/users" className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 space-y-4">
+              <h2 className="font-pixel text-[10px] text-pixel-yellow pixel-text-shadow uppercase">Aksi Cepat</h2>
+              <Card>
+                <CardContent className="p-4 space-y-2">
+                  <Link to="/admin/users" className="flex items-center justify-between p-3 border-2 border-pixel-gray hover:bg-pixel-panel-light hover:border-pixel-blue group">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded">
+                      <div className="p-2 bg-pixel-blue/15 text-pixel-blue border border-pixel-blue">
                         <GraduationCap className="w-4 h-4" />
                       </div>
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Kelola & Import Siswa</span>
+                      <span className="font-retro text-lg text-pixel-peach">Kelola & Import Siswa</span>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="w-4 h-4 text-pixel-lavender" />
                   </Link>
 
-                  <Link to="/admin/extracurriculars" className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group">
+                  <Link to="/admin/extracurriculars" className="flex items-center justify-between p-3 border-2 border-pixel-gray hover:bg-pixel-panel-light hover:border-pixel-green group">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 rounded">
+                      <div className="p-2 bg-pixel-green/15 text-pixel-green border border-pixel-green">
                         <Activity className="w-4 h-4" />
                       </div>
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Kelola Ekstrakurikuler</span>
+                      <span className="font-retro text-lg text-pixel-peach">Kelola Ekstrakurikuler</span>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="w-4 h-4 text-pixel-lavender" />
                   </Link>
 
-                  <Link to="/admin/enrollments" className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group">
+                  <Link to="/admin/enrollments" className="flex items-center justify-between p-3 border-2 border-pixel-gray hover:bg-pixel-panel-light hover:border-pixel-pink group">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded">
+                      <div className="p-2 bg-pixel-pink/15 text-pixel-pink border border-pixel-pink">
                         <BookOpen className="w-4 h-4" />
                       </div>
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Pendaftaran Ekskul Siswa</span>
+                      <span className="font-retro text-lg text-pixel-peach">Pendaftaran Ekskul Siswa</span>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="w-4 h-4 text-pixel-lavender" />
                   </Link>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-4">
               <div className="flex justify-between items-center">
-                <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Pendaftaran Terbaru</h2>
-                <Link to="/admin/enrollments" className="text-xs font-semibold text-primary dark:text-indigo-400 hover:underline flex items-center gap-1">
+                <h2 className="font-pixel text-[10px] text-pixel-yellow pixel-text-shadow uppercase">Pendaftaran Terbaru</h2>
+                <Link to="/admin/enrollments" className="font-pixel text-[7px] text-pixel-blue hover:text-pixel-yellow flex items-center gap-1 uppercase">
                   Lihat Semua <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
 
-              <Card className="border-slate-100 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
+              <Card>
                 <CardContent className="p-0">
                   {loading ? (
-                    <div className="p-6 text-center text-slate-400 text-sm">Memuat aktivitas...</div>
+                    <div className="p-6 text-center font-retro text-lg text-pixel-lavender">
+                      <span className="pixel-blink">MEMUAT DATA...</span>
+                    </div>
                   ) : recentEnrollments.length === 0 ? (
-                    <div className="p-6 text-center text-slate-400 text-sm">Belum ada aktivitas pendaftaran siswa baru.</div>
+                    <div className="p-6 text-center font-retro text-lg text-pixel-lavender">Belum ada aktivitas pendaftaran.</div>
                   ) : (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <div className="divide-y-2 divide-pixel-gray/30">
                       {recentEnrollments.map(rec => (
-                        <div key={rec.id} className="p-4 flex items-center justify-between text-sm hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                        <div key={rec.id} className="p-4 flex items-center justify-between hover:bg-pixel-panel-light">
                           <div className="flex items-start gap-3">
-                            <div className="p-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-full mt-0.5">
+                            <div className="p-2 bg-pixel-green/15 text-pixel-green border border-pixel-green mt-0.5">
                               <UsersIcon className="w-4 h-4" />
                             </div>
                             <div>
-                              <p className="font-semibold text-slate-800 dark:text-slate-200">{rec.student?.full_name}</p>
-                              <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
-                                Mendaftar ke ekskul <strong className="text-slate-700 dark:text-slate-300">{rec.extracurricular?.name}</strong> • Kelas {rec.student?.class}
+                              <p className="font-retro text-lg text-pixel-white">{rec.student?.full_name}</p>
+                              <p className="font-retro text-base text-pixel-lavender mt-0.5">
+                                Mendaftar ke <strong className="text-pixel-peach">{rec.extracurricular?.name}</strong> • Kelas {rec.student?.class}
                               </p>
                             </div>
                           </div>
                           <div className="text-right space-y-1">
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-2xs font-semibold uppercase ${
-                              rec.status === 'active' ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                            <span className={`pixel-badge ${
+                              rec.status === 'active' ? 'border-pixel-green text-pixel-green bg-pixel-green/10' : 'border-pixel-gray text-pixel-lavender'
                             }`}>
-                              {rec.status === 'active' ? 'Aktif' : rec.status}
+                              {rec.status === 'active' ? 'AKTIF' : rec.status}
                             </span>
-                            <p className="text-2xs text-slate-400 dark:text-slate-500 flex items-center justify-end gap-1">
+                            <p className="font-retro text-sm text-pixel-lavender/60 flex items-center justify-end gap-1">
                               <Clock className="w-3 h-3" />
                               {new Date(rec.enrolled_at).toLocaleDateString('id-ID')}
                             </p>
@@ -372,40 +363,39 @@ export default function AdminDashboard() {
 
       {/* Tab: Announcements */}
       {activeTab === 'announcements' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Create Announcement Form */}
-          <div className="lg:col-span-1 space-y-6">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Buat Pengumuman Baru</h2>
-            <Card className="border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+          <div className="lg:col-span-1 space-y-4">
+            <h2 className="font-pixel text-[10px] text-pixel-yellow pixel-text-shadow uppercase">Buat Pengumuman</h2>
+            <Card>
               <CardContent className="p-6">
                 <form onSubmit={handleCreateAnnouncement} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="ann-title" className="text-xs font-bold uppercase tracking-wider text-slate-400">Judul Pengumuman</Label>
+                    <Label htmlFor="ann-title" className="font-pixel text-[8px] uppercase tracking-widest text-pixel-lavender">Judul</Label>
                     <Input
                       id="ann-title"
                       placeholder="Mulai Pendaftaran Semester Baru..."
                       value={newTitle}
                       onChange={(e) => setNewTitle(e.target.value)}
-                      className="bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-800"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="ann-content" className="text-xs font-bold uppercase tracking-wider text-slate-400">Isi Pengumuman</Label>
+                    <Label htmlFor="ann-content" className="font-pixel text-[8px] uppercase tracking-widest text-pixel-lavender">Isi</Label>
                     <textarea
                       id="ann-content"
                       placeholder="Tuliskan detail informasi di sini..."
                       rows={5}
                       value={newContent}
                       onChange={(e) => setNewContent(e.target.value)}
-                      className="flex min-h-[120px] w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+                      className="pixel-input flex min-h-[120px] w-full rounded-none px-3 py-2 font-retro text-lg"
                     ></textarea>
                   </div>
                   <Button 
                     type="submit" 
-                    className="w-full bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl"
+                    className="w-full"
                     disabled={annLoading}
                   >
-                    {annLoading ? 'Mengirim...' : 'Siarkan Pengumuman'}
+                    {annLoading ? <span className="pixel-blink">MENGIRIM...</span> : 'SIARKAN'}
                   </Button>
                 </form>
               </CardContent>
@@ -413,31 +403,31 @@ export default function AdminDashboard() {
           </div>
 
           {/* Announcements List */}
-          <div className="lg:col-span-2 space-y-6">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Daftar Pengumuman</h2>
-            <Card className="border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+          <div className="lg:col-span-2 space-y-4">
+            <h2 className="font-pixel text-[10px] text-pixel-yellow pixel-text-shadow uppercase">Daftar Pengumuman</h2>
+            <Card>
               <CardContent className="p-0">
                 {announcements.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 dark:text-slate-500 text-sm">
+                  <div className="p-8 text-center font-retro text-lg text-pixel-lavender">
                     Belum ada pengumuman aktif.
                   </div>
                 ) : (
-                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <div className="divide-y-2 divide-pixel-gray/30">
                     {announcements.map((ann) => (
-                      <div key={ann.id} className="p-5 flex items-start justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                      <div key={ann.id} className="p-5 flex items-start justify-between gap-4 hover:bg-pixel-panel-light">
                         <div className="space-y-1 min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">{ann.title}</h4>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            <h4 className="font-retro text-xl text-pixel-white truncate">{ann.title}</h4>
+                            <span className={`pixel-badge ${
                               ann.is_active 
-                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400' 
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
+                                ? 'border-pixel-green text-pixel-green bg-pixel-green/10' 
+                                : 'border-pixel-gray text-pixel-lavender'
                             }`}>
-                              {ann.is_active ? 'Aktif' : 'Non-aktif'}
+                              {ann.is_active ? 'ON' : 'OFF'}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-3 whitespace-pre-wrap">{ann.content}</p>
-                          <div className="flex items-center gap-3 text-[10px] text-slate-400 dark:text-slate-500 mt-2">
+                          <p className="font-retro text-lg text-pixel-lavender line-clamp-3 whitespace-pre-wrap">{ann.content}</p>
+                          <div className="flex items-center gap-3 font-retro text-sm text-pixel-lavender/50 mt-2">
                             <span>Dibuat: {new Date(ann.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})}</span>
                             {ann.users?.full_name && <span>• Pengirim: {ann.users.full_name}</span>}
                           </div>
@@ -447,7 +437,7 @@ export default function AdminDashboard() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleToggleAnnouncement(ann.id, ann.is_active, ann.title)}
-                            className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-lg"
+                            className="text-pixel-lavender hover:text-pixel-blue"
                             title={ann.is_active ? "Sembunyikan" : "Tampilkan"}
                           >
                             {ann.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -456,7 +446,7 @@ export default function AdminDashboard() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDeleteAnnouncement(ann.id, ann.title)}
-                            className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg"
+                            className="text-pixel-red hover:text-pixel-red hover:bg-pixel-red/10"
                             title="Hapus"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -477,60 +467,60 @@ export default function AdminDashboard() {
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Log Audit Keamanan</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Catatan aktivitas penting dalam sistem untuk transparansi data.</p>
+              <h2 className="font-pixel text-[10px] text-pixel-yellow pixel-text-shadow uppercase">Log Audit</h2>
+              <p className="font-retro text-lg text-pixel-lavender mt-1">Catatan aktivitas penting dalam sistem.</p>
             </div>
             
             <div className="relative w-full sm:w-[320px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-pixel-lavender" />
               <Input
                 placeholder="Cari email, aksi, detail..."
                 value={searchLogQuery}
                 onChange={(e) => setSearchLogQuery(e.target.value)}
-                className="pl-9 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-xl"
+                className="pl-9"
               />
             </div>
           </div>
 
-          <Card className="border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+          <Card>
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm border-collapse">
+              <table className="w-full text-left border-collapse font-retro text-lg">
                 <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  <tr className="border-b-3 border-pixel-gray bg-pixel-navy font-pixel text-[7px] text-pixel-lavender uppercase tracking-wider">
                     <th className="p-4">Waktu</th>
                     <th className="p-4">Pengguna</th>
                     <th className="p-4">Aksi</th>
                     <th className="p-4">Detail</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                <tbody className="divide-y-2 divide-pixel-gray/20 text-pixel-peach">
                   {filteredLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="p-8 text-center text-slate-400 dark:text-slate-500 text-sm">
+                      <td colSpan={4} className="p-8 text-center text-pixel-lavender">
                         Tidak ada log aktivitas yang cocok.
                       </td>
                     </tr>
                   ) : (
                     filteredLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                        <td className="p-4 whitespace-nowrap text-xs text-slate-400 dark:text-slate-500">
+                      <tr key={log.id} className="hover:bg-pixel-panel-light">
+                        <td className="p-4 whitespace-nowrap text-base text-pixel-lavender">
                           {new Date(log.created_at).toLocaleString('id-ID')}
                         </td>
-                        <td className="p-4 font-semibold text-slate-800 dark:text-slate-200">
+                        <td className="p-4 text-pixel-white">
                           {log.user_email}
                         </td>
                         <td className="p-4 whitespace-nowrap">
-                          <span className={`inline-block px-2 py-0.5 rounded text-2xs font-mono font-bold uppercase ${
+                          <span className={`pixel-badge ${
                             log.action.includes('DELETE')
-                              ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400'
+                              ? 'border-pixel-red text-pixel-red bg-pixel-red/10'
                               : log.action.includes('CREATE')
-                              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
-                              : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400'
+                              ? 'border-pixel-green text-pixel-green bg-pixel-green/10'
+                              : 'border-pixel-blue text-pixel-blue bg-pixel-blue/10'
                           }`}>
                             {log.action}
                           </span>
                         </td>
-                        <td className="p-4 text-xs text-slate-600 dark:text-slate-400 max-w-[300px] truncate" title={log.details}>
+                        <td className="p-4 text-base text-pixel-lavender max-w-[300px] truncate" title={log.details}>
                           {log.details}
                         </td>
                       </tr>

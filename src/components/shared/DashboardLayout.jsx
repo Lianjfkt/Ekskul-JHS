@@ -15,14 +15,14 @@ export default function DashboardLayout() {
   const hasBottomNav = role === 'student' || role === 'parent'
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className="flex h-screen bg-pixel-navy pixel-bg-grid overflow-hidden">
       {/* Sidebar */}
       <Sidebar isOpen={isSidebarOpen} />
 
       {/* Overlay for mobile when sidebar is open */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden backdrop-blur-sm"
+          className="fixed inset-0 z-40 bg-black/70 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}

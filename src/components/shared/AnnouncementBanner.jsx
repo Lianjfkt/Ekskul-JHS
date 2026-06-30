@@ -23,30 +23,31 @@ export default function AnnouncementBanner() {
       {activeAnnouncements.map((ann) => (
         <div 
           key={ann.id} 
-          className="relative overflow-hidden bg-gradient-to-r from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20 border border-amber-500/20 dark:border-amber-500/30 rounded-2xl p-4 flex items-start gap-3 text-slate-800 dark:text-slate-200 transition-all duration-300 animate-in fade-in slide-in-from-top-4"
+          className="relative overflow-hidden bg-pixel-orange/10 border-3 border-pixel-orange rounded-none p-4 flex items-start gap-3 text-pixel-peach pixel-slide-in"
         >
-          <div className="w-9 h-9 rounded-xl bg-amber-500/20 dark:bg-amber-500/30 flex items-center justify-center shrink-0">
-            <Megaphone className="w-5 h-5 text-amber-600 dark:text-amber-400 animate-bounce" />
+          {/* Pixel icon box */}
+          <div className="w-9 h-9 bg-pixel-orange/20 border-2 border-pixel-orange flex items-center justify-center shrink-0">
+            <Megaphone className="w-5 h-5 text-pixel-orange pixel-bounce" />
           </div>
           <div className="flex-1 pr-6 min-w-0">
-            <h4 className="font-bold text-sm text-amber-800 dark:text-amber-300 flex items-center gap-2">
+            <h4 className="font-pixel text-[9px] text-pixel-yellow pixel-text-shadow flex items-center gap-2 leading-relaxed">
               {ann.title}
-              <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400">
-                Baru
+              <span className="pixel-badge border-pixel-yellow text-pixel-yellow bg-pixel-yellow/10 text-[7px]">
+                NEW!
               </span>
             </h4>
-            <p className="text-xs text-amber-900/80 dark:text-slate-300 mt-1 whitespace-pre-wrap leading-relaxed">
+            <p className="font-retro text-lg text-pixel-peach mt-1 whitespace-pre-wrap leading-relaxed">
               {ann.content}
             </p>
             {ann.users?.full_name && (
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
-                Diumumkan oleh: {ann.users.full_name}
+              <p className="font-retro text-base text-pixel-lavender mt-2">
+                By: {ann.users.full_name}
               </p>
             )}
           </div>
           <button 
             onClick={() => setDismissed(prev => [...prev, ann.id])}
-            className="absolute top-3 right-3 p-1 rounded-lg text-amber-700/60 dark:text-slate-400 hover:text-amber-900 dark:hover:text-slate-200 hover:bg-amber-500/10 dark:hover:bg-amber-500/20 transition-all"
+            className="absolute top-3 right-3 p-1 rounded-none text-pixel-lavender hover:text-pixel-red border-2 border-transparent hover:border-pixel-red"
             title="Tutup"
           >
             <X className="w-4 h-4" />

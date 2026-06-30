@@ -49,16 +49,19 @@ export default function Sidebar({ isOpen }) {
 
   return (
     <aside className={cn(
-      "fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto",
+      "fixed inset-y-0 left-0 z-50 w-64 bg-pixel-panel border-r-4 border-pixel-gray lg:translate-x-0 lg:static lg:inset-auto",
       isOpen ? "translate-x-0" : "-translate-x-full"
     )}>
-      <div className="flex items-center justify-center h-16 bg-slate-950">
-        <span className="text-xl font-bold text-white tracking-wider flex items-center gap-2">
-          <Activity className="w-6 h-6 text-primary" />
-          Ekskul App
+      {/* Logo Area */}
+      <div className="flex items-center justify-center h-16 bg-pixel-navy border-b-4 border-pixel-gray">
+        <span className="font-pixel text-[10px] text-pixel-blue pixel-text-shadow flex items-center gap-2 tracking-wider">
+          <Activity className="w-5 h-5 text-pixel-green" />
+          EKSKUL APP
         </span>
       </div>
-      <nav className="p-4 space-y-2 mt-4">
+
+      {/* Navigation */}
+      <nav className="p-3 space-y-1 mt-3">
         {currentMenu.map((item) => {
           const isActive = location.pathname.startsWith(item.path)
           const Icon = item.icon
@@ -68,10 +71,10 @@ export default function Sidebar({ isOpen }) {
               key={item.path}
               to={item.path}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
+                "flex items-center gap-3 px-4 py-3 rounded-none border-2 font-retro text-lg",
                 isActive 
-                  ? "bg-primary text-primary-foreground font-medium shadow-md" 
-                  : "hover:bg-slate-800 hover:text-white"
+                  ? "bg-pixel-blue/20 text-pixel-blue border-pixel-blue pixel-text-shadow" 
+                  : "text-pixel-peach border-transparent hover:bg-pixel-panel-light hover:border-pixel-gray"
               )}
             >
               <Icon className="w-5 h-5" />
@@ -80,6 +83,19 @@ export default function Sidebar({ isOpen }) {
           )
         })}
       </nav>
+
+      {/* Decorative pixel art bottom */}
+      <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+        <div className="flex gap-1">
+          {[...Array(5)].map((_, i) => (
+            <div 
+              key={i} 
+              className="w-2 h-2 bg-pixel-lavender/30"
+              style={{ animationDelay: `${i * 200}ms` }}
+            />
+          ))}
+        </div>
+      </div>
     </aside>
   )
 }

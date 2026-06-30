@@ -23,36 +23,36 @@ export default function StudentLayout() {
     : '?'
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-50">
+    <div className="min-h-screen bg-pixel-navy pixel-bg-grid">
       {/* Top Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-violet-100 shadow-sm">
+      <header className="sticky top-0 z-50 bg-pixel-panel border-b-4 border-pixel-gray">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md shadow-violet-200">
-              <Sparkles className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-none bg-pixel-purple border-2 border-pixel-gray flex items-center justify-center shadow-pixel-sm">
+              <Sparkles className="w-4 h-4 text-pixel-white" />
             </div>
-            <span className="font-bold text-slate-800 hidden sm:block text-sm tracking-tight">
-              Ekskul <span className="text-violet-600">Portal</span>
+            <span className="font-pixel text-[9px] text-pixel-peach hidden sm:block tracking-tight">
+              Ekskul <span className="text-pixel-blue">Portal</span>
             </span>
           </div>
 
           {/* Right: Profile + Actions */}
           <div className="flex items-center gap-2">
             {/* Notification */}
-            <button className="relative p-2 rounded-xl hover:bg-violet-50 text-slate-500 hover:text-violet-600 transition-colors">
+            <button className="relative p-2 rounded-none hover:bg-pixel-panel-light border-2 border-transparent hover:border-pixel-gray text-pixel-lavender hover:text-pixel-blue">
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full"></span>
+              <span className="absolute top-1 right-1 w-2 h-2 bg-pixel-red"></span>
             </button>
 
             {/* Profile chip */}
-            <div className="flex items-center gap-2.5 bg-violet-50 rounded-xl px-3 py-1.5 border border-violet-100">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs shadow-sm">
+            <div className="flex items-center gap-2.5 bg-pixel-navy rounded-none px-3 py-1.5 border-2 border-pixel-gray">
+              <div className="w-7 h-7 rounded-none bg-pixel-purple border border-pixel-gray flex items-center justify-center text-pixel-white font-pixel text-[8px] shadow-pixel-sm">
                 {initials}
               </div>
-              <div className="hidden sm:block">
-                <p className="text-xs font-semibold text-slate-800 leading-tight">{profile?.full_name || 'Memuat...'}</p>
-                <p className="text-xs text-violet-500 leading-tight">{profile?.class || 'Siswa'}</p>
+              <div className="hidden sm:block font-retro text-lg">
+                <p className="font-semibold text-pixel-white leading-tight">{profile?.full_name || 'Memuat...'}</p>
+                <p className="text-pixel-purple leading-tight">{profile?.class || 'Siswa'}</p>
               </div>
             </div>
 
@@ -60,7 +60,7 @@ export default function StudentLayout() {
             <button
               onClick={logout}
               title="Logout"
-              className="p-2 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors"
+              className="p-2 rounded-none hover:bg-pixel-panel-light border-2 border-transparent hover:border-pixel-red text-pixel-lavender hover:text-pixel-red"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -80,10 +80,10 @@ export default function StudentLayout() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-none border-2 font-retro text-lg ${
                   isActive
-                    ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-200'
-                    : 'text-slate-600 hover:bg-violet-50 hover:text-violet-700'
+                    ? 'bg-pixel-purple/20 text-pixel-purple border-pixel-purple pixel-text-shadow'
+                    : 'text-pixel-peach border-transparent hover:bg-pixel-panel-light hover:border-pixel-gray'
                 }`}
               >
                 <Icon className="w-4 h-4 shrink-0" />
@@ -100,7 +100,7 @@ export default function StudentLayout() {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-violet-100 shadow-lg z-50 safe-area-inset-bottom">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-pixel-panel border-t-4 border-pixel-gray z-50">
         <div className="grid grid-cols-4 h-16 max-w-sm mx-auto">
           {navItems.map(item => {
             const isActive = location.pathname === item.path ||
@@ -110,16 +110,16 @@ export default function StudentLayout() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center justify-center gap-0.5 transition-all ${
-                  isActive ? 'text-violet-600' : 'text-slate-400'
+                className={`flex flex-col items-center justify-center gap-0.5 ${
+                  isActive ? 'text-pixel-purple' : 'text-pixel-lavender'
                 }`}
               >
-                <div className={`p-1.5 rounded-xl transition-all duration-200 ${
-                  isActive ? 'bg-violet-100 scale-110' : ''
+                <div className={`p-1.5 rounded-none ${
+                  isActive ? 'bg-pixel-purple/20 border-2 border-pixel-purple scale-110' : ''
                 }`}>
                   <Icon className="w-5 h-5" />
                 </div>
-                <span className="text-[10px] font-semibold">{item.name}</span>
+                <span className="font-pixel text-[6px] uppercase tracking-wider">{item.name}</span>
               </Link>
             )
           })}

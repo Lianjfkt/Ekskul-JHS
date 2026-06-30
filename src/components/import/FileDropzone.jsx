@@ -1,15 +1,7 @@
 import { useRef, useState } from 'react'
-import { UploadCloud, FileSpreadsheet, X, Download } from 'lucide-react'
+import { UploadCloud, X, Download } from 'lucide-react'
 import { validateFileType } from '../../utils/excelParser'
 
-/**
- * FileDropzone – drag-and-drop + click-to-browse file upload area.
- *
- * Props:
- *  onFileParsed(file) – called when a valid file is selected
- *  onTemplate()       – called when "Download Template" is clicked
- *  accept             – file accept string (default: csv & xlsx)
- */
 export default function FileDropzone({ onFileSelected, onTemplate, disabled = false }) {
   const inputRef = useRef(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -41,7 +33,6 @@ export default function FileDropzone({ onFileSelected, onTemplate, disabled = fa
 
   function onInputChange(e) {
     handleFile(e.target.files?.[0])
-    // Reset input so same file can be re-selected
     e.target.value = ''
   }
 
@@ -55,11 +46,10 @@ export default function FileDropzone({ onFileSelected, onTemplate, disabled = fa
         onClick={() => !disabled && inputRef.current?.click()}
         className={`
           relative flex flex-col items-center justify-center gap-3
-          border-2 border-dashed rounded-xl p-10 cursor-pointer
-          transition-all duration-200 select-none
+          border-3 border-dashed p-10 cursor-pointer select-none rounded-none
           ${isDragging
-            ? 'border-primary bg-primary/5 scale-[1.01]'
-            : 'border-slate-200 bg-slate-50 hover:border-primary/60 hover:bg-primary/5'
+            ? 'border-pixel-blue bg-pixel-blue/5'
+            : 'border-pixel-gray bg-pixel-navy hover:border-pixel-blue hover:bg-pixel-panel-light'
           }
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         `}
@@ -73,30 +63,29 @@ export default function FileDropzone({ onFileSelected, onTemplate, disabled = fa
           disabled={disabled}
         />
 
-        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-colors ${
-          isDragging ? 'bg-primary text-white' : 'bg-white text-primary shadow-sm border border-slate-100'
+        <div className={`w-16 h-16 bg-pixel-panel border-2 border-pixel-gray flex items-center justify-center ${
+          isDragging ? 'text-pixel-blue border-pixel-blue' : 'text-pixel-lavender'
         }`}>
           <UploadCloud className="w-8 h-8" />
         </div>
 
-        <div className="text-center">
-          <p className="font-semibold text-slate-700">
+        <div className="text-center font-retro text-lg">
+          <p className="font-semibold text-pixel-white">
             {isDragging ? 'Lepaskan file di sini' : 'Drag & drop file di sini'}
           </p>
-          <p className="text-sm text-slate-400 mt-0.5">atau klik untuk browse file</p>
+          <p className="text-pixel-lavender mt-0.5">atau klik untuk browse file</p>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <span className="px-2.5 py-1 bg-white border border-slate-100 rounded-full shadow-sm font-mono font-medium">.CSV</span>
-          <span className="px-2.5 py-1 bg-white border border-slate-100 rounded-full shadow-sm font-mono font-medium">.XLSX</span>
-          <span className="text-slate-300">•</span>
+        <div className="flex items-center gap-2 font-pixel text-[8px] text-pixel-lavender">
+          <span className="px-2 py-1 bg-pixel-panel border border-pixel-gray rounded-none">.CSV</span>
+          <span className="px-2 py-1 bg-pixel-panel border border-pixel-gray rounded-none">.XLSX</span>
           <span>Maks. 5 MB</span>
         </div>
       </div>
 
       {/* File Error */}
       {fileError && (
-        <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+        <div className="flex items-start gap-2 p-3 bg-pixel-red/10 border-2 border-pixel-red text-pixel-red font-retro text-lg">
           <X className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span>{fileError}</span>
         </div>
@@ -107,7 +96,7 @@ export default function FileDropzone({ onFileSelected, onTemplate, disabled = fa
         <button
           type="button"
           onClick={onTemplate}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-emerald-300 text-emerald-700 text-sm font-medium hover:bg-emerald-50 transition-colors"
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-none border-3 border-dashed border-pixel-green text-pixel-green font-retro text-lg hover:bg-pixel-green/10"
         >
           <Download className="w-4 h-4" />
           Download Template Excel
