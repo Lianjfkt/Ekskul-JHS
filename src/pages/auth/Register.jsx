@@ -30,23 +30,35 @@ export default function Register() {
     }
   })
 
+  const toTitleCase = (str) => {
+    return str
+      .toLowerCase()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
   const onSubmit = async (data) => {
     try {
+      const cleanEmail = data.email.toLowerCase().trim()
+      const cleanName = toTitleCase(data.full_name.trim())
+      const cleanClass = data.class.trim()
+
       // 1. Panggil fungsi RPC untuk registrasi terpadu
       const { error: regError } = await supabase.rpc('student_self_register', {
-        p_email: data.email,
+        p_email: cleanEmail,
         p_password: data.password,
-        p_nis: data.nis,
-        p_full_name: data.full_name,
-        p_class: data.class,
+        p_nis: data.nis.trim(),
+        p_full_name: cleanName,
+        p_class: cleanClass,
         p_gender: data.gender,
-        p_phone: data.phone
+        p_phone: data.phone.trim()
       })
 
       if (regError) throw regError
 
       // 2. Login otomatis setelah berhasil registrasi
-      await login(data.email, data.password)
+      await login(cleanEmail, data.password)
       
       const currentRole = useAuthStore.getState().role
       if (currentRole) {
@@ -99,6 +111,7 @@ export default function Register() {
                     className="bg-slate-950/80 border-slate-800 text-slate-100 placeholder-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl"
                     {...register("nis")}
                   />
+                  <p className="text-[10px] text-slate-500">Contoh: 202601001</p>
                   {errors.nis && <p className="text-xs text-rose-400 font-medium mt-1">{errors.nis.message}</p>}
                 </div>
                 <div className="space-y-1.5">
@@ -109,6 +122,7 @@ export default function Register() {
                     className="bg-slate-950/80 border-slate-800 text-slate-100 placeholder-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl"
                     {...register("full_name")}
                   />
+                  <p className="text-[10px] text-slate-500">Huruf awal kapital. Contoh: Budi Santoso</p>
                   {errors.full_name && <p className="text-xs text-rose-400 font-medium mt-1">{errors.full_name.message}</p>}
                 </div>
               </div>
@@ -119,10 +133,11 @@ export default function Register() {
                   <Label htmlFor="class" className="text-xs font-semibold uppercase tracking-wider text-slate-400">Kelas</Label>
                   <Input
                     id="class"
-                    placeholder="Contoh: VIII-A"
+                    placeholder="Contoh: 7.1"
                     className="bg-slate-950/80 border-slate-800 text-slate-100 placeholder-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl"
                     {...register("class")}
                   />
+                  <p className="text-[10px] text-slate-500">Format: Tingkat.Kelas. Contoh: 7.1 atau 8.2</p>
                   {errors.class && <p className="text-xs text-rose-400 font-medium mt-1">{errors.class.message}</p>}
                 </div>
                 <div className="space-y-1.5">
@@ -135,6 +150,7 @@ export default function Register() {
                     <option value="Laki-laki">Laki-laki</option>
                     <option value="Perempuan">Perempuan</option>
                   </select>
+                  <p className="text-[10px] text-slate-500">Pilih jenis kelamin</p>
                   {errors.gender && <p className="text-xs text-rose-400 font-medium mt-1">{errors.gender.message}</p>}
                 </div>
               </div>
@@ -149,6 +165,7 @@ export default function Register() {
                     className="bg-slate-950/80 border-slate-800 text-slate-100 placeholder-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl"
                     {...register("phone")}
                   />
+                  <p className="text-[10px] text-slate-500">Gunakan angka diawali 0. Contoh: 081234567890</p>
                   {errors.phone && <p className="text-xs text-rose-400 font-medium mt-1">{errors.phone.message}</p>}
                 </div>
                 <div className="space-y-1.5">
@@ -156,10 +173,11 @@ export default function Register() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="siswa@sekolah.com"
+                    placeholder="user@jhs.com"
                     className="bg-slate-950/80 border-slate-800 text-slate-100 placeholder-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl"
                     {...register("email")}
                   />
+                  <p className="text-[10px] text-slate-500">Format email. Contoh: user@jhs.com</p>
                   {errors.email && <p className="text-xs text-rose-400 font-medium mt-1">{errors.email.message}</p>}
                 </div>
               </div>
@@ -174,6 +192,7 @@ export default function Register() {
                   className="bg-slate-950/80 border-slate-800 text-slate-100 placeholder-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-xl"
                   {...register("password")}
                 />
+                <p className="text-[10px] text-slate-500">Password minimal 6 karakter</p>
                 {errors.password && <p className="text-xs text-rose-400 font-medium mt-1">{errors.password.message}</p>}
               </div>
 

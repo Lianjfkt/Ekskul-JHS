@@ -80,11 +80,9 @@ export default function Login() {
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Password
-                  </Label>
-                </div>
+                <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Password
+                </Label>
                 <div className="relative">
                   <Input
                     id="password"

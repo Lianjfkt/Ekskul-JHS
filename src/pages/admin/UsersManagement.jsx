@@ -39,7 +39,9 @@ export default function UsersManagement() {
     full_name: '',
     class: '',
     gender: 'Laki-laki',
-    phone: ''
+    phone: '',
+    email: '',
+    password: ''
   })
 
   // Form States - User (Coach/Parent/Admin)
@@ -64,7 +66,10 @@ export default function UsersManagement() {
       // 1. Fetch Students
       const { data: studentsData, error: sErr } = await supabase
         .from('students')
-        .select('*')
+        .select(`
+          *,
+          users:users!student_id (id, email)
+        `)
         .order('full_name', { ascending: true })
       if (sErr) throw sErr
       setStudents(studentsData || [])
@@ -92,13 +97,16 @@ export default function UsersManagement() {
   // --- STUDENT CRUD FUNCTIONS ---
   const handleOpenStudentModal = (student = null) => {
     if (student) {
+      const associatedUser = student.users?.[0]
       setSelectedStudent(student)
       setStudentForm({
         nis: student.nis,
         full_name: student.full_name,
         class: student.class,
         gender: student.gender || 'Laki-laki',
-        phone: student.phone || ''
+        phone: student.phone || '',
+        email: associatedUser?.email || '',
+        password: ''
       })
     } else {
       setSelectedStudent(null)
@@ -107,7 +115,9 @@ export default function UsersManagement() {
         full_name: '',
         class: '',
         gender: 'Laki-laki',
-        phone: ''
+        phone: '',
+        email: '',
+        password: ''
       })
     }
     setIsStudentModalOpen(true)
@@ -118,26 +128,89 @@ export default function UsersManagement() {
     setErrorMsg('')
     setSuccessMsg('')
     try {
+      const toTitleCase = (str) => {
+        return str
+          .toLowerCase()
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+      }
+
+      const cleanName = toTitleCase(studentForm.full_name.trim())
+      const cleanEmail = studentForm.email.toLowerCase().trim()
+
       if (selectedStudent) {
         // Edit Mode
         const { error } = await supabase
           .from('students')
           .update({
-            nis: studentForm.nis,
-            full_name: studentForm.full_name,
-            class: studentForm.class,
+            nis: studentForm.nis.trim(),
+            full_name: cleanName,
+            class: studentForm.class.trim(),
             gender: studentForm.gender,
-            phone: studentForm.phone
+            phone: studentForm.phone.trim()
           })
           .eq('id', selectedStudent.id)
         if (error) throw error
+
+        const associatedUser = selectedStudent.users?.[0]
+        if (associatedUser) {
+          // Update credentials if email changed or password was typed
+          if (associatedUser.email !== cleanEmail || (studentForm.password && studentForm.password.length >= 6)) {
+            const { error: uErr } = await supabase.rpc('admin_update_user', {
+              p_user_id: associatedUser.id,
+              p_email: cleanEmail,
+              p_password: studentForm.password || null,
+              p_full_name: cleanName,
+              p_student_id: selectedStudent.id
+            })
+            if (uErr) throw uErr
+          }
+        } else if (cleanEmail) {
+          // Create login account if email was provided for the first time
+          if (!studentForm.password || studentForm.password.length < 6) {
+            throw new Error('Password minimal 6 karakter diperlukan untuk membuat akun baru.')
+          }
+          const { error: uErr } = await supabase.rpc('admin_create_user', {
+            p_email: cleanEmail,
+            p_password: studentForm.password,
+            p_full_name: cleanName,
+            p_role: 'student',
+            p_student_id: selectedStudent.id
+          })
+          if (uErr) throw uErr
+        }
+
         setSuccessMsg('Berhasil memperbarui data siswa.')
       } else {
         // Insert Mode
-        const { error } = await supabase
+        const { data: newStudent, error: sErr } = await supabase
           .from('students')
-          .insert([studentForm])
-        if (error) throw error
+          .insert([{
+            nis: studentForm.nis.trim(),
+            full_name: cleanName,
+            class: studentForm.class.trim(),
+            gender: studentForm.gender,
+            phone: studentForm.phone.trim()
+          }])
+          .select()
+          .single()
+        if (sErr) throw sErr
+
+        if (cleanEmail) {
+          if (!studentForm.password || studentForm.password.length < 6) {
+            throw new Error('Password minimal 6 karakter diperlukan untuk membuat akun baru.')
+          }
+          const { error: uErr } = await supabase.rpc('admin_create_user', {
+            p_email: cleanEmail,
+            p_password: studentForm.password,
+            p_full_name: cleanName,
+            p_role: 'student',
+            p_student_id: newStudent.id
+          })
+          if (uErr) throw uErr
+        }
+
         setSuccessMsg('Berhasil menambahkan siswa baru.')
       }
       setIsStudentModalOpen(false)
@@ -147,16 +220,26 @@ export default function UsersManagement() {
     }
   }
 
-  const handleStudentDelete = async (id) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus data siswa ini? Ini juga akan menghapus data pendaftaran dan absensi terkait.')) return
+  const handleStudentDelete = async (student) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus siswa "${student.full_name}"? Ini juga akan menghapus akun login dan semua data absensi/nilai terkait.`)) return
     setErrorMsg('')
     try {
-      const { error } = await supabase
+      const associatedUser = student.users?.[0]
+      if (associatedUser) {
+        // Clean delete from auth
+        const { error: uErr } = await supabase.rpc('admin_delete_user', {
+          p_user_id: associatedUser.id
+        })
+        if (uErr) throw uErr
+      }
+
+      const { error: sErr } = await supabase
         .from('students')
         .delete()
-        .eq('id', id)
-      if (error) throw error
-      setSuccessMsg('Berhasil menghapus data siswa.')
+        .eq('id', student.id)
+      if (sErr) throw sErr
+
+      setSuccessMsg('Berhasil menghapus data siswa dan akun login terkait.')
       fetchData()
     } catch (err) {
       setErrorMsg(err.message)
@@ -216,13 +299,12 @@ export default function UsersManagement() {
       alert('Akun administrator utama tidak dapat dihapus.')
       return
     }
-    if (!confirm('Apakah Anda yakin ingin menghapus akun pengguna ini? Data autentikasi Supabase terkait juga akan terpengaruh jika cascade aktif.')) return
+    if (!confirm('Apakah Anda yakin ingin menghapus akun pengguna ini? Data autentikasi Supabase terkait juga akan terpengaruh.')) return
     setErrorMsg('')
     try {
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', id)
+      const { error } = await supabase.rpc('admin_delete_user', {
+        p_user_id: id
+      })
       if (error) throw error
       setSuccessMsg('Berhasil menghapus akun pengguna.')
       fetchData()
@@ -368,13 +450,14 @@ export default function UsersManagement() {
                         <th className="px-6 py-4">Kelas</th>
                         <th className="px-6 py-4">Gender</th>
                         <th className="px-6 py-4">No. Telepon</th>
+                        <th className="px-6 py-4">Email Akun</th>
                         <th className="px-6 py-4 text-right">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
                       {filteredStudents.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="px-6 py-8 text-center text-slate-400">Tidak ada data siswa ditemukan.</td>
+                          <td colSpan={7} className="px-6 py-8 text-center text-slate-400">Tidak ada data siswa ditemukan.</td>
                         </tr>
                       ) : (
                         filteredStudents.map(student => (
@@ -386,11 +469,12 @@ export default function UsersManagement() {
                             </td>
                             <td className="px-6 py-4">{student.gender}</td>
                             <td className="px-6 py-4 text-slate-500">{student.phone || '-'}</td>
+                            <td className="px-6 py-4 text-slate-600 font-mono text-xs">{student.users?.[0]?.email || <span className="text-slate-400 italic">Belum ada akun</span>}</td>
                             <td className="px-6 py-4 text-right space-x-2">
                               <Button onClick={() => handleOpenStudentModal(student)} variant="ghost" size="icon" className="h-8 w-8 hover:text-primary">
                                 <Edit2 className="w-4 h-4" />
                               </Button>
-                              <Button onClick={() => handleStudentDelete(student.id)} variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                              <Button onClick={() => handleStudentDelete(student)} variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive">
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </td>
@@ -606,6 +690,31 @@ export default function UsersManagement() {
                   value={studentForm.phone}
                   onChange={e => setStudentForm({...studentForm, phone: e.target.value})}
                 />
+              </div>
+              <div className="border-t border-slate-100 pt-3 mt-3">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Akun Login Siswa (Opsional)</p>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="s_email">Email Akun</Label>
+                    <Input
+                      id="s_email"
+                      type="email"
+                      placeholder="Contoh: siswa@jhs.com"
+                      value={studentForm.email}
+                      onChange={e => setStudentForm({...studentForm, email: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="s_pass">{selectedStudent?.users?.[0] ? 'Ubah Password (Kosongkan jika tidak diubah)' : 'Password Awal'}</Label>
+                    <Input
+                      id="s_pass"
+                      type="password"
+                      placeholder={selectedStudent?.users?.[0] ? 'Masukkan password baru' : 'Min. 6 karakter'}
+                      value={studentForm.password}
+                      onChange={e => setStudentForm({...studentForm, password: e.target.value})}
+                    />
+                  </div>
+                </div>
               </div>
               <div className="pt-4 border-t border-slate-100 flex justify-end gap-2">
                 <Button type="button" onClick={() => setIsStudentModalOpen(false)} variant="outline">Batal</Button>
