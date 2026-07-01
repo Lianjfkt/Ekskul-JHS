@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -330,7 +330,7 @@ export default function CoachAttendances() {
  <td className="px-6 py-4 font-mono text-pixel-lavender">{student.nis}</td>
  <td className="px-6 py-4 font-semibold text-pixel-white">{student.full_name}</td>
  <td className="px-6 py-4">
- <span className="px-2.5 py-1 font-retro text-base bg-slate-100 text-pixel-white rounded-none">{student.class}</span>
+ <span className="px-2.5 py-1 font-retro text-base bg-slate-100 text-pixel-black rounded-none">{student.class}</span>
  </td>
  <td className="px-6 py-4">
  <div className="flex justify-center gap-6">

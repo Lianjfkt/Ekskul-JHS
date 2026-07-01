@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -348,7 +348,7 @@ export default function EnrollmentManagement() {
  <td className="px-6 py-4 font-mono text-pixel-peach">{en.student?.nis}</td>
  <td className="px-6 py-4 font-medium text-pixel-white">{en.student?.full_name}</td>
  <td className="px-6 py-4">
- <span className="px-2.5 py-1 font-retro text-base bg-slate-100 text-pixel-white rounded-none">{en.student?.class}</span>
+ <span className="px-2.5 py-1 font-retro text-base bg-slate-100 text-pixel-black rounded-none">{en.student?.class}</span>
  </td>
  {activeTab === 'pending' && (
  <td className="px-6 py-4 text-pixel-lavender font-mono text-xs">{en.student?.phone || '-'}</td>

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent } from '@/components/ui/card'
@@ -338,7 +338,7 @@ export default function CoachGrades() {
  <span className="text-xs text-pixel-lavender font-mono">NIS: {student.nis}</span>
  </td>
  <td className="px-6 py-4 text-center">
- <span className="px-2.5 py-1 font-retro text-base bg-slate-100 text-pixel-white rounded-none">{student.class}</span>
+ <span className="px-2.5 py-1 font-retro text-base bg-slate-100 text-pixel-black rounded-none">{student.class}</span>
  </td>
  <td className="px-4 py-4 text-center font-bold font-mono text-pixel-peach">
  {student.attendancePercentage}%

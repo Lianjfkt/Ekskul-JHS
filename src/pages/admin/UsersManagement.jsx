@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -465,7 +465,7 @@ export default function UsersManagement() {
  <td className="px-6 py-4 font-mono font-semibold text-pixel-white">{student.nis}</td>
  <td className="px-6 py-4 font-medium text-pixel-white">{student.full_name}</td>
  <td className="px-6 py-4">
- <span className="px-2.5 py-1 font-retro text-base bg-slate-100 text-pixel-white rounded-none">{student.class}</span>
+ <span className="px-2.5 py-1 font-retro text-base bg-slate-100 text-pixel-black rounded-none">{student.class}</span>
  </td>
  <td className="px-6 py-4">{student.gender}</td>
  <td className="px-6 py-4 text-pixel-lavender">{student.phone || '-'}</td>
