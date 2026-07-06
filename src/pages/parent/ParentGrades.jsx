@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useParentChildren } from '../../hooks/useParentChildren'
 import { useGrades } from '../../hooks/useGrades'
 import {
@@ -38,14 +38,14 @@ export default function ParentGrades() {
  // Prepare data for Radar Chart
  const radarData = useMemo(() => {
  if (displayGrades.length === 0) return []
- const subjects = ['Sikap', 'Keterampilan', 'Pengetahuan']
+ const subjects = ['Sikap', 'Keterampilan', 'Keaktifan']
  return subjects.map(subj => {
  const row = { subject: subj }
  displayGrades.forEach(g => {
  const eksName = g.extracurriculars.name
  if (subj === 'Sikap') row[eksName] = g.attitude_score || 0
  if (subj === 'Keterampilan') row[eksName] = g.skill_score || 0
- if (subj === 'Pengetahuan') row[eksName] = g.knowledge_score || 0
+ if (subj === 'Keaktifan') row[eksName] = g.activity_score || 0
  })
  return row
  })
@@ -70,14 +70,14 @@ export default function ParentGrades() {
  g.semester,
  g.attitude_score ?? '-',
  g.skill_score ?? '-',
- g.knowledge_score ?? '-',
+ g.activity_score ?? '-',
  g.avg,
  g.predikat
  ])
 
  autoTable(doc, {
  startY: selectedSemester ? 45 : 38,
- head: [['Ekstrakurikuler', 'Smstr', 'Sikap', 'Keterampilan', 'Pengetahuan', 'Rata-rata', 'Predikat']],
+ head: [['Ekstrakurikuler', 'Smstr', 'Sikap', 'Keterampilan', 'Keaktifan', 'Rata-rata', 'Predikat']],
  body: tableData,
  theme: 'grid',
  headStyles: { fillColor: [139, 92, 246] }
@@ -226,11 +226,11 @@ export default function ParentGrades() {
  </div>
 
  <div className="flex justify-between items-center text-sm pt-2">
- <span className="text-pixel-peach">Pengetahuan</span>
- <span className="font-semibold text-pixel-white">{g.knowledge_score}</span>
+ <span className="text-pixel-peach">Keaktifan</span>
+ <span className="font-semibold text-pixel-white">{g.activity_score}</span>
  </div>
  <div className="h-1.5 w-full bg-slate-100 rounded-none overflow-hidden">
- <div className="h-full bg-amber-400 rounded-none" style={{ width: `${g.knowledge_score}%` }}></div>
+ <div className="h-full bg-amber-400 rounded-none" style={{ width: `${g.activity_score}%` }}></div>
  </div>
  </div>
 

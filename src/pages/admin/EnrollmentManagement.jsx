@@ -213,7 +213,7 @@ export default function EnrollmentManagement() {
  </div>
  )}
  {successMsg && (
- <div className="p-4 bg-pixel-green/100/15 border-3 border-pixel-green rounded-none text-pixel-green text-sm flex items-start gap-3">
+ <div className="p-4 bg-pixel-green/15 border-3 border-pixel-green rounded-none text-pixel-green text-sm flex items-start gap-3">
  <Check className="w-5 h-5 flex-shrink-0 mt-0.5" />
  <div>{successMsg}</div>
  </div>

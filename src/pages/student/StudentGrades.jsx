@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { useGrades } from '../../hooks/useGrades'
 import {
@@ -34,18 +34,18 @@ export default function StudentGrades() {
  const radarData = useMemo(() => {
  if (displayGrades.length === 0) return []
  
- // We want to show comparison of Sikap, Keterampilan, Pengetahuan per ekskul
+ // We want to show comparison of Sikap, Keterampilan, Keaktifan per ekskul
  // The format for Recharts Radar is:
  // [ { subject: 'Sikap', EkskulA: 90, EkskulB: 80 }, { subject: 'Keterampilan', ... } ]
  
- const subjects = ['Sikap', 'Keterampilan', 'Pengetahuan']
+ const subjects = ['Sikap', 'Keterampilan', 'Keaktifan']
  const data = subjects.map(subj => {
  const row = { subject: subj }
  displayGrades.forEach(g => {
  const eksName = g.extracurriculars.name
  if (subj === 'Sikap') row[eksName] = g.attitude_score || 0
  if (subj === 'Keterampilan') row[eksName] = g.skill_score || 0
- if (subj === 'Pengetahuan') row[eksName] = g.knowledge_score || 0
+ if (subj === 'Keaktifan') row[eksName] = g.activity_score || 0
  })
  return row
  })
@@ -169,11 +169,11 @@ export default function StudentGrades() {
  </div>
 
  <div className="flex justify-between items-center text-sm pt-2">
- <span className="text-pixel-peach">Pengetahuan</span>
- <span className="font-semibold text-pixel-white">{g.knowledge_score}</span>
+ <span className="text-pixel-peach">Keaktifan</span>
+ <span className="font-semibold text-pixel-white">{g.activity_score}</span>
  </div>
  <div className="h-1.5 w-full bg-slate-100 rounded-none overflow-hidden">
- <div className="h-full bg-amber-400 rounded-none" style={{ width: `${g.knowledge_score}%` }}></div>
+ <div className="h-full bg-amber-400 rounded-none" style={{ width: `${g.activity_score}%` }}></div>
  </div>
  </div>
  

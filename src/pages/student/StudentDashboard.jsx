@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { useStudentProfile } from '../../hooks/useStudentProfile'
@@ -114,7 +114,7 @@ export default function StudentDashboard() {
  // Get last grade
  const { data: gradeData } = await supabase
  .from('grades')
- .select('attitude_score, skill_score, knowledge_score, semester')
+ .select('attitude_score, skill_score, activity_score, semester')
  .eq('student_id', studentId)
  .eq('extracurricular_id', ekskulId)
  .order('graded_at', { ascending: false })
@@ -124,7 +124,7 @@ export default function StudentDashboard() {
  let lastGrade = null
  if (gradeData) {
  const avg = Math.round(
- ((gradeData.attitude_score || 0) + (gradeData.skill_score || 0) + (gradeData.knowledge_score || 0)) / 3
+ ((gradeData.attitude_score || 0) + (gradeData.skill_score || 0) + (gradeData.activity_score || 0)) / 3
  )
  const predikat = avg >= 90 ? 'A' : avg >= 75 ? 'B' : avg >= 60 ? 'C' : 'D'
  lastGrade = { avg, predikat, semester: gradeData.semester }

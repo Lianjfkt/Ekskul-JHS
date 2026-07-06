@@ -25,7 +25,7 @@ export default function CoachGrades() {
  // Data States
  const [students, setStudents] = useState([])
  
- // Grades sheet state: { [studentId]: { attitude_score: '', skill_score: '', knowledge_score: '', notes: '' } }
+ // Grades sheet state: { [studentId]: { attitude_score: '', skill_score: '', activity_score: '', notes: '' } }
  const [gradesSheet, setGradesSheet] = useState({})
 
  useEffect(() => {
@@ -126,14 +126,14 @@ export default function CoachGrades() {
  sheet[student.id] = {
  attitude_score: record.attitude_score !== null ? record.attitude_score.toString() : '',
  skill_score: record.skill_score !== null ? record.skill_score.toString() : '',
- knowledge_score: record.knowledge_score !== null ? record.knowledge_score.toString() : '',
+ activity_score: record.activity_score !== null ? record.activity_score.toString() : '',
  notes: record.notes || ''
  }
  } else {
  sheet[student.id] = {
  attitude_score: '',
  skill_score: '',
- knowledge_score: '',
+ activity_score: '',
  notes: ''
  }
  }
@@ -199,7 +199,7 @@ export default function CoachGrades() {
  // Parse score strings to integers or set to null
  const att = sheet.attitude_score !== '' ? parseInt(sheet.attitude_score) : null
  const sk = sheet.skill_score !== '' ? parseInt(sheet.skill_score) : null
- const knw = sheet.knowledge_score !== '' ? parseInt(sheet.knowledge_score) : null
+ const act = sheet.activity_score !== '' ? parseInt(sheet.activity_score) : null
  
  return {
  student_id: student.id,
@@ -208,7 +208,7 @@ export default function CoachGrades() {
  academic_year: selectedAcademicYear,
  attitude_score: att,
  skill_score: sk,
- knowledge_score: knw,
+ activity_score: act,
  notes: sheet.notes || '',
  graded_by: user.id,
  graded_at: new Date().toISOString()
@@ -241,7 +241,7 @@ export default function CoachGrades() {
  </div>
  )}
  {successMsg && (
- <div className="p-4 bg-pixel-green/100/15 border-3 border-pixel-green rounded-none text-pixel-green text-sm flex items-start gap-3">
+ <div className="p-4 bg-pixel-green/15 border-3 border-pixel-green rounded-none text-pixel-green text-sm flex items-start gap-3">
  <Check className="w-5 h-5 flex-shrink-0 mt-0.5" />
  <div>{successMsg}</div>
  </div>
@@ -324,13 +324,13 @@ export default function CoachGrades() {
  <th className="px-4 py-4 w-24 text-center">Absensi</th>
  <th className="px-4 py-4 w-28 text-center">Nilai Sikap</th>
  <th className="px-4 py-4 w-28 text-center">Nilai Keterampilan</th>
- <th className="px-4 py-4 w-28 text-center">Nilai Pengetahuan</th>
+ <th className="px-4 py-4 w-28 text-center">Nilai Aktivitas</th>
  <th className="px-6 py-4 w-1/3">Catatan / Rekomendasi Pelatih</th>
  </tr>
  </thead>
  <tbody className="divide-y-2 divide-pixel-gray/30 text-sm text-pixel-peach">
  {students.map(student => {
- const studentGr = gradesSheet[student.id] || { attitude_score: '', skill_score: '', knowledge_score: '', notes: '' }
+ const studentGr = gradesSheet[student.id] || { attitude_score: '', skill_score: '', activity_score: '', notes: '' }
  return (
  <tr key={student.id} className="hover:bg-pixel-navy/30">
  <td className="px-6 py-4 font-semibold text-pixel-white">
@@ -364,8 +364,8 @@ export default function CoachGrades() {
  <td className="px-4 py-4">
  <Input
  type="text"
- value={studentGr.knowledge_score}
- onChange={(e) => handleScoreChange(student.id, 'knowledge_score', e.target.value)}
+ value={studentGr.activity_score}
+ onChange={(e) => handleScoreChange(student.id, 'activity_score', e.target.value)}
  placeholder="0-100"
  className="text-center font-mono font-bold text-pixel-white"
  />

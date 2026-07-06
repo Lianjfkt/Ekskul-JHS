@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { 
  Card, 
@@ -201,7 +201,7 @@ export default function RecapManagement() {
  let totalGradeScore = 0
  let gradeCount = 0
  grades.forEach(g => {
- const avg = Math.round(((g.attitude_score || 0) + (g.skill_score || 0) + (g.knowledge_score || 0)) / 3)
+ const avg = Math.round(((g.attitude_score || 0) + (g.skill_score || 0) + (g.activity_score || 0)) / 3)
  totalGradeScore += avg
  gradeCount++
  })
@@ -239,7 +239,7 @@ export default function RecapManagement() {
 
  const gradeStatsByEkskul = {}
  grades.forEach(g => {
- const avg = Math.round(((g.attitude_score || 0) + (g.skill_score || 0) + (g.knowledge_score || 0)) / 3)
+ const avg = Math.round(((g.attitude_score || 0) + (g.skill_score || 0) + (g.activity_score || 0)) / 3)
  if (!gradeStatsByEkskul[g.extracurricular_id]) {
  gradeStatsByEkskul[g.extracurricular_id] = { totalScore: 0, count: 0 }
  }
@@ -369,7 +369,7 @@ export default function RecapManagement() {
  // --- TAB 3: GRADE REPORT (FILTERED) ---
  const gradeReportRows = useMemo(() => {
  return grades.map(g => {
- const avg = Math.round(((g.attitude_score || 0) + (g.skill_score || 0) + (g.knowledge_score || 0)) / 3)
+ const avg = Math.round(((g.attitude_score || 0) + (g.skill_score || 0) + (g.activity_score || 0)) / 3)
  let predikat = 'D'
  if (avg >= 90) predikat = 'A'
  else if (avg >= 75) predikat = 'B'
@@ -386,7 +386,7 @@ export default function RecapManagement() {
  academicYear: g.academic_year,
  attitude: g.attitude_score || 0,
  skill: g.skill_score || 0,
- activity: g.knowledge_score || 0,
+ activity: g.activity_score || 0,
  avg,
  predikat,
  notes: g.notes || '-'

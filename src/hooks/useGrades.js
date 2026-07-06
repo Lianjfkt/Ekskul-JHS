@@ -13,7 +13,7 @@ export function useGrades(studentId, semesterFilter = null) {
         .from('grades')
         .select(`
           id, semester, academic_year,
-          attitude_score, skill_score, knowledge_score, notes, graded_at,
+          attitude_score, skill_score, activity_score, notes, graded_at,
           extracurriculars(id, name, schedule, description)
         `)
         .eq('student_id', studentId)
@@ -28,7 +28,7 @@ export function useGrades(studentId, semesterFilter = null) {
 
       const enriched = (data || []).map(g => {
         const avg = Math.round(
-          ((g.attitude_score || 0) + (g.skill_score || 0) + (g.knowledge_score || 0)) / 3
+          ((g.attitude_score || 0) + (g.skill_score || 0) + (g.activity_score || 0)) / 3
         )
         let predikat = 'D'
         if (avg >= 90) predikat = 'A'
