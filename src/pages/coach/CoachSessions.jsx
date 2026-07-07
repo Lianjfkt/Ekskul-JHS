@@ -30,7 +30,7 @@ export default function CoachSessions() {
  session_date: new Date().toISOString().split('T')[0],
  topic: '',
  notes: '',
- handled_by: ''
+ coaches_present: []
  })
 
  useEffect(() => {
@@ -60,7 +60,10 @@ export default function CoachSessions() {
  .select(`
  *,
  extracurricular:extracurricular_id (name, coach_id, coach_id_2, coach:coach_id(id, full_name), coach2:coach_id_2(id, full_name)),
- handler:handled_by (full_name)
+ session_coaches (
+   id,
+   coach:coach_id (id, full_name)
+ )
  `)
  .in('extracurricular_id', ekskulIds)
  .order('session_date', { ascending: false })
@@ -68,7 +71,7 @@ export default function CoachSessions() {
  setSessions(sessionsData || [])
 
  // Set default extracurricular in form if not set
- setForm(f => ({...f, extracurricular_id: ekskuls[0].id, handled_by: user.id}))
+ setForm(f => ({...f, extracurricular_id: ekskuls[0].id, coaches_present: [user.id]}))
  }
  } catch (err) {
  console.error(err)
@@ -81,12 +84,13 @@ export default function CoachSessions() {
   const handleOpenModal = (session = null) => {
   if (session) {
   setSelectedSession(session)
+  const presentCoaches = session.session_coaches ? session.session_coaches.map(sc => sc.coach?.id).filter(Boolean) : []
   setForm({
   extracurricular_id: session.extracurricular_id,
   session_date: session.session_date,
   topic: session.topic || '',
   notes: session.notes || '',
-  handled_by: session.handled_by || user.id
+  coaches_present: presentCoaches.length > 0 ? presentCoaches : [user.id]
   })
   } else {
   setSelectedSession(null)
@@ -95,7 +99,7 @@ export default function CoachSessions() {
   session_date: new Date().toISOString().split('T')[0],
   topic: '',
   notes: '',
-  handled_by: user.id
+  coaches_present: [user.id]
   })
   }
   setIsModalOpen(true)
@@ -105,7 +109,15 @@ export default function CoachSessions() {
   e.preventDefault()
   setErrorMsg('')
   setSuccessMsg('')
+
+  if (form.coaches_present.length === 0) {
+    setErrorMsg('Harap pilih minimal 1 pelatih yang memimpin sesi latihan.')
+    return
+  }
+
   try {
+  let sessionId = selectedSession?.id
+
   if (selectedSession) {
   // Edit Mode
   const { error } = await supabase
@@ -114,15 +126,22 @@ export default function CoachSessions() {
   extracurricular_id: form.extracurricular_id,
   session_date: form.session_date,
   topic: form.topic,
-  notes: form.notes,
-  handled_by: form.handled_by || null
+  notes: form.notes
   })
   .eq('id', selectedSession.id)
   if (error) throw error
+
+  // Hapus relasi pelatih lama
+  const { error: delErr } = await supabase
+  .from('session_coaches')
+  .delete()
+  .eq('session_id', selectedSession.id)
+  if (delErr) throw delErr
+
   setSuccessMsg('Sesi latihan berhasil diperbarui.')
   } else {
   // Create Mode
-  const { error } = await supabase
+  const { data: newSession, error } = await supabase
   .from('sessions')
   .insert([
   {
@@ -130,13 +149,27 @@ export default function CoachSessions() {
   session_date: form.session_date,
   topic: form.topic,
   notes: form.notes,
-  created_by: user.id,
-  handled_by: form.handled_by || user.id
+  created_by: user.id
   }
   ])
+  .select()
+  .single()
   if (error) throw error
+  sessionId = newSession.id
   setSuccessMsg('Sesi latihan baru berhasil dibuat.')
   }
+
+  // Insert relasi pelatih baru
+  const coachesToInsert = form.coaches_present.map(cId => ({
+    session_id: sessionId,
+    coach_id: cId
+  }))
+
+  const { error: insErr } = await supabase
+  .from('session_coaches')
+  .insert(coachesToInsert)
+  if (insErr) throw insErr
+
   setIsModalOpen(false)
   fetchData()
   } catch (err) {
@@ -229,7 +262,7 @@ export default function CoachSessions() {
   })}
   </td>
   <td className="px-6 py-4 font-bold text-pixel-white">{session.extracurricular?.name}</td>
-  <td className="px-6 py-4 text-pixel-yellow font-semibold">{session.handler?.full_name || 'Tidak diketahui'}</td>
+  <td className="px-6 py-4 text-pixel-yellow font-semibold">{session.session_coaches && session.session_coaches.length > 0 ? session.session_coaches.map(sc => sc.coach?.full_name).filter(Boolean).join(', ') : 'Tidak diketahui'}</td>
   <td className="px-6 py-4 font-semibold text-pixel-white">{session.topic || 'Sesi Umum'}</td>
   <td className="px-6 py-4 text-pixel-lavender max-w-xs truncate">{session.notes || '-'}</td>
   <td className="px-6 py-4 text-right space-x-2">
@@ -265,47 +298,66 @@ export default function CoachSessions() {
  </div>
  <form onSubmit={handleSubmit} className="p-6 space-y-4">
  
- {/* Pilih Ekskul */}
- <div className="space-y-1.5">
- <Label htmlFor="s_ekskul">Ekstrakurikuler</Label>
- <select
- id="s_ekskul"
- required
- className="flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
- value={form.extracurricular_id}
- onChange={e => {
+  {/* Pilih Ekskul */}
+  <div className="space-y-1.5">
+  <Label htmlFor="s_ekskul">Ekstrakurikuler</Label>
+  <select
+  id="s_ekskul"
+  required
+  className="flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+  value={form.extracurricular_id}
+  onChange={e => {
     const selectedId = e.target.value
     const eksObj = managedEkskuls.find(ex => ex.id === selectedId)
-    setForm({...form, extracurricular_id: selectedId, handled_by: eksObj?.coach?.id || user.id})
+    setForm({...form, extracurricular_id: selectedId, coaches_present: [eksObj?.coach?.id || user.id].filter(Boolean)})
   }}
- >
- {managedEkskuls.map(e => (
- <option key={e.id} value={e.id}>{e.name}</option>
- ))}
- </select>
- </div>
+  >
+  {managedEkskuls.map(e => (
+  <option key={e.id} value={e.id}>{e.name}</option>
+  ))}
+  </select>
+  </div>
 
- {/* Pilih Pelatih yang Memimpin Sesi */}
+  {/* Pilih Pelatih yang Memimpin Sesi (Multi-select Checkbox) */}
   {(() => {
     const selectedEkskulObj = managedEkskuls.find(e => e.id === form.extracurricular_id)
     if (!selectedEkskulObj) return null
+
+    const handleCheckboxChange = (coachId, checked) => {
+      if (checked) {
+        setForm(f => ({...f, coaches_present: [...f.coaches_present, coachId]}))
+      } else {
+        setForm(f => ({...f, coaches_present: f.coaches_present.filter(id => id !== coachId)}))
+      }
+    }
+
     return (
-      <div className="space-y-1.5">
-      <Label htmlFor="s_handled">Pelatih yang Memimpin Sesi</Label>
-      <select
-      id="s_handled"
-      required
-      className="flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      value={form.handled_by}
-      onChange={e => setForm({...form, handled_by: e.target.value})}
-      >
-      {selectedEkskulObj.coach && (
-        <option value={selectedEkskulObj.coach.id}>{selectedEkskulObj.coach.full_name} (Pelatih 1)</option>
-      )}
-      {selectedEkskulObj.coach2 && (
-        <option value={selectedEkskulObj.coach2.id}>{selectedEkskulObj.coach2.full_name} (Pelatih 2)</option>
-      )}
-      </select>
+      <div className="space-y-2">
+        <Label>Pelatih yang Memimpin Latihan (Dapat Pilih Lebih dari 1)</Label>
+        <div className="flex flex-col gap-2 p-3 bg-pixel-navy border border-pixel-gray/30">
+          {selectedEkskulObj.coach && (
+            <label className="flex items-center gap-2 cursor-pointer font-retro text-base text-pixel-peach select-none">
+              <input
+                type="checkbox"
+                checked={form.coaches_present.includes(selectedEkskulObj.coach.id)}
+                onChange={e => handleCheckboxChange(selectedEkskulObj.coach.id, e.target.checked)}
+                className="h-4 w-4 accent-pixel-blue"
+              />
+              <span>{selectedEkskulObj.coach.full_name} (Pelatih 1)</span>
+            </label>
+          )}
+          {selectedEkskulObj.coach2 && (
+            <label className="flex items-center gap-2 cursor-pointer font-retro text-base text-pixel-peach select-none">
+              <input
+                type="checkbox"
+                checked={form.coaches_present.includes(selectedEkskulObj.coach2.id)}
+                onChange={e => handleCheckboxChange(selectedEkskulObj.coach2.id, e.target.checked)}
+                className="h-4 w-4 accent-pixel-blue"
+              />
+              <span>{selectedEkskulObj.coach2.full_name} (Pelatih 2)</span>
+            </label>
+          )}
+        </div>
       </div>
     )
   })()}

@@ -80,7 +80,7 @@ export default function RecapManagement() {
  supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email)').order('name', { ascending: true }),
  supabase.from('enrollments').select('*, student:student_id (id, nis, full_name, class)').eq('status', 'active'),
  supabase.from('grades').select('*, student:student_id (id, nis, full_name, class), extracurricular:extracurricular_id (id, name)'),
- supabase.from('sessions').select('*, creator:created_by (id, full_name, email), handler:handled_by (id, full_name, email), extracurricular:extracurricular_id (id, name, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email))').order('session_date', { ascending: false }),
+ supabase.from('sessions').select('*, creator:created_by (id, full_name, email), extracurricular:extracurricular_id (id, name, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email)), session_coaches (id, coach:coach_id (id, full_name, email))').order('session_date', { ascending: false }),
  supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)'),
  supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true })
  ])
@@ -195,56 +195,64 @@ export default function RecapManagement() {
   return `${monthsIndo[parseInt(startMonth, 10) - 1]} – ${monthsIndo[parseInt(endMonth, 10) - 1]} ${endYear}`
  }
 
-  const getSessionCoach = (session) => {
-   if (session.handler) return session.handler
-   if (session.creator) return session.creator
-   if (session.extracurricular?.coach) return session.extracurricular.coach
-   return { id: 'unknown', full_name: 'Tanpa Pelatih', email: '' }
+  // Mendapatkan daftar pelatih yang memimpin sesi (dari tabel session_coaches)
+  // Fallback ke creator/coach jika belum ada data di session_coaches (backward compat)
+  const getSessionCoaches = (session) => {
+   if (session.session_coaches && session.session_coaches.length > 0) {
+    return session.session_coaches.map(sc => sc.coach).filter(Boolean)
+   }
+   // Fallback untuk data lama
+   if (session.creator) return [session.creator]
+   if (session.extracurricular?.coach) return [session.extracurricular.coach]
+   return [{ id: 'unknown', full_name: 'Tanpa Pelatih', email: '' }]
   }
 
- const coachSessionReportRows = useMemo(() => {
-  const groups = {}
+  const coachSessionReportRows = useMemo(() => {
+   const groups = {}
 
-  sessions.forEach(s => {
-   const coach = getSessionCoach(s)
-   const ekskul = s.extracurricular || { id: 'unknown', name: 'Ekskul Tidak Diketahui' }
-   const periodKey = getSessionPeriodKey(s.session_date)
+   sessions.forEach(s => {
+    const coaches = getSessionCoaches(s)
+    const ekskul = s.extracurricular || { id: 'unknown', name: 'Ekskul Tidak Diketahui' }
+    const periodKey = getSessionPeriodKey(s.session_date)
 
-   const key = `${coach.id}_${ekskul.id}_${periodKey}`
-   if (!groups[key]) {
-    groups[key] = {
-     coachId: coach.id,
-     coachName: coach.full_name,
-     coachEmail: coach.email || '-',
-     ekskulId: ekskul.id,
-     ekskulName: ekskul.name,
-     periodKey: periodKey,
-     sessionsCount: 0,
-     sessionsList: []
-    }
-   }
-   groups[key].sessionsCount++
-   groups[key].sessionsList.push({
-    id: s.id,
-    session_date: s.session_date,
-    topic: s.topic,
-    notes: s.notes
+    // Setiap pelatih yang hadir mendapat 1 catatan kehadiran
+    coaches.forEach(coach => {
+     const key = `${coach.id}_${ekskul.id}_${periodKey}`
+     if (!groups[key]) {
+      groups[key] = {
+       coachId: coach.id,
+       coachName: coach.full_name,
+       coachEmail: coach.email || '-',
+       ekskulId: ekskul.id,
+       ekskulName: ekskul.name,
+       periodKey: periodKey,
+       sessionsCount: 0,
+       sessionsList: []
+      }
+     }
+     groups[key].sessionsCount++
+     groups[key].sessionsList.push({
+      id: s.id,
+      session_date: s.session_date,
+      topic: s.topic,
+      notes: s.notes
+     })
+    })
    })
-  })
 
-  return Object.values(groups).filter(row => {
-   const matchCoach = selectedCoach ? row.coachId === selectedCoach : true
-   const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
-   const matchMonth = selectedMonth ? row.periodKey === selectedMonth : true
-   const matchSearch = searchQuery
-    ? row.coachName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      row.ekskulName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      row.sessionsList.some(s => s.topic?.toLowerCase().includes(searchQuery.toLowerCase()))
-    : true
+   return Object.values(groups).filter(row => {
+    const matchCoach = selectedCoach ? row.coachId === selectedCoach : true
+    const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
+    const matchMonth = selectedMonth ? row.periodKey === selectedMonth : true
+    const matchSearch = searchQuery
+     ? row.coachName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       row.ekskulName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       row.sessionsList.some(s => s.topic?.toLowerCase().includes(searchQuery.toLowerCase()))
+     : true
 
-   return matchCoach && matchEkskul && matchMonth && matchSearch
-  })
- }, [sessions, selectedCoach, selectedEkskul, selectedMonth, searchQuery])
+    return matchCoach && matchEkskul && matchMonth && matchSearch
+   })
+  }, [sessions, selectedCoach, selectedEkskul, selectedMonth, searchQuery])
 
  // --- CORE COMPUTED METRICS ---
  const computedStats = useMemo(() => {
