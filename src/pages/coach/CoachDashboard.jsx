@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabaseClient'
@@ -31,7 +31,7 @@ export default function CoachDashboard() {
  const { data: ekskuls, error: eErr } = await supabase
  .from('extracurriculars')
  .select('*')
- .eq('coach_id', user.id)
+ .or(`coach_id.eq.${user.id},coach_id_2.eq.${user.id}`)
  if (eErr) throw eErr
  setManagedEkskuls(ekskuls || [])
 

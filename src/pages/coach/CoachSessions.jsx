@@ -46,7 +46,7 @@ export default function CoachSessions() {
  const { data: ekskuls, error: eErr } = await supabase
  .from('extracurriculars')
  .select('id, name')
- .eq('coach_id', user.id)
+ .or(`coach_id.eq.${user.id},coach_id_2.eq.${user.id}`)
  if (eErr) throw eErr
  setManagedEkskuls(ekskuls || [])
 

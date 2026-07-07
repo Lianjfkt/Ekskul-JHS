@@ -77,10 +77,10 @@ export default function RecapManagement() {
  { data: attendancesData, error: aErr },
  { data: coachesData, error: cErr }
  ] = await Promise.all([
- supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email)').order('name', { ascending: true }),
+ supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email)').order('name', { ascending: true }),
  supabase.from('enrollments').select('*, student:student_id (id, nis, full_name, class)').eq('status', 'active'),
  supabase.from('grades').select('*, student:student_id (id, nis, full_name, class), extracurricular:extracurricular_id (id, name)'),
- supabase.from('sessions').select('*, creator:created_by (id, full_name, email), extracurricular:extracurricular_id (id, name, coach:coach_id (id, full_name, email))').order('session_date', { ascending: false }),
+ supabase.from('sessions').select('*, creator:created_by (id, full_name, email), extracurricular:extracurricular_id (id, name, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email))').order('session_date', { ascending: false }),
  supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)'),
  supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true })
  ])
@@ -124,72 +124,125 @@ export default function RecapManagement() {
  }, [enrollments, grades])
 
  // Helpers & memoized hooks for Coach Sessions Recap
- const availableMonths = useMemo(() => {
- const months = new Set()
- sessions.forEach(s => {
- if (s.session_date) {
- const yyyymm = s.session_date.substring(0, 7)
- months.add(yyyymm)
+
+ // Cut-off period helper: returns period key "YYYY-MM_YYYY-MM" (startMonth_endMonth)
+ // Period runs from 25th of monthA to 24th of monthB
+ const getSessionPeriodKey = (sessionDate) => {
+  if (!sessionDate) return 'unknown'
+  const date = new Date(sessionDate)
+  const day = date.getDate()
+  const month = date.getMonth() // 0-indexed
+  const year = date.getFullYear()
+
+  if (day >= 25) {
+   // Belongs to period: current month -> next month
+   const startMonth = month
+   const startYear = year
+   const endMonth = (month + 1) % 12
+   const endYear = month === 11 ? year + 1 : year
+   const startKey = `${startYear}-${String(startMonth + 1).padStart(2, '0')}`
+   const endKey = `${endYear}-${String(endMonth + 1).padStart(2, '0')}`
+   return `${startKey}_${endKey}`
+  } else {
+   // day <= 24: Belongs to period: previous month -> current month
+   const endMonth = month
+   const endYear = year
+   const startMonth = (month - 1 + 12) % 12
+   const startYear = month === 0 ? year - 1 : year
+   const startKey = `${startYear}-${String(startMonth + 1).padStart(2, '0')}`
+   const endKey = `${endYear}-${String(endMonth + 1).padStart(2, '0')}`
+   return `${startKey}_${endKey}`
+  }
  }
- })
- return Array.from(months).sort().reverse()
+
+ const availablePeriods = useMemo(() => {
+  const periods = new Set()
+  sessions.forEach(s => {
+   if (s.session_date) {
+    periods.add(getSessionPeriodKey(s.session_date))
+   }
+  })
+  return Array.from(periods).sort().reverse()
  }, [sessions])
 
- const formatMonthYearIndo = (yyyymm) => {
- if (!yyyymm || yyyymm === 'unknown') return 'Bulan Tidak Diketahui'
- const [year, month] = yyyymm.split('-')
  const monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
- return `${monthsIndo[parseInt(month, 10) - 1]} ${year}`
+
+ const formatMonthYearIndo = (yyyymm) => {
+  if (!yyyymm || yyyymm === 'unknown') return 'Bulan Tidak Diketahui'
+  const [year, month] = yyyymm.split('-')
+  return `${monthsIndo[parseInt(month, 10) - 1]} ${year}`
+ }
+
+ const formatPeriodIndo = (periodKey) => {
+  if (!periodKey || periodKey === 'unknown') return 'Periode Tidak Diketahui'
+  const parts = periodKey.split('_')
+  if (parts.length !== 2) return formatMonthYearIndo(periodKey)
+  const [startYYYYMM, endYYYYMM] = parts
+  const [startYear, startMonth] = startYYYYMM.split('-')
+  const [endYear, endMonth] = endYYYYMM.split('-')
+  const startLabel = `25 ${monthsIndo[parseInt(startMonth, 10) - 1]} ${startYear}`
+  const endLabel = `24 ${monthsIndo[parseInt(endMonth, 10) - 1]} ${endYear}`
+  return `${startLabel} – ${endLabel}`
+ }
+
+ const formatPeriodShortIndo = (periodKey) => {
+  if (!periodKey || periodKey === 'unknown') return 'Periode Tidak Diketahui'
+  const parts = periodKey.split('_')
+  if (parts.length !== 2) return formatMonthYearIndo(periodKey)
+  const [startYYYYMM, endYYYYMM] = parts
+  const [, startMonth] = startYYYYMM.split('-')
+  const [endYear, endMonth] = endYYYYMM.split('-')
+  return `${monthsIndo[parseInt(startMonth, 10) - 1]} – ${monthsIndo[parseInt(endMonth, 10) - 1]} ${endYear}`
  }
 
  const getSessionCoach = (session) => {
- if (session.creator) return session.creator
- if (session.extracurricular?.coach) return session.extracurricular.coach
- return { id: 'unknown', full_name: 'Tanpa Pelatih', email: '' }
+  if (session.creator) return session.creator
+  if (session.extracurricular?.coach) return session.extracurricular.coach
+  return { id: 'unknown', full_name: 'Tanpa Pelatih', email: '' }
  }
 
  const coachSessionReportRows = useMemo(() => {
- const groups = {}
+  const groups = {}
 
- sessions.forEach(s => {
- const coach = getSessionCoach(s)
- const ekskul = s.extracurricular || { id: 'unknown', name: 'Ekskul Tidak Diketahui' }
- const yyyymm = s.session_date ? s.session_date.substring(0, 7) : 'unknown'
+  sessions.forEach(s => {
+   const coach = getSessionCoach(s)
+   const ekskul = s.extracurricular || { id: 'unknown', name: 'Ekskul Tidak Diketahui' }
+   const periodKey = getSessionPeriodKey(s.session_date)
 
- const key = `${coach.id}_${ekskul.id}_${yyyymm}`
- if (!groups[key]) {
- groups[key] = {
- coachId: coach.id,
- coachName: coach.full_name,
- coachEmail: coach.email || '-',
- ekskulId: ekskul.id,
- ekskulName: ekskul.name,
- monthKey: yyyymm,
- sessionsCount: 0,
- sessionsList: []
- }
- }
- groups[key].sessionsCount++
- groups[key].sessionsList.push({
- id: s.id,
- session_date: s.session_date,
- topic: s.topic,
- notes: s.notes
- })
- })
+   const key = `${coach.id}_${ekskul.id}_${periodKey}`
+   if (!groups[key]) {
+    groups[key] = {
+     coachId: coach.id,
+     coachName: coach.full_name,
+     coachEmail: coach.email || '-',
+     ekskulId: ekskul.id,
+     ekskulName: ekskul.name,
+     periodKey: periodKey,
+     sessionsCount: 0,
+     sessionsList: []
+    }
+   }
+   groups[key].sessionsCount++
+   groups[key].sessionsList.push({
+    id: s.id,
+    session_date: s.session_date,
+    topic: s.topic,
+    notes: s.notes
+   })
+  })
 
- return Object.values(groups).filter(row => {
- const matchCoach = selectedCoach ? row.coachId === selectedCoach : true
- const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
- const matchMonth = selectedMonth ? row.monthKey === selectedMonth : true
- const matchSearch = searchQuery
- ? row.coachName.toLowerCase().includes(searchQuery.toLowerCase()) ||
- row.ekskulName.toLowerCase().includes(searchQuery.toLowerCase()) ||
- row.sessionsList.some(s => s.topic?.toLowerCase().includes(searchQuery.toLowerCase()))
- : true
+  return Object.values(groups).filter(row => {
+   const matchCoach = selectedCoach ? row.coachId === selectedCoach : true
+   const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
+   const matchMonth = selectedMonth ? row.periodKey === selectedMonth : true
+   const matchSearch = searchQuery
+    ? row.coachName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      row.ekskulName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      row.sessionsList.some(s => s.topic?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : true
 
- return matchCoach && matchEkskul && matchMonth && matchSearch
- })
+   return matchCoach && matchEkskul && matchMonth && matchSearch
+  })
  }, [sessions, selectedCoach, selectedEkskul, selectedMonth, searchQuery])
 
  // --- CORE COMPUTED METRICS ---
@@ -257,11 +310,13 @@ export default function RecapManagement() {
  const grInfo = gradeStatsByEkskul[e.id]
  const avgGr = grInfo && grInfo.count > 0 ? Math.round(grInfo.totalScore / grInfo.count) : 0
 
- return {
- id: e.id,
- name: e.name,
- coachName: e.coach?.full_name || 'Belum ditunjuk',
- schedule: e.schedule || '-',
+  const coachNames = [e.coach?.full_name, e.coach2?.full_name].filter(Boolean).join(', ') || 'Belum ditunjuk'
+
+  return {
+   id: e.id,
+   name: e.name,
+   coachName: coachNames,
+   schedule: e.schedule || '-',
  isActive: e.is_active,
  activeSiswa,
  sessionsCount,
@@ -456,20 +511,20 @@ export default function RecapManagement() {
  }
 
  const exportCoachSessionsToExcel = () => {
- const rows = coachSessionReportRows.map(r => [
- r.coachName,
- r.coachEmail,
- r.ekskulName,
- formatMonthYearIndo(r.monthKey),
- r.sessionsCount,
- r.sessionsList.map(s => `${s.session_date} (${s.topic || 'Sesi Latihan'})`).join('; ')
- ])
- const headers = ['Nama Pelatih', 'Email Pelatih', 'Ekstrakurikuler', 'Bulan & Tahun', 'Jumlah Sesi', 'Daftar Sesi']
- exportToExcel(rows, headers, 'Laporan Sesi Pelatih', 'rekap_sesi_pelatih.xlsx')
+  const rows = coachSessionReportRows.map(r => [
+   r.coachName,
+   r.coachEmail,
+   r.ekskulName,
+   formatPeriodIndo(r.periodKey),
+   r.sessionsCount,
+   r.sessionsList.map(s => `${s.session_date} (${s.topic || 'Sesi Latihan'})`).join('; ')
+  ])
+  const headers = ['Nama Pelatih', 'Email Pelatih', 'Ekstrakurikuler', 'Periode', 'Jumlah Sesi', 'Daftar Sesi']
+  exportToExcel(rows, headers, 'Laporan Sesi Pelatih', 'rekap_sesi_pelatih.xlsx')
  }
 
  const exportCoachSessionsDetailToExcel = (rowGroup) => {
- const { coachName, ekskulName, monthKey, sessionsList, ekskulId } = rowGroup
+ const { coachName, ekskulName, periodKey, sessionsList, ekskulId } = rowGroup
 
  // Find total active students registered in this ekskul
  const totalPeserta = enrollments.filter(en => en.extracurricular_id === ekskulId).length
@@ -479,9 +534,7 @@ export default function RecapManagement() {
  const academicYear = sampleEnroll?.academic_year || '2025/2026'
  const semester = sampleEnroll?.semester || 'Genap'
 
- const monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
- const [year, month] = monthKey.split('-')
- const periodeLabel = `${monthsIndo[parseInt(month, 10) - 1]} ${year}`
+ const periodeLabel = formatPeriodIndo(periodKey)
 
  // Construct the custom header structure like the image
  const data = [
@@ -564,9 +617,10 @@ export default function RecapManagement() {
  XLSX.utils.book_append_sheet(wb, ws, 'Daftar Hadir')
 
  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
- const sanitizedCoachName = coachName.replace(/[^a-z0-9]/gi, '_').toLowerCase()
- const sanitizedEkskulName = ekskulName.replace(/[^a-z0-9]/gi, '_').toLowerCase()
- saveAs(new Blob([wbout], { type: 'application/octet-stream' }), `daftar_hadir_${sanitizedCoachName}_${sanitizedEkskulName}_${monthKey}.xlsx`)
+  const sanitizedCoachName = coachName.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+  const sanitizedEkskulName = ekskulName.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+  const sanitizedPeriod = periodKey.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+  saveAs(new Blob([wbout], { type: 'application/octet-stream' }), `daftar_hadir_${sanitizedCoachName}_${sanitizedEkskulName}_${sanitizedPeriod}.xlsx`)
  }
 
  const exportToExcel = (rows, headers, sheetName, filename) => {
@@ -759,13 +813,12 @@ export default function RecapManagement() {
  >
  Laporan Nilai Siswa
  </button>
- <button 
- onClick={() => { setActiveTab('coachSessions'); setSearchQuery(''); setSelectedCoach(''); setSelectedEkskul(''); setSelectedMonth(''); }}
- className={`pb-3 font-retro text-lg border-b-2 whitespace-nowrap ${
- activeTab === 'coachSessions' ? 'border-indigo-600 text-pixel-blue' : 'border-transparent text-pixel-lavender hover:text-pixel-white'
- }`}
- >
- Laporan Sesi Pelatih
+ <button  onClick={() => { setActiveTab('coachSessions'); setSearchQuery(''); setSelectedCoach(''); setSelectedEkskul(''); setSelectedMonth(''); }}
+  className={`pb-3 font-retro text-lg border-b-2 whitespace-nowrap ${
+  activeTab === 'coachSessions' ? 'border-indigo-600 text-pixel-blue' : 'border-transparent text-pixel-lavender hover:text-pixel-white'
+  }`}
+  >
+  Laporan Kehadiran Pelatih
  </button>
  </div>
 
@@ -851,16 +904,16 @@ export default function RecapManagement() {
  ))}
  </select>
 
- <select
- value={selectedMonth}
- onChange={e => setSelectedMonth(e.target.value)}
- className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300"
- >
- <option value="">Semua Bulan</option>
- {availableMonths.map(m => (
- <option key={m} value={m}>{formatMonthYearIndo(m)}</option>
- ))}
- </select>
+  <select
+  value={selectedMonth}
+  onChange={e => setSelectedMonth(e.target.value)}
+  className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300"
+  >
+  <option value="">Semua Periode</option>
+  {availablePeriods.map(p => (
+   <option key={p} value={p}>{formatPeriodShortIndo(p)}</option>
+  ))}
+  </select>
  </>
  )}
  </div>
@@ -1063,12 +1116,12 @@ export default function RecapManagement() {
  <table className="w-full text-left border-collapse text-sm">
  <thead>
  <tr className="bg-pixel-navy/75 border-b border-pixel-gray/30 text-pixel-lavender font-semibold">
- <th className="p-4 pl-6">Nama Pelatih</th>
- <th className="p-4">Email Pelatih</th>
- <th className="p-4">Ekstrakurikuler</th>
- <th className="p-4 text-center">Bulan & Tahun</th>
- <th className="p-4 text-center">Total Sesi Pertemuan</th>
- <th className="p-4 text-center pr-6">Aksi</th>
+  <th className="p-4 pl-6">Nama Pelatih</th>
+  <th className="p-4">Email Pelatih</th>
+  <th className="p-4">Ekstrakurikuler</th>
+  <th className="p-4 text-center">Periode</th>
+  <th className="p-4 text-center">Total Sesi Pertemuan</th>
+  <th className="p-4 text-center pr-6">Aksi</th>
  </tr>
  </thead>
  <tbody className="divide-y-2 divide-pixel-gray/30">
@@ -1082,7 +1135,7 @@ export default function RecapManagement() {
  <td className="p-4 pl-6 font-semibold text-pixel-white">{r.coachName}</td>
  <td className="p-4 text-pixel-lavender">{r.coachEmail}</td>
  <td className="p-4 font-medium text-pixel-peach">{r.ekskulName}</td>
- <td className="p-4 text-center text-pixel-peach font-medium">{formatMonthYearIndo(r.monthKey)}</td>
+  <td className="p-4 text-center text-pixel-peach font-medium">{formatPeriodShortIndo(r.periodKey)}</td>
  <td className="p-4 text-center pr-6 font-bold text-pixel-blue">{r.sessionsCount} Sesi</td>
  <td className="p-4 text-center pr-6 space-x-2">
  <Button 
@@ -1134,7 +1187,7 @@ export default function RecapManagement() {
  
  <div className="p-6 overflow-y-auto max-h-[400px] space-y-4">
  <p className="font-retro text-lg text-pixel-white">
- Riwayat Sesi untuk Bulan {formatMonthYearIndo(selectedSessionGroup.monthKey)}
+  Riwayat Sesi untuk Periode {formatPeriodIndo(selectedSessionGroup.periodKey)}
  </p>
  
  <div className="space-y-3">
