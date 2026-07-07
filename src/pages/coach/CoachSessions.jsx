@@ -29,7 +29,8 @@ export default function CoachSessions() {
  extracurricular_id: '',
  session_date: new Date().toISOString().split('T')[0],
  topic: '',
- notes: ''
+ notes: '',
+ handled_by: ''
  })
 
  useEffect(() => {
@@ -45,7 +46,7 @@ export default function CoachSessions() {
  // 1. Fetch managed extracurriculars
  const { data: ekskuls, error: eErr } = await supabase
  .from('extracurriculars')
- .select('id, name')
+ .select('id, name, coach_id, coach_id_2, coach:coach_id(id, full_name), coach2:coach_id_2(id, full_name)')
  .or(`coach_id.eq.${user.id},coach_id_2.eq.${user.id}`)
  if (eErr) throw eErr
  setManagedEkskuls(ekskuls || [])
@@ -58,7 +59,8 @@ export default function CoachSessions() {
  .from('sessions')
  .select(`
  *,
- extracurricular:extracurricular_id (name)
+ extracurricular:extracurricular_id (name, coach_id, coach_id_2, coach:coach_id(id, full_name), coach2:coach_id_2(id, full_name)),
+ handler:handled_by (full_name)
  `)
  .in('extracurricular_id', ekskulIds)
  .order('session_date', { ascending: false })
@@ -66,7 +68,7 @@ export default function CoachSessions() {
  setSessions(sessionsData || [])
 
  // Set default extracurricular in form if not set
- setForm(f => ({...f, extracurricular_id: ekskuls[0].id}))
+ setForm(f => ({...f, extracurricular_id: ekskuls[0].id, handled_by: user.id}))
  }
  } catch (err) {
  console.error(err)
@@ -76,67 +78,71 @@ export default function CoachSessions() {
  }
  }
 
- const handleOpenModal = (session = null) => {
- if (session) {
- setSelectedSession(session)
- setForm({
- extracurricular_id: session.extracurricular_id,
- session_date: session.session_date,
- topic: session.topic || '',
- notes: session.notes || ''
- })
- } else {
- setSelectedSession(null)
- setForm({
- extracurricular_id: managedEkskuls[0]?.id || '',
- session_date: new Date().toISOString().split('T')[0],
- topic: '',
- notes: ''
- })
- }
- setIsModalOpen(true)
- }
+  const handleOpenModal = (session = null) => {
+  if (session) {
+  setSelectedSession(session)
+  setForm({
+  extracurricular_id: session.extracurricular_id,
+  session_date: session.session_date,
+  topic: session.topic || '',
+  notes: session.notes || '',
+  handled_by: session.handled_by || user.id
+  })
+  } else {
+  setSelectedSession(null)
+  setForm({
+  extracurricular_id: managedEkskuls[0]?.id || '',
+  session_date: new Date().toISOString().split('T')[0],
+  topic: '',
+  notes: '',
+  handled_by: user.id
+  })
+  }
+  setIsModalOpen(true)
+  }
 
- const handleSubmit = async (e) => {
- e.preventDefault()
- setErrorMsg('')
- setSuccessMsg('')
- try {
- if (selectedSession) {
- // Edit Mode
- const { error } = await supabase
- .from('sessions')
- .update({
- extracurricular_id: form.extracurricular_id,
- session_date: form.session_date,
- topic: form.topic,
- notes: form.notes
- })
- .eq('id', selectedSession.id)
- if (error) throw error
- setSuccessMsg('Sesi latihan berhasil diperbarui.')
- } else {
- // Create Mode
- const { error } = await supabase
- .from('sessions')
- .insert([
- {
- extracurricular_id: form.extracurricular_id,
- session_date: form.session_date,
- topic: form.topic,
- notes: form.notes,
- created_by: user.id
- }
- ])
- if (error) throw error
- setSuccessMsg('Sesi latihan baru berhasil dibuat.')
- }
- setIsModalOpen(false)
- fetchData()
- } catch (err) {
- setErrorMsg(err.message)
- }
- }
+  const handleSubmit = async (e) => {
+  e.preventDefault()
+  setErrorMsg('')
+  setSuccessMsg('')
+  try {
+  if (selectedSession) {
+  // Edit Mode
+  const { error } = await supabase
+  .from('sessions')
+  .update({
+  extracurricular_id: form.extracurricular_id,
+  session_date: form.session_date,
+  topic: form.topic,
+  notes: form.notes,
+  handled_by: form.handled_by || null
+  })
+  .eq('id', selectedSession.id)
+  if (error) throw error
+  setSuccessMsg('Sesi latihan berhasil diperbarui.')
+  } else {
+  // Create Mode
+  const { error } = await supabase
+  .from('sessions')
+  .insert([
+  {
+  extracurricular_id: form.extracurricular_id,
+  session_date: form.session_date,
+  topic: form.topic,
+  notes: form.notes,
+  created_by: user.id,
+  handled_by: form.handled_by || user.id
+  }
+  ])
+  if (error) throw error
+  setSuccessMsg('Sesi latihan baru berhasil dibuat.')
+  }
+  setIsModalOpen(false)
+  fetchData()
+  } catch (err) {
+  setErrorMsg(err.message)
+  }
+  }
 
  const handleDelete = async (id) => {
  if (!confirm('Apakah Anda yakin ingin menghapus sesi ini? Semua data absensi siswa pada sesi ini juga akan dihapus.')) return
@@ -196,42 +202,44 @@ export default function CoachSessions() {
  <div className="overflow-x-auto">
  <table className="w-full text-left border-collapse">
  <thead>
- <tr className="bg-pixel-navy border-b border-pixel-gray/30 font-retro text-base text-pixel-lavender uppercase tracking-wider">
- <th className="px-6 py-4">Tanggal</th>
- <th className="px-6 py-4">Ekstrakurikuler</th>
- <th className="px-6 py-4">Topik / Materi Latihan</th>
- <th className="px-6 py-4">Catatan Sesi</th>
- <th className="px-6 py-4 text-right">Aksi</th>
- </tr>
- </thead>
- <tbody className="divide-y-2 divide-pixel-gray/30 text-sm text-pixel-peach">
- {sessions.length === 0 ? (
- <tr>
- <td colSpan={5} className="px-6 py-8 text-center text-pixel-lavender">Belum ada sesi latihan yang dibuat.</td>
- </tr>
- ) : (
- sessions.map(session => (
- <tr key={session.id} className="hover:bg-pixel-panel-light">
- <td className="px-6 py-4 font-mono font-semibold text-pixel-white flex items-center gap-1.5 mt-2">
- <CalendarDays className="w-4 h-4 text-primary" />
- {new Date(session.session_date).toLocaleDateString('id-ID', {
- weekday: 'short',
- year: 'numeric',
- month: 'short',
- day: 'numeric'
- })}
- </td>
- <td className="px-6 py-4 font-bold text-pixel-white">{session.extracurricular?.name}</td>
- <td className="px-6 py-4 font-semibold text-pixel-white">{session.topic || 'Sesi Umum'}</td>
- <td className="px-6 py-4 text-pixel-lavender max-w-xs truncate">{session.notes || '-'}</td>
- <td className="px-6 py-4 text-right space-x-2">
- <Button onClick={() => handleOpenModal(session)} variant="ghost" size="icon" className="h-8 w-8 hover:bg-pixel-panel-light hover:text-primary">
- <Edit2 className="w-4 h-4" />
- </Button>
- <Button onClick={() => handleDelete(session.id)} variant="ghost" size="icon" className="h-8 w-8 hover:bg-pixel-red/10 text-pixel-red hover:text-pixel-red">
- <Trash2 className="w-4 h-4" />
- </Button>
- </td>
+  <tr className="bg-pixel-navy border-b border-pixel-gray/30 font-retro text-base text-pixel-lavender uppercase tracking-wider">
+  <th className="px-6 py-4">Tanggal</th>
+  <th className="px-6 py-4">Ekstrakurikuler</th>
+  <th className="px-6 py-4">Pelatih Memimpin</th>
+  <th className="px-6 py-4">Topik / Materi Latihan</th>
+  <th className="px-6 py-4">Catatan Sesi</th>
+  <th className="px-6 py-4 text-right">Aksi</th>
+  </tr>
+  </thead>
+  <tbody className="divide-y-2 divide-pixel-gray/30 text-sm text-pixel-peach">
+  {sessions.length === 0 ? (
+  <tr>
+  <td colSpan={6} className="px-6 py-8 text-center text-pixel-lavender">Belum ada sesi latihan yang dibuat.</td>
+  </tr>
+  ) : (
+  sessions.map(session => (
+  <tr key={session.id} className="hover:bg-pixel-panel-light">
+  <td className="px-6 py-4 font-mono font-semibold text-pixel-white flex items-center gap-1.5 mt-2">
+  <CalendarDays className="w-4 h-4 text-primary" />
+  {new Date(session.session_date).toLocaleDateString('id-ID', {
+  weekday: 'short',
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric'
+  })}
+  </td>
+  <td className="px-6 py-4 font-bold text-pixel-white">{session.extracurricular?.name}</td>
+  <td className="px-6 py-4 text-pixel-yellow font-semibold">{session.handler?.full_name || 'Tidak diketahui'}</td>
+  <td className="px-6 py-4 font-semibold text-pixel-white">{session.topic || 'Sesi Umum'}</td>
+  <td className="px-6 py-4 text-pixel-lavender max-w-xs truncate">{session.notes || '-'}</td>
+  <td className="px-6 py-4 text-right space-x-2">
+  <Button onClick={() => handleOpenModal(session)} variant="ghost" size="icon" className="h-8 w-8 hover:bg-pixel-panel-light hover:text-primary">
+  <Edit2 className="w-4 h-4" />
+  </Button>
+  <Button onClick={() => handleDelete(session.id)} variant="ghost" size="icon" className="h-8 w-8 hover:bg-pixel-red/10 text-pixel-red hover:text-pixel-red">
+  <Trash2 className="w-4 h-4" />
+  </Button>
+  </td>
  </tr>
  ))
  )}
@@ -265,13 +273,42 @@ export default function CoachSessions() {
  required
  className="flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
  value={form.extracurricular_id}
- onChange={e => setForm({...form, extracurricular_id: e.target.value})}
+ onChange={e => {
+    const selectedId = e.target.value
+    const eksObj = managedEkskuls.find(ex => ex.id === selectedId)
+    setForm({...form, extracurricular_id: selectedId, handled_by: eksObj?.coach?.id || user.id})
+  }}
  >
  {managedEkskuls.map(e => (
  <option key={e.id} value={e.id}>{e.name}</option>
  ))}
  </select>
  </div>
+
+ {/* Pilih Pelatih yang Memimpin Sesi */}
+  {(() => {
+    const selectedEkskulObj = managedEkskuls.find(e => e.id === form.extracurricular_id)
+    if (!selectedEkskulObj) return null
+    return (
+      <div className="space-y-1.5">
+      <Label htmlFor="s_handled">Pelatih yang Memimpin Sesi</Label>
+      <select
+      id="s_handled"
+      required
+      className="flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      value={form.handled_by}
+      onChange={e => setForm({...form, handled_by: e.target.value})}
+      >
+      {selectedEkskulObj.coach && (
+        <option value={selectedEkskulObj.coach.id}>{selectedEkskulObj.coach.full_name} (Pelatih 1)</option>
+      )}
+      {selectedEkskulObj.coach2 && (
+        <option value={selectedEkskulObj.coach2.id}>{selectedEkskulObj.coach2.full_name} (Pelatih 2)</option>
+      )}
+      </select>
+      </div>
+    )
+  })()}
 
  {/* Tanggal Sesi */}
  <div className="space-y-1.5">

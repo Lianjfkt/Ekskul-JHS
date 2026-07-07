@@ -80,7 +80,7 @@ export default function RecapManagement() {
  supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email)').order('name', { ascending: true }),
  supabase.from('enrollments').select('*, student:student_id (id, nis, full_name, class)').eq('status', 'active'),
  supabase.from('grades').select('*, student:student_id (id, nis, full_name, class), extracurricular:extracurricular_id (id, name)'),
- supabase.from('sessions').select('*, creator:created_by (id, full_name, email), extracurricular:extracurricular_id (id, name, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email))').order('session_date', { ascending: false }),
+ supabase.from('sessions').select('*, creator:created_by (id, full_name, email), handler:handled_by (id, full_name, email), extracurricular:extracurricular_id (id, name, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email))').order('session_date', { ascending: false }),
  supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)'),
  supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true })
  ])
@@ -195,11 +195,12 @@ export default function RecapManagement() {
   return `${monthsIndo[parseInt(startMonth, 10) - 1]} – ${monthsIndo[parseInt(endMonth, 10) - 1]} ${endYear}`
  }
 
- const getSessionCoach = (session) => {
-  if (session.creator) return session.creator
-  if (session.extracurricular?.coach) return session.extracurricular.coach
-  return { id: 'unknown', full_name: 'Tanpa Pelatih', email: '' }
- }
+  const getSessionCoach = (session) => {
+   if (session.handler) return session.handler
+   if (session.creator) return session.creator
+   if (session.extracurricular?.coach) return session.extracurricular.coach
+   return { id: 'unknown', full_name: 'Tanpa Pelatih', email: '' }
+  }
 
  const coachSessionReportRows = useMemo(() => {
   const groups = {}
