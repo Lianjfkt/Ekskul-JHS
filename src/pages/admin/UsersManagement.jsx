@@ -247,52 +247,107 @@ export default function UsersManagement() {
  }
 
  // --- USER CRUD FUNCTIONS (Coaches, Parents, Admins) ---
- const handleOpenUserModal = (role = 'coach') => {
- setUserForm({
- email: '',
- password: '',
- full_name: '',
- role: role,
- student_id: ''
- })
- setIsUserModalOpen(true)
- }
+  const handleOpenUserModal = (roleOrUser = 'coach', isEdit = false) => {
+    if (isEdit && roleOrUser && typeof roleOrUser === 'object') {
+      setSelectedUser(roleOrUser)
+      setUserForm({
+        email: roleOrUser.email,
+        password: '',
+        full_name: roleOrUser.full_name,
+        role: roleOrUser.role,
+        student_id: roleOrUser.student_id || ''
+      })
+    } else {
+      setSelectedUser(null)
+      setUserForm({
+        email: '',
+        password: '',
+        full_name: '',
+        role: typeof roleOrUser === 'string' ? roleOrUser : 'coach',
+        student_id: ''
+      })
+    }
+    setIsUserModalOpen(true)
+  }
 
- const handleUserSubmit = async (e) => {
- e.preventDefault()
- setErrorMsg('')
- setSuccessMsg('')
- try {
- // Call Postgres Function admin_create_user via RPC
- const { data, error } = await supabase.rpc('admin_create_user', {
- p_email: userForm.email,
- p_password: userForm.password,
- p_full_name: userForm.full_name,
- p_role: userForm.role,
- p_student_id: userForm.role === 'parent' || userForm.role === 'student' ? userForm.student_id || null : null
- })
+  const handleUserSubmit = async (e) => {
+    e.preventDefault()
+    setErrorMsg('')
+    setSuccessMsg('')
+    try {
+      if (selectedUser) {
+        // Mode Edit User
+        const { error } = await supabase.rpc('admin_update_user', {
+          p_user_id: selectedUser.id,
+          p_email: userForm.email.toLowerCase().trim(),
+          p_password: userForm.password || null,
+          p_full_name: userForm.full_name.trim(),
+          p_student_id: userForm.role === 'parent' || userForm.role === 'student' ? userForm.student_id || null : null
+        })
 
- if (error) throw error
+        if (error) throw error
 
- // Jika role parent, kita juga sinkronisasi ke tabel public.parents
- if (userForm.role === 'parent' && userForm.student_id) {
- const { error: pErr } = await supabase
- .from('parents')
- .insert([{
- student_id: userForm.student_id,
- full_name: userForm.full_name,
- relationship: 'Orang Tua'
- }])
- if (pErr) console.warn('Gagal sinkron ke tabel parents:', pErr.message)
- }
+        // Jika role parent, sinkronisasi data/nama di tabel public.parents
+        if (userForm.role === 'parent') {
+          // Cari apakah sudah ada di tabel parents
+          const { data: existingParent } = await supabase
+            .from('parents')
+            .select('id')
+            .eq('student_id', selectedUser.student_id)
+            .limit(1)
 
- setSuccessMsg(`Berhasil membuat akun ${userForm.role} baru dengan ID: ${data}`)
- setIsUserModalOpen(false)
- fetchData()
- } catch (err) {
- setErrorMsg(`Gagal membuat user. Pastikan Anda telah menjalankan script SQL update_schema_admin_user_creation.sql di Supabase. Error: ${err.message}`)
- }
- }
+          if (existingParent && existingParent.length > 0) {
+            await supabase
+              .from('parents')
+              .update({
+                full_name: userForm.full_name.trim(),
+                student_id: userForm.student_id || null
+              })
+              .eq('id', existingParent[0].id)
+          } else if (userForm.student_id) {
+            await supabase
+              .from('parents')
+              .insert([{
+                student_id: userForm.student_id,
+                full_name: userForm.full_name.trim(),
+                relationship: 'Orang Tua'
+              }])
+          }
+        }
+
+        setSuccessMsg(`Berhasil memperbarui data akun ${userForm.role}.`)
+      } else {
+        // Mode Create User
+        const { data, error } = await supabase.rpc('admin_create_user', {
+          p_email: userForm.email.toLowerCase().trim(),
+          p_password: userForm.password,
+          p_full_name: userForm.full_name.trim(),
+          p_role: userForm.role,
+          p_student_id: userForm.role === 'parent' || userForm.role === 'student' ? userForm.student_id || null : null
+        })
+
+        if (error) throw error
+
+        // Jika role parent, kita juga sinkronisasi ke tabel public.parents
+        if (userForm.role === 'parent' && userForm.student_id) {
+          const { error: pErr } = await supabase
+            .from('parents')
+            .insert([{
+              student_id: userForm.student_id,
+              full_name: userForm.full_name.trim(),
+              relationship: 'Orang Tua'
+            }])
+          if (pErr) console.warn('Gagal sinkron ke tabel parents:', pErr.message)
+        }
+
+        setSuccessMsg(`Berhasil membuat akun ${userForm.role} baru dengan ID: ${data}`)
+      }
+      setIsUserModalOpen(false)
+      fetchData()
+    } catch (err) {
+      setErrorMsg(`Gagal membuat user. Pastikan Anda telah menjalankan script SQL update_schema_admin_user_creation.sql di Supabase. Error: ${err.message}`)
+    }
+  }
 
  const handleUserDelete = async (id, email) => {
  if (email === 'admin@sekolah.com') {
@@ -509,7 +564,10 @@ export default function UsersManagement() {
  <td className="px-6 py-4 font-medium text-pixel-white">{coach.full_name}</td>
  <td className="px-6 py-4 text-pixel-lavender">{coach.email}</td>
  <td className="px-6 py-4 text-pixel-lavender">{new Date(coach.created_at).toLocaleDateString('id-ID')}</td>
- <td className="px-6 py-4 text-right">
+ <td className="px-6 py-4 text-right space-x-2">
+ <Button onClick={() => handleOpenUserModal(coach, true)} variant="ghost" size="icon" className="h-8 w-8 hover:text-primary">
+ <Edit2 className="w-4 h-4" />
+ </Button>
  <Button onClick={() => handleUserDelete(coach.id, coach.email)} variant="ghost" size="icon" className="h-8 w-8 text-pixel-red hover:bg-pixel-red/10 hover:text-pixel-red">
  <Trash2 className="w-4 h-4" />
  </Button>
@@ -551,7 +609,10 @@ export default function UsersManagement() {
  <span className="px-2.5 py-1 font-retro text-base bg-primary/10 text-primary rounded-none">{parent.students.class}</span>
  ) : '-'}
  </td>
- <td className="px-6 py-4 text-right">
+ <td className="px-6 py-4 text-right space-x-2">
+ <Button onClick={() => handleOpenUserModal(parent, true)} variant="ghost" size="icon" className="h-8 w-8 hover:text-primary">
+ <Edit2 className="w-4 h-4" />
+ </Button>
  <Button onClick={() => handleUserDelete(parent.id, parent.email)} variant="ghost" size="icon" className="h-8 w-8 text-pixel-red hover:bg-pixel-red/10 hover:text-pixel-red">
  <Trash2 className="w-4 h-4" />
  </Button>
@@ -600,7 +661,16 @@ export default function UsersManagement() {
  </span>
  </td>
  <td className="px-6 py-4 text-pixel-lavender">{new Date(user.created_at).toLocaleDateString('id-ID')}</td>
- <td className="px-6 py-4 text-right">
+ <td className="px-6 py-4 text-right space-x-2">
+ <Button 
+ onClick={() => handleOpenUserModal(user, true)} 
+ disabled={user.email === 'admin@sekolah.com'}
+ variant="ghost" 
+ size="icon" 
+ className="h-8 w-8 hover:text-primary disabled:opacity-30"
+ >
+ <Edit2 className="w-4 h-4" />
+ </Button>
  <Button 
  onClick={() => handleUserDelete(user.id, user.email)} 
  disabled={user.email === 'admin@sekolah.com'}
@@ -725,13 +795,13 @@ export default function UsersManagement() {
  </div>
  )}
 
- {/* --- MODAL TAMBAH AKUN (COACH/PARENT/STUDENT) --- */}
+ {/* --- MODAL TAMBAH/EDIT AKUN (COACH/PARENT/STUDENT) --- */}
  {isUserModalOpen && (
  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
  <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-md overflow-hidden pixel-slide-in">
  <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy">
  <h3 className="font-bold text-pixel-white text-lg">
- Daftar Akun {userForm.role === 'coach' ? 'Pelatih' : userForm.role === 'parent' ? 'Wali Murid' : 'Siswa'} Baru
+ {selectedUser ? 'Ubah' : 'Daftar'} Akun {userForm.role === 'coach' ? 'Pelatih' : userForm.role === 'parent' ? 'Wali Murid' : 'Siswa'} {selectedUser ? '' : 'Baru'}
  </h3>
  <Button onClick={() => setIsUserModalOpen(false)} variant="ghost" size="icon" className="h-8 w-8 rounded-none">
  <X className="w-4 h-4" />
@@ -754,18 +824,19 @@ export default function UsersManagement() {
  id="u_email"
  type="email"
  required
+ disabled={!!selectedUser}
  placeholder={userForm.role === 'student' ?"Contoh: siswa@sekolah.com" :"Contoh: email@sekolah.com"}
  value={userForm.email}
  onChange={e => setUserForm({...userForm, email: e.target.value})}
  />
  </div>
  <div className="space-y-1.5">
- <Label htmlFor="u_pass">Password Awal (Min. 6 Karakter)</Label>
+ <Label htmlFor="u_pass">{selectedUser ? 'Ubah Password (Kosongkan jika tidak diubah)' : 'Password Awal (Min. 6 Karakter)'}</Label>
  <Input
  id="u_pass"
  type="password"
- required
- placeholder="Password akun"
+ required={!selectedUser}
+ placeholder={selectedUser ? 'Masukkan password baru' : 'Password akun'}
  value={userForm.password}
  onChange={e => setUserForm({...userForm, password: e.target.value})}
  />
@@ -792,7 +863,7 @@ export default function UsersManagement() {
 
  <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2">
  <Button type="button" onClick={() => setIsUserModalOpen(false)} variant="outline">Batal</Button>
- <Button type="submit">Daftarkan Akun</Button>
+ <Button type="submit">{selectedUser ? 'Simpan' : 'Daftarkan Akun'}</Button>
  </div>
  </form>
  </div>
