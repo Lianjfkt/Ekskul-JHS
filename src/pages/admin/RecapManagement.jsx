@@ -657,17 +657,21 @@ export default function RecapManagement() {
  }))
  }, [computedStats.ekskulSummaries])
 
- const coachChartData = useMemo(() => {
- const coachSessionCounts = {}
- sessions.forEach(s => {
- const coach = getSessionCoach(s)
- coachSessionCounts[coach.full_name] = (coachSessionCounts[coach.full_name] || 0) + 1
- })
- return Object.entries(coachSessionCounts).map(([name, count]) => ({
- name,
- 'Jumlah Sesi': count
- }))
- }, [sessions])
+  const coachChartData = useMemo(() => {
+  const coachSessionCounts = {}
+  sessions.forEach(s => {
+   const coaches = getSessionCoaches(s)
+   coaches.forEach(coach => {
+    if (coach && coach.full_name) {
+     coachSessionCounts[coach.full_name] = (coachSessionCounts[coach.full_name] || 0) + 1
+    }
+   })
+  })
+  return Object.entries(coachSessionCounts).map(([name, count]) => ({
+  name,
+  'Jumlah Sesi': count
+  }))
+  }, [sessions])
 
  if (loading) {
  return (
