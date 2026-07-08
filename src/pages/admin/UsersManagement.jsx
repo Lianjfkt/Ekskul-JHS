@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { 
  Search, Plus, Upload, Trash2, Edit2, UserPlus, 
  Users as UsersIcon, ShieldAlert, GraduationCap, 
- UserCheck, Check, X
+ UserCheck, Check, X, FileSpreadsheet
 } from 'lucide-react'
 import ImportCSVModal from '../../components/import/ImportCSVModal'
 
@@ -22,15 +22,18 @@ export default function UsersManagement() {
 
  // Data States
  const [students, setStudents] = useState([])
+ const [studentMaster, setStudentMaster] = useState([])
  const [coaches, setCoaches] = useState([])
  const [parents, setParents] = useState([])
  const [allUsers, setAllUsers] = useState([])
 
  // Modal States
  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false)
+ const [isMasterModalOpen, setIsMasterModalOpen] = useState(false)
  const [isUserModalOpen, setIsUserModalOpen] = useState(false)
  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
  const [selectedStudent, setSelectedStudent] = useState(null)
+ const [selectedMaster, setSelectedMaster] = useState(null)
  const [selectedUser, setSelectedUser] = useState(null)
 
  // Form States - Student
@@ -44,6 +47,15 @@ export default function UsersManagement() {
  password: ''
  })
 
+ // Form States - Student Master
+ const [masterForm, setMasterForm] = useState({
+ nis: '',
+ full_name: '',
+ class: '',
+ gender: 'Laki-laki',
+ phone: ''
+ })
+
  // Form States - User (Coach/Parent/Admin)
  const [userForm, setUserForm] = useState({
  email: '',
@@ -52,8 +64,6 @@ export default function UsersManagement() {
  role: 'coach',
  student_id: ''
  })
-
-
 
  useEffect(() => {
  fetchData()
@@ -86,6 +96,14 @@ export default function UsersManagement() {
  setAllUsers(usersData || [])
  setCoaches(usersData?.filter(u => u.role === 'coach') || [])
  setParents(usersData?.filter(u => u.role === 'parent') || [])
+
+ // 3. Fetch Student Master
+ const { data: masterData, error: mErr } = await supabase
+ .from('student_master')
+ .select('*')
+ .order('full_name', { ascending: true })
+ if (mErr) throw mErr
+ setStudentMaster(masterData || [])
  } catch (err) {
  console.error(err)
  setErrorMsg('Gagal mengambil data dari database: ' + err.message)
@@ -221,7 +239,7 @@ export default function UsersManagement() {
  }
 
  const handleStudentDelete = async (student) => {
- if (!confirm(`Apakah Anda yakin ingin menghapus siswa"${student.full_name}"? Ini juga akan menghapus akun login dan semua data absensi/nilai terkait.`)) return
+ if (!confirm(`Apakah Anda yakin ingin menghapus siswa "${student.full_name}"? Ini juga akan menghapus akun login dan semua data absensi/nilai terkait.`)) return
  setErrorMsg('')
  try {
  const associatedUser = student.users?.[0]
@@ -244,6 +262,94 @@ export default function UsersManagement() {
  } catch (err) {
  setErrorMsg(err.message)
  }
+ }
+
+ // --- STUDENT MASTER CRUD FUNCTIONS ---
+ const handleOpenMasterModal = (m = null) => {
+   if (m) {
+     setSelectedMaster(m)
+     setMasterForm({
+       nis: m.nis,
+       full_name: m.full_name,
+       class: m.class,
+       gender: m.gender || 'Laki-laki',
+       phone: m.phone || ''
+     })
+   } else {
+     setSelectedMaster(null)
+     setMasterForm({
+       nis: '',
+       full_name: '',
+       class: '',
+       gender: 'Laki-laki',
+       phone: ''
+     })
+   }
+   setIsMasterModalOpen(true)
+ }
+
+ const handleMasterSubmit = async (e) => {
+   e.preventDefault()
+   setErrorMsg('')
+   setSuccessMsg('')
+   try {
+     const toTitleCase = (str) => {
+       return str
+         .toLowerCase()
+         .split(' ')
+         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+         .join(' ');
+     }
+     const cleanName = toTitleCase(masterForm.full_name.trim())
+
+     if (selectedMaster) {
+       // Edit Mode
+       const { error } = await supabase
+         .from('student_master')
+         .update({
+           full_name: cleanName,
+           class: masterForm.class.trim(),
+           gender: masterForm.gender,
+           phone: masterForm.phone.trim()
+         })
+         .eq('nis', selectedMaster.nis)
+       if (error) throw error
+       setSuccessMsg('Berhasil memperbarui data acuan siswa.')
+     } else {
+       // Insert Mode
+       const { error } = await supabase
+         .from('student_master')
+         .insert([{
+           nis: masterForm.nis.trim(),
+           full_name: cleanName,
+           class: masterForm.class.trim(),
+           gender: masterForm.gender,
+           phone: masterForm.phone.trim()
+         }])
+       if (error) throw error
+       setSuccessMsg('Berhasil menambahkan data acuan siswa.')
+     }
+     setIsMasterModalOpen(false)
+     fetchData()
+   } catch (err) {
+     setErrorMsg(err.message)
+   }
+ }
+
+ const handleMasterDelete = async (m) => {
+   if (!confirm(`Apakah Anda yakin ingin menghapus siswa master "${m.full_name}" dari data acuan? Ini tidak menghapus akun siswa yang sudah terdaftar.`)) return
+   setErrorMsg('')
+   try {
+     const { error } = await supabase
+       .from('student_master')
+       .delete()
+       .eq('nis', m.nis)
+     if (error) throw error
+     setSuccessMsg('Berhasil menghapus data acuan siswa.')
+     fetchData()
+   } catch (err) {
+     setErrorMsg(err.message)
+   }
  }
 
  // --- USER CRUD FUNCTIONS (Coaches, Parents, Admins) ---
@@ -368,13 +474,17 @@ export default function UsersManagement() {
  }
  }
 
-
-
  // Filter Data berdasarkan Search
  const filteredStudents = students.filter(s => 
  s.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
  s.nis.includes(searchQuery) ||
  s.class.toLowerCase().includes(searchQuery.toLowerCase())
+ )
+
+ const filteredStudentMaster = studentMaster.filter(m => 
+ m.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+ m.nis.includes(searchQuery) ||
+ m.class.toLowerCase().includes(searchQuery.toLowerCase())
  )
 
  const filteredCoaches = coaches.filter(c => 
@@ -435,6 +545,16 @@ export default function UsersManagement() {
  </Button>
  </>
  )}
+ {activeTab === 'master' && (
+ <>
+ <Button onClick={() => setIsImportModalOpen(true)} variant="outline" className="gap-2 flex-1 sm:flex-none">
+ <Upload className="w-4 h-4" /> Import Excel/CSV
+ </Button>
+ <Button onClick={() => handleOpenMasterModal()} className="gap-2 flex-1 sm:flex-none">
+ <Plus className="w-4 h-4" /> Master Siswa
+ </Button>
+ </>
+ )}
  {activeTab === 'pelatih' && (
  <Button onClick={() => handleOpenUserModal('coach')} className="gap-2 w-full sm:w-auto">
  <UserPlus className="w-4 h-4" /> Pelatih Baru
@@ -452,6 +572,7 @@ export default function UsersManagement() {
  <div className="flex border-b border-pixel-gray gap-2">
  {[
  { id: 'siswa', label: 'Data Siswa', icon: GraduationCap },
+ { id: 'master', label: 'Master Siswa', icon: FileSpreadsheet },
  { id: 'pelatih', label: 'Pelatih', icon: UserCheck },
  { id: 'parent', label: 'Wali Murid', icon: UsersIcon },
  { id: 'semua', label: 'Semua Akun', icon: ShieldAlert }
@@ -530,6 +651,47 @@ export default function UsersManagement() {
  <Edit2 className="w-4 h-4" />
  </Button>
  <Button onClick={() => handleStudentDelete(student)} variant="ghost" size="icon" className="h-8 w-8 text-pixel-red hover:bg-pixel-red/10 hover:text-pixel-red">
+ <Trash2 className="w-4 h-4" />
+ </Button>
+ </td>
+ </tr>
+ ))
+ )}
+ </tbody>
+ </table>
+ </div>
+ )}
+
+ {/* TAB MASTER */}
+ {activeTab === 'master' && (
+ <div className="overflow-x-auto">
+ <table className="w-full text-left border-collapse">
+ <thead>
+ <tr className="bg-pixel-navy border-b border-pixel-gray/30 font-retro text-base text-pixel-lavender uppercase tracking-wider">
+ <th className="px-6 py-4">NIS</th>
+ <th className="px-6 py-4">Nama</th>
+ <th className="px-6 py-4">Kelas</th>
+ <th className="px-6 py-4">Gender</th>
+ <th className="px-6 py-4 text-right">Aksi</th>
+ </tr>
+ </thead>
+ <tbody className="divide-y-2 divide-pixel-gray/30 text-sm text-pixel-peach">
+ {filteredStudentMaster.length === 0 ? (
+ <tr>
+ <td colSpan={5} className="px-6 py-8 text-center text-pixel-lavender">Tidak ada data master ditemukan.</td>
+ </tr>
+ ) : (
+ filteredStudentMaster.map(m => (
+ <tr key={m.nis} className="hover:bg-pixel-navy/55">
+ <td className="px-6 py-4 font-mono text-pixel-white">{m.nis}</td>
+ <td className="px-6 py-4 font-medium text-pixel-white">{m.full_name}</td>
+ <td className="px-6 py-4">{m.class}</td>
+ <td className="px-6 py-4">{m.gender}</td>
+ <td className="px-6 py-4 text-right space-x-2">
+ <Button onClick={() => handleOpenMasterModal(m)} variant="ghost" size="icon" className="h-8 w-8 hover:text-primary">
+ <Edit2 className="w-4 h-4" />
+ </Button>
+ <Button onClick={() => handleMasterDelete(m)} variant="ghost" size="icon" className="h-8 w-8 text-pixel-red hover:bg-pixel-red/10 hover:text-pixel-red">
  <Trash2 className="w-4 h-4" />
  </Button>
  </td>
@@ -870,12 +1032,87 @@ export default function UsersManagement() {
  </div>
  )}
 
- {/* --- MODAL IMPORT CSV SISWA (new robust modal) --- */}
+ {/* --- MODAL DATA MASTER SISWA --- */}
+ {isMasterModalOpen && (
+ <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+ <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-md overflow-hidden pixel-slide-in">
+ <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy">
+ <h3 className="font-bold text-pixel-white text-lg">
+ {selectedMaster ? 'Ubah Data Acuan Siswa' : 'Tambah Data Acuan Siswa Baru'}
+ </h3>
+ <Button onClick={() => setIsMasterModalOpen(false)} variant="ghost" size="icon" className="h-8 w-8 rounded-none">
+ <X className="w-4 h-4" />
+ </Button>
+ </div>
+ <form onSubmit={handleMasterSubmit} className="p-6 space-y-4">
+ <div className="space-y-1.5">
+ <Label htmlFor="m_nis">NIS</Label>
+ <Input
+ id="m_nis"
+ required
+ disabled={!!selectedMaster}
+ placeholder="Contoh: 10001"
+ value={masterForm.nis}
+ onChange={e => setMasterForm({...masterForm, nis: e.target.value})}
+ />
+ </div>
+ <div className="space-y-1.5">
+ <Label htmlFor="m_name">Nama Lengkap</Label>
+ <Input
+ id="m_name"
+ required
+ placeholder="Nama Lengkap"
+ value={masterForm.full_name}
+ onChange={e => setMasterForm({...masterForm, full_name: e.target.value})}
+ />
+ </div>
+ <div className="space-y-1.5">
+ <Label htmlFor="m_class">Kelas</Label>
+ <Input
+ id="m_class"
+ required
+ placeholder="Contoh: VII-A"
+ value={masterForm.class}
+ onChange={e => setMasterForm({...masterForm, class: e.target.value})}
+ />
+ </div>
+ <div className="space-y-1.5">
+ <Label htmlFor="m_gender">Gender</Label>
+ <select
+ id="m_gender"
+ className="flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+ value={masterForm.gender}
+ onChange={e => setMasterForm({...masterForm, gender: e.target.value})}
+ >
+ <option value="Laki-laki">Laki-laki</option>
+ <option value="Perempuan">Perempuan</option>
+ </select>
+ </div>
+ <div className="space-y-1.5">
+ <Label htmlFor="m_phone">No. Telepon (Opsional)</Label>
+ <Input
+ id="m_phone"
+ placeholder="Contoh: 081234567890"
+ value={masterForm.phone}
+ onChange={e => setMasterForm({...masterForm, phone: e.target.value})}
+ />
+ </div>
+
+ <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2">
+ <Button type="button" onClick={() => setIsMasterModalOpen(false)} variant="outline">Batal</Button>
+ <Button type="submit">{selectedMaster ? 'Simpan' : 'Tambah'}</Button>
+ </div>
+ </form>
+ </div>
+ </div>
+ )}
+
+ {/* --- MODAL IMPORT CSV --- */}
  <ImportCSVModal
  isOpen={isImportModalOpen}
  onClose={() => setIsImportModalOpen(false)}
- type="students"
- onSuccess={() => { fetchData(); setSuccessMsg('Import selesai! Tabel siswa telah diperbarui.') }}
+ type={activeTab === 'siswa' ? 'students' : activeTab === 'master' ? 'student_master' : 'students'}
+ onSuccess={() => { fetchData(); setSuccessMsg('Import selesai! Tabel data telah diperbarui.') }}
  />
  </div>
  )

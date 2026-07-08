@@ -106,6 +106,74 @@ export async function validateStudentRows(rows, existingNis = []) {
   return { valid, updates, errors, missingCols: [] }
 }
 
+/**
+ * Validate rows for student master import.
+ */
+export async function validateStudentMasterRows(rows, existingNis = []) {
+  if (rows.length === 0) return { valid: [], updates: [], errors: [], missingCols: [] }
+
+  const missingCols = checkRequiredColumns(rows[0], STUDENT_REQUIRED_COLS)
+  if (missingCols.length > 0) {
+    return { valid: [], updates: [], errors: [], missingCols }
+  }
+
+  const existingSet = new Set(existingNis.map(String))
+  const seenNisInFile = new Set()
+
+  const valid = []
+  const updates = []
+  const errors = []
+
+  rows.forEach((row, idx) => {
+    const rowNum = idx + 2
+    const rowErrors = []
+
+    const nis = String(row.nis ?? '').trim()
+    const full_name = String(row.full_name ?? '').trim()
+    const klass = String(row.class ?? '').trim()
+    const genderRaw = String(row.gender ?? '').trim().toLowerCase()
+    const phone = String(row.phone ?? '').trim()
+
+    if (!nis) {
+      rowErrors.push('NIS tidak boleh kosong')
+    } else if (!/^\d{5,10}$/.test(nis)) {
+      rowErrors.push('NIS harus berupa angka 5-10 digit')
+    } else if (seenNisInFile.has(nis)) {
+      rowErrors.push(`NIS ${nis} duplikat dalam file ini`)
+    }
+
+    if (!full_name) rowErrors.push('Nama lengkap tidak boleh kosong')
+    if (!klass) rowErrors.push('Kelas tidak boleh kosong')
+
+    const genderMapped = GENDER_MAP[genderRaw]
+    if (!genderMapped) {
+      rowErrors.push('Gender harus diisi L atau P (atau Laki-laki / Perempuan)')
+    }
+
+    if (nis) seenNisInFile.add(nis)
+
+    const cleanRow = {
+      nis,
+      full_name,
+      class: klass,
+      gender: genderMapped || genderRaw,
+      phone,
+      _index: idx,
+      _rowNum: rowNum,
+    }
+
+    if (rowErrors.length > 0) {
+      errors.push({ row: rowNum, nis, errors: rowErrors, _raw: row, _index: idx })
+    } else if (existingSet.has(nis)) {
+      updates.push(cleanRow)
+    } else {
+      valid.push(cleanRow)
+    }
+  })
+
+  return { valid, updates, errors, missingCols: [] }
+}
+
 // ─── ENROLLMENT VALIDATOR ─────────────────────────────────────────────────────
 
 /**

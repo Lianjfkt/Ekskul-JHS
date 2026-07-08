@@ -3,9 +3,10 @@ import { X, FileSpreadsheet, ChevronRight, ChevronLeft, Upload, Download } from 
 import { supabase } from '../../lib/supabaseClient'
 
 import { parseFile } from '../../utils/excelParser'
-import { validateStudentRows, validateEnrollmentRows } from '../../utils/csvValidator'
-import { downloadStudentTemplate, downloadEnrollmentTemplate, downloadErrorLog } from '../../utils/templateGenerator'
+import { validateStudentRows, validateStudentMasterRows, validateEnrollmentRows } from '../../utils/csvValidator'
+import { downloadStudentTemplate, downloadStudentMasterTemplate, downloadEnrollmentTemplate, downloadErrorLog } from '../../utils/templateGenerator'
 import { useImportStudents } from '../../hooks/useImportStudents'
+import { useImportStudentMaster } from '../../hooks/useImportStudentMaster'
 import { useImportEnrollments } from '../../hooks/useImportEnrollments'
 
 import FileDropzone from './FileDropzone'
@@ -50,9 +51,14 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
 
   // Hooks
   const studentImport   = useImportStudents()
+  const studentMasterImport = useImportStudentMaster()
   const enrollmentImport = useImportEnrollments()
 
-  const activeImport = type === 'students' ? studentImport : enrollmentImport
+  const activeImport = type === 'students'
+    ? studentImport
+    : type === 'student_master'
+      ? studentMasterImport
+      : enrollmentImport
 
   // Load reference data from DB
   useEffect(() => {
@@ -63,8 +69,9 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
   async function loadReferenceData() {
     setIsLoadingRef(true)
     try {
+      const tableToLoad = type === 'student_master' ? 'student_master' : 'students'
       const { data: students } = await supabase
-        .from('students')
+        .from(tableToLoad)
         .select('id, nis')
       const nis = (students || []).map((s) => s.nis)
       setExistingNis(nis)
@@ -95,6 +102,7 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
     setMissingCols([])
     setParseError('')
     studentImport.reset()
+    studentMasterImport.reset()
     enrollmentImport.reset()
     onClose()
   }
@@ -129,6 +137,8 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
 
     if (type === 'students') {
       result = await validateStudentRows(rows, existingNis)
+    } else if (type === 'student_master') {
+      result = await validateStudentMasterRows(rows, existingNis)
     } else {
       result = validateEnrollmentRows(rows, existingNis, ekskulList)
     }
@@ -149,6 +159,11 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
         setStep(STEP_RESULT)
         onSuccess?.()
       })
+    } else if (type === 'student_master') {
+      await studentMasterImport.startImport({ valid: validRows, updates: updateRows }, () => {
+        setStep(STEP_RESULT)
+        onSuccess?.()
+      })
     } else {
       await enrollmentImport.startImport({ valid: validRows }, nisToStudentId, () => {
         setStep(STEP_RESULT)
@@ -165,8 +180,11 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
   if (!isOpen) return null
 
   const isStudents    = type === 'students'
-  const modalTitle    = isStudents ? 'IMPORT DATA SISWA' : 'IMPORT PENDAFTARAN'
+  const isStudentMaster = type === 'student_master'
+  const modalTitle    = isStudents ? 'IMPORT DATA SISWA' : isStudentMaster ? 'IMPORT DATA MASTER SISWA' : 'IMPORT PENDAFTARAN'
   const modalSubtitle = isStudents
+    ? 'Format: .csv / .xlsx dengan kolom nis, full_name, class, gender, phone'
+    : isStudentMaster
     ? 'Format: .csv / .xlsx dengan kolom nis, full_name, class, gender, phone'
     : 'Format: .csv / .xlsx dengan kolom nis, extracurricular_name, semester, academic_year'
 
@@ -223,8 +241,10 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
                 onFileSelected={handleFileSelected}
                 disabled={isParsing || isLoadingRef}
                 onTemplate={() =>
-                  isStudents
+                  type === 'students'
                     ? downloadStudentTemplate()
+                    : type === 'student_master'
+                    ? downloadStudentMasterTemplate()
                     : downloadEnrollmentTemplate(ekskulList)
                 }
               />

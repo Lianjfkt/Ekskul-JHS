@@ -75,6 +75,50 @@ export function downloadStudentTemplate() {
   saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'template_siswa.xlsx')
 }
 
+/**
+ * Generate and download the student master import template.
+ */
+export function downloadStudentMasterTemplate() {
+  const wb = XLSX.utils.book_new()
+
+  // Sheet 1 – Data
+  const headers = ['nis *', 'full_name *', 'class *', 'gender *', 'phone']
+  const examples = [
+    ['10001', 'Budi Santoso', 'VII-A', 'L', '081234567890'],
+    ['10002', 'Siti Rahayu', 'VII-B', 'P', '081234567891'],
+    ['10003', 'Ahmad Fauzi', 'VIII-A', 'L', '081234567892'],
+  ]
+
+  const sheetData = [headers, ...examples]
+  const ws = XLSX.utils.aoa_to_sheet(sheetData)
+
+  applyHeaderStyle(ws, headers, headers.length)
+  setColumnWidths(ws, [14, 30, 10, 10, 18])
+
+  ws['!rows'] = [{ hpt: 24 }] // header row height
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Data Master Siswa')
+
+  // Sheet 2 – Instructions
+  const instructions = [
+    ['Field', 'Penjelasan'],
+    ['nis *', 'Nomor Induk Siswa — hanya angka, 5-10 digit. Wajib diisi. (*)'],
+    ['full_name *', 'Nama lengkap siswa. Wajib diisi. (*)'],
+    ['class *', 'Kelas siswa, contoh: VII-A, VIII-B, IX-C. Wajib diisi. (*)'],
+    ['gender *', 'Gender: isi dengan huruf L (Laki-laki) atau P (Perempuan). Wajib diisi. (*)'],
+    ['phone', 'Nomor telepon/HP. Tidak wajib.'],
+    ['', ''],
+    ['Catatan', 'Baris dengan (*) pada header adalah kolom wajib.'],
+    ['', 'NIS yang sudah ada di database master akan di-UPDATE (di-upsert), bukan error.'],
+    ['', 'Hapus 3 baris contoh data sebelum diisi dengan data sebenarnya.'],
+  ]
+  addInstructionSheet(wb, instructions)
+
+  // Export
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+  saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'template_master_siswa.xlsx')
+}
+
 // ─── ENROLLMENT TEMPLATE ──────────────────────────────────────────────────────
 
 /**
@@ -126,7 +170,7 @@ export function downloadEnrollmentTemplate(ekskulList = []) {
 /**
  * Export failed rows to an Excel error log file.
  * @param {{ row: number, nis: string, errors: string[], _raw: object }[]} errorRows
- * @param {'students'|'enrollments'} type
+ * @param {'students'|'student_master'|'enrollments'} type
  */
 export function downloadErrorLog(errorRows, type = 'students') {
   const wb = XLSX.utils.book_new()
@@ -143,6 +187,7 @@ export function downloadErrorLog(errorRows, type = 'students') {
   XLSX.utils.book_append_sheet(wb, ws, 'Error Log')
 
   const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-  const fname = type === 'students' ? 'error_log_siswa.xlsx' : 'error_log_enrollment.xlsx'
+  const fname = type === 'students' ? 'error_log_siswa.xlsx' : 
+                type === 'student_master' ? 'error_log_master_siswa.xlsx' : 'error_log_enrollment.xlsx'
   saveAs(new Blob([wbout], { type: 'application/octet-stream' }), fname)
 }
