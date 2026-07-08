@@ -71,11 +71,16 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
     try {
       if (type === 'student_master') {
         // student_master uses 'nis' as PK, no 'id' column
-        const { data: masterData } = await supabase
+        const { data: masterData, error: mErr } = await supabase
           .from('student_master')
           .select('nis')
-        const nis = (masterData || []).map((s) => s.nis)
-        setExistingNis(nis)
+        if (mErr) {
+          console.warn('Tabel student_master belum tersedia:', mErr.message)
+          setExistingNis([])
+        } else {
+          const nis = (masterData || []).map((s) => s.nis)
+          setExistingNis(nis)
+        }
         setNisToStudentId({})
       } else {
         const { data: students } = await supabase

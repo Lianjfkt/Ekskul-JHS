@@ -97,13 +97,15 @@ export default function UsersManagement() {
  setCoaches(usersData?.filter(u => u.role === 'coach') || [])
  setParents(usersData?.filter(u => u.role === 'parent') || [])
 
- // 3. Fetch Student Master
- const { data: masterData, error: mErr } = await supabase
- .from('student_master')
- .select('*')
- .order('full_name', { ascending: true })
- if (mErr) throw mErr
- setStudentMaster(masterData || [])
+  // 3. Fetch Student Master (graceful — tabel mungkin belum ada)
+  try {
+  const { data: masterData, error: mErr } = await supabase
+  .from('student_master')
+  .select('*')
+  .order('full_name', { ascending: true })
+  if (!mErr) setStudentMaster(masterData || [])
+  else console.warn('Tabel student_master belum tersedia:', mErr.message)
+  } catch (_) { /* tabel belum ada, abaikan */ }
  } catch (err) {
  console.error(err)
  setErrorMsg('Gagal mengambil data dari database: ' + err.message)
