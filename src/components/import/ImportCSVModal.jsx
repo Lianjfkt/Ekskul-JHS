@@ -69,16 +69,25 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
   async function loadReferenceData() {
     setIsLoadingRef(true)
     try {
-      const tableToLoad = type === 'student_master' ? 'student_master' : 'students'
-      const { data: students } = await supabase
-        .from(tableToLoad)
-        .select('id, nis')
-      const nis = (students || []).map((s) => s.nis)
-      setExistingNis(nis)
+      if (type === 'student_master') {
+        // student_master uses 'nis' as PK, no 'id' column
+        const { data: masterData } = await supabase
+          .from('student_master')
+          .select('nis')
+        const nis = (masterData || []).map((s) => s.nis)
+        setExistingNis(nis)
+        setNisToStudentId({})
+      } else {
+        const { data: students } = await supabase
+          .from('students')
+          .select('id, nis')
+        const nis = (students || []).map((s) => s.nis)
+        setExistingNis(nis)
 
-      const map = {}
-      ;(students || []).forEach((s) => { map[s.nis] = s.id })
-      setNisToStudentId(map)
+        const map = {}
+        ;(students || []).forEach((s) => { map[s.nis] = s.id })
+        setNisToStudentId(map)
+      }
 
       if (type === 'enrollments') {
         const { data: ekskuls } = await supabase
