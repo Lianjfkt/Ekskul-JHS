@@ -46,8 +46,8 @@ export default function CoachSessions() {
  // 1. Fetch managed extracurriculars
  const { data: ekskuls, error: eErr } = await supabase
  .from('extracurriculars')
- .select('id, name, coach_id, coach_id_2, coach:coach_id(id, full_name), coach2:coach_id_2(id, full_name)')
- .or(`coach_id.eq.${user.id},coach_id_2.eq.${user.id}`)
+ .select('id, name, coach_id, coach_id_2, coach_id_3, coach:coach_id(id, full_name), coach2:coach_id_2(id, full_name), coach3:coach_id_3(id, full_name)')
+ .or(`coach_id.eq.${user.id},coach_id_2.eq.${user.id},coach_id_3.eq.${user.id}`)
  if (eErr) throw eErr
  setManagedEkskuls(ekskuls || [])
 
@@ -59,7 +59,7 @@ export default function CoachSessions() {
  .from('sessions')
  .select(`
  *,
- extracurricular:extracurricular_id (name, coach_id, coach_id_2, coach:coach_id(id, full_name), coach2:coach_id_2(id, full_name)),
+ extracurricular:extracurricular_id (name, coach_id, coach_id_2, coach_id_3, coach:coach_id(id, full_name), coach2:coach_id_2(id, full_name), coach3:coach_id_3(id, full_name)),
  session_coaches (
    id,
    coach:coach_id (id, full_name)
@@ -355,6 +355,17 @@ export default function CoachSessions() {
                 className="h-4 w-4 accent-pixel-blue"
               />
               <span>{selectedEkskulObj.coach2.full_name} (Pelatih 2)</span>
+            </label>
+          )}
+          {selectedEkskulObj.coach3 && (
+            <label className="flex items-center gap-2 cursor-pointer font-retro text-base text-pixel-peach select-none">
+              <input
+                type="checkbox"
+                checked={form.coaches_present.includes(selectedEkskulObj.coach3.id)}
+                onChange={e => handleCheckboxChange(selectedEkskulObj.coach3.id, e.target.checked)}
+                className="h-4 w-4 accent-pixel-blue"
+              />
+              <span>{selectedEkskulObj.coach3.full_name} (Pelatih 3)</span>
             </label>
           )}
         </div>

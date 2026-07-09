@@ -77,10 +77,10 @@ export default function RecapManagement() {
  { data: attendancesData, error: aErr },
  { data: coachesData, error: cErr }
  ] = await Promise.all([
- supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email)').order('name', { ascending: true }),
+ supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email), coach3:coach_id_3 (id, full_name, email)').order('name', { ascending: true }),
  supabase.from('enrollments').select('*, student:student_id (id, nis, full_name, class)').eq('status', 'active'),
  supabase.from('grades').select('*, student:student_id (id, nis, full_name, class), extracurricular:extracurricular_id (id, name)'),
- supabase.from('sessions').select('*, creator:created_by (id, full_name, email), extracurricular:extracurricular_id (id, name, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email)), session_coaches (id, coach:coach_id (id, full_name, email))').order('session_date', { ascending: false }),
+ supabase.from('sessions').select('*, creator:created_by (id, full_name, email), extracurricular:extracurricular_id (id, name, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email), coach3:coach_id_3 (id, full_name, email)), session_coaches (id, coach:coach_id (id, full_name, email))').order('session_date', { ascending: false }),
  supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)'),
  supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true })
  ])
@@ -319,7 +319,7 @@ export default function RecapManagement() {
  const grInfo = gradeStatsByEkskul[e.id]
  const avgGr = grInfo && grInfo.count > 0 ? Math.round(grInfo.totalScore / grInfo.count) : 0
 
-  const coachNames = [e.coach?.full_name, e.coach2?.full_name].filter(Boolean).join(', ') || 'Belum ditunjuk'
+  const coachNames = [e.coach?.full_name, e.coach2?.full_name, e.coach3?.full_name].filter(Boolean).join(', ') || 'Belum ditunjuk'
 
   return {
    id: e.id,

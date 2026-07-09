@@ -72,7 +72,7 @@ export default function StudentExtracurriculars() {
  id, semester, academic_year, status,
  extracurriculars(
  id, name, description, schedule, is_active,
- users(full_name)
+ coach:coach_id(full_name), coach2:coach_id_2(full_name), coach3:coach_id_3(full_name)
  )
  `)
  .eq('student_id', studentId)
@@ -261,7 +261,11 @@ export default function StudentExtracurriculars() {
  <div className="space-y-3">
  {enrollments.map(enr => {
  const ekskul = enr.extracurriculars
- const coachName = ekskul?.users?.full_name
+ const coachName = [
+    ekskul?.coach?.full_name,
+    ekskul?.coach2?.full_name,
+    ekskul?.coach3?.full_name
+  ].filter(Boolean).join(', ')
 
  return (
  <div

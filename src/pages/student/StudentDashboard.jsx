@@ -78,7 +78,7 @@ export default function StudentDashboard() {
  .select(`
  id, semester, academic_year, status,
  extracurriculars(id, name, schedule, description, coach_id,
- users(full_name)
+ coach:coach_id(full_name), coach2:coach_id_2(full_name), coach3:coach_id_3(full_name)
  )
  `)
  .eq('student_id', studentId)

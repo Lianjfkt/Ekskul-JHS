@@ -39,7 +39,7 @@ export default function CoachGrades() {
  const { data, error } = await supabase
  .from('extracurriculars')
  .select('id, name')
- .or(`coach_id.eq.${user.id},coach_id_2.eq.${user.id}`)
+ .or(`coach_id.eq.${user.id},coach_id_2.eq.${user.id},coach_id_3.eq.${user.id}`)
  if (error) throw error
  setManagedEkskuls(data || [])
  

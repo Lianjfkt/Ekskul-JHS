@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { useAttendanceSummary } from '../../hooks/useAttendanceSummary'
@@ -64,7 +64,7 @@ export default function StudentExtracurricularDetail() {
  try {
  const { data } = await supabase
  .from('extracurriculars')
- .select('*, users(full_name)')
+ .select('*, coach:coach_id (full_name), coach2:coach_id_2 (full_name), coach3:coach_id_3 (full_name)')
  .eq('id', ekskulId)
  .single()
  setEkskul(data)
@@ -136,11 +136,18 @@ export default function StudentExtracurricularDetail() {
  <h1 className="text-xl font-bold">{ekskul?.name}</h1>
  <p className="text-violet-200 text-sm mt-1 line-clamp-2">{ekskul?.description || 'Tidak ada deskripsi.'}</p>
  <div className="flex items-center gap-4 mt-3 flex-wrap">
- {ekskul?.users?.full_name && (
- <span className="flex items-center gap-1.5 text-xs text-violet-100">
- <User className="w-3.5 h-3.5" /> {ekskul.users.full_name}
- </span>
- )}
+ {(() => {
+    const coachNames = [
+      ekskul?.coach?.full_name,
+      ekskul?.coach2?.full_name,
+      ekskul?.coach3?.full_name
+    ].filter(Boolean).join(', ')
+    return coachNames ? (
+      <span className="flex items-center gap-1.5 text-xs text-violet-100">
+        <User className="w-3.5 h-3.5" /> {coachNames}
+      </span>
+    ) : null
+  })()}
  <span className="flex items-center gap-1.5 text-xs text-violet-100">
  <Clock className="w-3.5 h-3.5" /> {ekskul?.schedule || 'Jadwal belum diatur'}
  </span>

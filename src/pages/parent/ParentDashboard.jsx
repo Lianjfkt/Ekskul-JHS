@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { useParentChildren } from '../../hooks/useParentChildren'
@@ -95,7 +95,7 @@ export default function ParentDashboard() {
  .select(`
  id, semester, academic_year, status,
  extracurriculars(id, name, schedule, description, coach_id,
- users(full_name)
+ coach:coach_id(full_name), coach2:coach_id_2(full_name), coach3:coach_id_3(full_name)
  )
  `)
  .eq('student_id', studentId)

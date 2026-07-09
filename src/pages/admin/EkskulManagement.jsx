@@ -30,6 +30,7 @@ export default function EkskulManagement() {
     schedule: '',
     coach_id: '',
     coach_id_2: '',
+    coach_id_3: '',
     is_active: true
   })
 
@@ -53,7 +54,8 @@ export default function EkskulManagement() {
         .select(`
           *,
           coach:coach_id (id, full_name, email),
-          coach2:coach_id_2 (id, full_name, email)
+          coach2:coach_id_2 (id, full_name, email),
+          coach3:coach_id_3 (id, full_name, email)
         `)
         .order('name', { ascending: true })
       if (eErr) throw eErr
@@ -75,6 +77,7 @@ export default function EkskulManagement() {
         schedule: ekskul.schedule || '',
         coach_id: ekskul.coach_id || '',
         coach_id_2: ekskul.coach_id_2 || '',
+        coach_id_3: ekskul.coach_id_3 || '',
         is_active: ekskul.is_active !== undefined ? ekskul.is_active : true
       })
     } else {
@@ -85,6 +88,7 @@ export default function EkskulManagement() {
         schedule: '',
         coach_id: coaches[0]?.id || '',
         coach_id_2: '',
+        coach_id_3: '',
         is_active: true
       })
     }
@@ -96,9 +100,11 @@ export default function EkskulManagement() {
     setErrorMsg('')
     setSuccessMsg('')
     try {
-      // Validasi: pelatih 1 dan 2 tidak boleh sama
-      if (form.coach_id && form.coach_id_2 && form.coach_id === form.coach_id_2) {
-        setErrorMsg('Pelatih 1 dan Pelatih 2 tidak boleh orang yang sama.')
+      // Validasi: pelatih yang dipilih tidak boleh sama (duplikat)
+      const selectedCoaches = [form.coach_id, form.coach_id_2, form.coach_id_3].filter(Boolean)
+      const uniqueCoaches = new Set(selectedCoaches)
+      if (selectedCoaches.length !== uniqueCoaches.size) {
+        setErrorMsg('Setiap pelatih yang ditunjuk harus berbeda (tidak boleh duplikat).')
         return
       }
 
@@ -111,6 +117,7 @@ export default function EkskulManagement() {
             schedule: form.schedule,
             coach_id: form.coach_id || null,
             coach_id_2: form.coach_id_2 || null,
+            coach_id_3: form.coach_id_3 || null,
             is_active: form.is_active
           })
           .eq('id', selectedEkskul.id)
@@ -126,6 +133,7 @@ export default function EkskulManagement() {
               schedule: form.schedule,
               coach_id: form.coach_id || null,
               coach_id_2: form.coach_id_2 || null,
+              coach_id_3: form.coach_id_3 || null,
               is_active: form.is_active
             }
           ])
@@ -274,6 +282,10 @@ export default function EkskulManagement() {
                       <User className="w-4 h-4 text-pixel-lavender" />
                       <span>Pelatih 2: <strong className="text-pixel-yellow">{ekskul.coach2?.full_name || '-'}</strong></span>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-pixel-lavender" />
+                      <span>Pelatih 3: <strong className="text-pixel-yellow">{ekskul.coach3?.full_name || '-'}</strong></span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -349,10 +361,25 @@ export default function EkskulManagement() {
                   id="e_coach_2"
                   className="pixel-input flex h-10 w-full rounded-none px-3 py-2 font-retro text-lg"
                   value={form.coach_id_2}
-                  onChange={e => setForm({...form, coach_id_2: e.target.value})}
+                  onChange={e => setForm({...form, coach_id_2: e.target.value, coach_id_3: e.target.value === form.coach_id_3 ? '' : form.coach_id_3})}
                 >
                   <option value="">-- Tidak Ada / Pilih Pelatih 2 --</option>
                   {coaches.filter(c => c.id !== form.coach_id).map(c => (
+                    <option key={c.id} value={c.id}>{c.full_name} ({c.email})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="e_coach_3">Pilih Pelatih 3 (Opsional)</Label>
+                <select
+                  id="e_coach_3"
+                  className="pixel-input flex h-10 w-full rounded-none px-3 py-2 font-retro text-lg"
+                  value={form.coach_id_3}
+                  onChange={e => setForm({...form, coach_id_3: e.target.value})}
+                >
+                  <option value="">-- Tidak Ada / Pilih Pelatih 3 --</option>
+                  {coaches.filter(c => c.id !== form.coach_id && c.id !== form.coach_id_2).map(c => (
                     <option key={c.id} value={c.id}>{c.full_name} ({c.email})</option>
                   ))}
                 </select>
