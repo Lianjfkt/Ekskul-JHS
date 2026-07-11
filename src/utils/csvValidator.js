@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabaseClient'
 
 // ─── REQUIRED COLUMNS ─────────────────────────────────────────────────────────
-export const STUDENT_REQUIRED_COLS = ['nis', 'full_name', 'class', 'gender', 'phone']
+export const STUDENT_REQUIRED_COLS = ['nis', 'full_name', 'class', 'gender']
 export const ENROLLMENT_REQUIRED_COLS = ['nis', 'extracurricular_name', 'semester', 'academic_year']
 
 // Gender shorthand → full value stored in DB

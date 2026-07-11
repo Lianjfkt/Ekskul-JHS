@@ -56,7 +56,7 @@ function parseCSV(file) {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: (h) => h.trim().toLowerCase().replace(/\s+/g, '_'),
+      transformHeader: (h) => h.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
       transform: (val) => (typeof val === 'string' ? val.trim() : val),
       complete: (results) => {
         if (results.errors?.length > 0 && results.data?.length === 0) {
