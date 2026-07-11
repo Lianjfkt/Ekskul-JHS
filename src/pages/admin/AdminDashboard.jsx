@@ -11,7 +11,8 @@ import { auditLogService } from '../../utils/auditLogService'
 import { 
   GraduationCap, Activity, UserCheck, BookOpen, 
   ArrowRight, Plus, Upload, Users as UsersIcon, Clock,
-  Megaphone, ShieldAlert, Trash2, Eye, EyeOff, Search
+  Megaphone, ShieldAlert, Trash2, Eye, EyeOff, Search,
+  AlertCircle, CheckCircle2, XCircle, RefreshCw, UserX
 } from 'lucide-react'
 
 export default function AdminDashboard() {
@@ -36,11 +37,43 @@ export default function AdminDashboard() {
   const [logs, setLogs] = useState([])
   const [searchLogQuery, setSearchLogQuery] = useState('')
 
+  // Student Tracking state
+  const [trackingStudents, setTrackingStudents] = useState([])
+  const [trackingLoading, setTrackingLoading] = useState(false)
+  const [trackingFilter, setTrackingFilter] = useState('all') // 'all', 'no_account', 'no_ekskul', 'both_missing'
+  const [searchTrackingQuery, setSearchTrackingQuery] = useState('')
+
   useEffect(() => {
     fetchStats()
     loadAnnouncements()
     loadAuditLogs()
+    fetchTrackingData()
   }, [])
+
+  const fetchTrackingData = async () => {
+    setTrackingLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select(`
+          id,
+          nis,
+          full_name,
+          class,
+          gender,
+          phone,
+          users:users!student_id (id, email),
+          enrollments:enrollments (id, status)
+        `)
+        .order('full_name', { ascending: true })
+      if (error) throw error
+      setTrackingStudents(data || [])
+    } catch (err) {
+      console.error('Error fetching tracking data:', err.message)
+    } finally {
+      setTrackingLoading(false)
+    }
+  }
 
   const fetchStats = async () => {
     setLoading(true)
@@ -171,6 +204,31 @@ export default function AdminDashboard() {
     log.details?.toLowerCase().includes(searchLogQuery.toLowerCase())
   )
 
+  // Filter tracking students based on search query and status filter
+  const filteredTrackingStudents = trackingStudents.filter(st => {
+    const query = searchTrackingQuery.toLowerCase().trim()
+    const matchesSearch = !query || 
+      st.full_name?.toLowerCase().includes(query) ||
+      st.nis?.includes(query) ||
+      st.class?.toLowerCase().includes(query)
+
+    if (!matchesSearch) return false
+
+    const hasAccount = st.users && st.users.length > 0
+    const hasEkskul = st.enrollments && st.enrollments.filter(e => e.status === 'active').length > 0
+
+    if (trackingFilter === 'no_account') {
+      return !hasAccount
+    }
+    if (trackingFilter === 'no_ekskul') {
+      return !hasEkskul
+    }
+    if (trackingFilter === 'both_missing') {
+      return !hasAccount && !hasEkskul
+    }
+    return true
+  })
+
   // Card items config — pixel colors
   const statCards = [
     {
@@ -225,9 +283,10 @@ export default function AdminDashboard() {
       </div>
 
       {/* Pixel Tabs Selector */}
-      <div className="flex border-b-4 border-pixel-gray gap-1">
+      <div className="flex border-b-4 border-pixel-gray gap-1 flex-wrap sm:flex-nowrap">
         {[
           { key: 'dashboard', label: 'DASHBOARD' },
+          { key: 'tracking', label: 'TRACKING SISWA' },
           { key: 'announcements', label: 'PENGUMUMAN' },
           { key: 'logs', label: 'AUDIT LOG' },
         ].map(tab => (
@@ -358,6 +417,200 @@ export default function AdminDashboard() {
               </Card>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Tab: Tracking Siswa */}
+      {activeTab === 'tracking' && (
+        <div className="space-y-6">
+          {/* Header & Refresh */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h2 className="font-pixel text-[10px] text-pixel-yellow pixel-text-shadow uppercase">Tracking Siswa</h2>
+              <p className="font-retro text-lg text-pixel-lavender mt-1">Pantau siswa yang belum punya akun login atau belum daftar ekskul.</p>
+            </div>
+            <Button variant="outline" onClick={fetchTrackingData} className="gap-2" disabled={trackingLoading}>
+              <RefreshCw className={`w-4 h-4 ${trackingLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              {
+                label: 'Total Siswa',
+                value: trackingStudents.length,
+                icon: UsersIcon,
+                color: 'text-pixel-blue',
+                bg: 'bg-pixel-blue/15',
+                border: 'border-pixel-blue',
+                filter: 'all'
+              },
+              {
+                label: 'Belum Punya Akun',
+                value: trackingStudents.filter(s => !s.users || s.users.length === 0).length,
+                icon: UserX,
+                color: 'text-pixel-red',
+                bg: 'bg-pixel-red/15',
+                border: 'border-pixel-red',
+                filter: 'no_account'
+              },
+              {
+                label: 'Belum Daftar Ekskul',
+                value: trackingStudents.filter(s => !s.enrollments || s.enrollments.filter(e => e.status === 'active').length === 0).length,
+                icon: AlertCircle,
+                color: 'text-pixel-orange',
+                bg: 'bg-pixel-orange/15',
+                border: 'border-pixel-orange',
+                filter: 'no_ekskul'
+              },
+              {
+                label: 'Keduanya Belum',
+                value: trackingStudents.filter(s => (!s.users || s.users.length === 0) && (!s.enrollments || s.enrollments.filter(e => e.status === 'active').length === 0)).length,
+                icon: XCircle,
+                color: 'text-pixel-pink',
+                bg: 'bg-pixel-pink/15',
+                border: 'border-pixel-pink',
+                filter: 'both_missing'
+              }
+            ].map((card) => {
+              const Icon = card.icon
+              const isActive = trackingFilter === card.filter
+              return (
+                <button
+                  key={card.filter}
+                  onClick={() => setTrackingFilter(card.filter)}
+                  className={`p-4 border-3 text-left transition-all ${
+                    isActive
+                      ? `${card.bg} ${card.border} ${card.color}`
+                      : 'border-pixel-gray bg-pixel-panel text-pixel-lavender hover:border-pixel-gray/60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <Icon className={`w-5 h-5 ${isActive ? card.color : 'text-pixel-lavender'}`} />
+                    {isActive && <span className="font-pixel text-[7px]">AKTIF</span>}
+                  </div>
+                  <div className={`font-pixel text-xl pixel-text-shadow ${isActive ? card.color : 'text-pixel-white'}`}>
+                    {trackingLoading ? '...' : card.value}
+                  </div>
+                  <div className="font-retro text-base mt-1">{card.label}</div>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-pixel-lavender" />
+            <Input
+              placeholder="Cari nama, NIS, atau kelas..."
+              value={searchTrackingQuery}
+              onChange={(e) => setSearchTrackingQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {/* Data Table */}
+          <Card>
+            <CardContent className="p-0">
+              {trackingLoading ? (
+                <div className="p-8 text-center font-retro text-lg text-pixel-lavender">
+                  <span className="pixel-blink">MEMUAT DATA SISWA...</span>
+                </div>
+              ) : filteredTrackingStudents.length === 0 ? (
+                <div className="p-8 text-center font-retro text-lg text-pixel-lavender">
+                  <CheckCircle2 className="w-10 h-10 text-pixel-green mx-auto mb-2" />
+                  Tidak ada siswa yang sesuai kriteria filter ini. Semua siswa sudah memiliki akun dan ekskul!
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse font-retro text-lg">
+                    <thead>
+                      <tr className="border-b-3 border-pixel-gray bg-pixel-navy font-pixel text-[7px] text-pixel-lavender uppercase tracking-wider">
+                        <th className="p-4">NIS</th>
+                        <th className="p-4">Nama Lengkap</th>
+                        <th className="p-4">Kelas</th>
+                        <th className="p-4">Status Akun Login</th>
+                        <th className="p-4">Status Ekskul</th>
+                        <th className="p-4">Aksi Cepat</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-pixel-gray/20">
+                      {filteredTrackingStudents.map((student) => {
+                        const hasAccount = student.users && student.users.length > 0
+                        const activeEnrollments = student.enrollments?.filter(e => e.status === 'active') || []
+                        const hasEkskul = activeEnrollments.length > 0
+
+                        return (
+                          <tr key={student.id} className="hover:bg-pixel-panel-light">
+                            <td className="p-4 font-mono text-pixel-lavender text-base">{student.nis}</td>
+                            <td className="p-4 text-pixel-white font-semibold">{student.full_name}</td>
+                            <td className="p-4 text-pixel-peach">{student.class}</td>
+                            <td className="p-4">
+                              {hasAccount ? (
+                                <div className="flex items-center gap-1.5">
+                                  <CheckCircle2 className="w-4 h-4 text-pixel-green" />
+                                  <span className="font-retro text-base text-pixel-green">Sudah</span>
+                                  <span className="font-retro text-sm text-pixel-lavender/60 truncate max-w-[120px]" title={student.users[0]?.email}>
+                                    ({student.users[0]?.email})
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5">
+                                  <XCircle className="w-4 h-4 text-pixel-red" />
+                                  <span className="font-retro text-base text-pixel-red">Belum Punya Akun</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-4">
+                              {hasEkskul ? (
+                                <div className="flex items-center gap-1.5">
+                                  <CheckCircle2 className="w-4 h-4 text-pixel-green" />
+                                  <span className="font-retro text-base text-pixel-green">{activeEnrollments.length} Ekskul</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5">
+                                  <AlertCircle className="w-4 h-4 text-pixel-orange" />
+                                  <span className="font-retro text-base text-pixel-orange">Belum Daftar</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-4">
+                              <div className="flex gap-2 flex-wrap">
+                                {!hasAccount && (
+                                  <Link
+                                    to="/admin/users"
+                                    className="font-pixel text-[7px] px-2 py-1 border-2 border-pixel-blue text-pixel-blue hover:bg-pixel-blue/10 whitespace-nowrap"
+                                  >
+                                    + Buat Akun
+                                  </Link>
+                                )}
+                                {!hasEkskul && (
+                                  <Link
+                                    to="/admin/enrollments"
+                                    className="font-pixel text-[7px] px-2 py-1 border-2 border-pixel-orange text-pixel-orange hover:bg-pixel-orange/10 whitespace-nowrap"
+                                  >
+                                    + Daftarkan Ekskul
+                                  </Link>
+                                )}
+                                {hasAccount && hasEkskul && (
+                                  <span className="font-pixel text-[7px] text-pixel-green">✓ Lengkap</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="px-4 py-3 border-t-2 border-pixel-gray/30 bg-pixel-navy/30 text-right font-retro text-base text-pixel-lavender">
+                    Menampilkan {filteredTrackingStudents.length} dari {trackingStudents.length} siswa
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
 
