@@ -13,6 +13,7 @@ import FileDropzone from './FileDropzone'
 import PreviewTable from './PreviewTable'
 import ValidationErrors from './ValidationErrors'
 import ImportProgress from './ImportProgress'
+import { Button } from '../ui/button'
 
 // Step constants
 const STEP_UPLOAD   = 1
