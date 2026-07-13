@@ -53,7 +53,14 @@ export default function AdminDashboard() {
   const fetchTrackingData = async () => {
     setTrackingLoading(true)
     try {
-      const { data, error } = await supabase
+      // 1. Fetch student_master (Data acuan resmi sekolah)
+      const { data: masterData, error: mErr } = await supabase
+        .from('student_master')
+        .select('*')
+      if (mErr) throw mErr
+
+      // 2. Fetch students (Data pendaftaran aktif, profil, beserta user dan ekskul)
+      const { data: studentsData, error: sErr } = await supabase
         .from('students')
         .select(`
           id,
@@ -65,9 +72,61 @@ export default function AdminDashboard() {
           users:users!student_id (id, email),
           enrollments:enrollments (id, status)
         `)
-        .order('full_name', { ascending: true })
-      if (error) throw error
-      setTrackingStudents(data || [])
+      if (sErr) throw sErr
+
+      const merged = []
+      const processedNis = new Set()
+
+      // Gabungkan data dari masterData
+      (masterData || []).forEach(m => {
+        const s = (studentsData || []).find(x => x.nis === m.nis)
+        processedNis.add(m.nis)
+        
+        const hasAccount = s ? (s.users && s.users.length > 0) : false
+        const activeEnrollmentsCount = s?.enrollments ? s.enrollments.filter(e => e.status === 'active').length : 0
+        const hasEkskul = activeEnrollmentsCount > 0
+
+        merged.push({
+          id: s?.id || null,
+          nis: m.nis,
+          full_name: m.full_name,
+          class: m.class,
+          gender: m.gender,
+          phone: m.phone,
+          hasAccount,
+          hasEkskul,
+          activeEnrollmentsCount,
+          users: s?.users || [],
+          enrollments: s?.enrollments || []
+        })
+      })
+
+      // Jika ada data di studentsData yang tidak terdaftar di masterData (discrepancy fallback)
+      (studentsData || []).forEach(s => {
+        if (!processedNis.has(s.nis)) {
+          const hasAccount = s.users && s.users.length > 0
+          const activeEnrollmentsCount = s.enrollments ? s.enrollments.filter(e => e.status === 'active').length : 0
+          const hasEkskul = activeEnrollmentsCount > 0
+
+          merged.push({
+            id: s.id,
+            nis: s.nis,
+            full_name: s.full_name,
+            class: s.class,
+            gender: s.gender,
+            phone: s.phone,
+            hasAccount,
+            hasEkskul,
+            activeEnrollmentsCount,
+            users: s.users || [],
+            enrollments: s.enrollments || []
+          })
+        }
+      })
+
+      // Urutkan berdasarkan nama
+      merged.sort((a, b) => a.full_name.localeCompare(b.full_name))
+      setTrackingStudents(merged)
     } catch (err) {
       console.error('Error fetching tracking data:', err.message)
     } finally {
@@ -434,7 +493,6 @@ export default function AdminDashboard() {
               Refresh
             </Button>
           </div>
-
           {/* Summary Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
@@ -449,7 +507,7 @@ export default function AdminDashboard() {
               },
               {
                 label: 'Belum Punya Akun',
-                value: trackingStudents.filter(s => !s.users || s.users.length === 0).length,
+                value: trackingStudents.filter(s => !s.hasAccount).length,
                 icon: UserX,
                 color: 'text-pixel-red',
                 bg: 'bg-pixel-red/15',
@@ -458,7 +516,7 @@ export default function AdminDashboard() {
               },
               {
                 label: 'Belum Daftar Ekskul',
-                value: trackingStudents.filter(s => !s.enrollments || s.enrollments.filter(e => e.status === 'active').length === 0).length,
+                value: trackingStudents.filter(s => !s.hasEkskul).length,
                 icon: AlertCircle,
                 color: 'text-pixel-orange',
                 bg: 'bg-pixel-orange/15',
@@ -467,7 +525,7 @@ export default function AdminDashboard() {
               },
               {
                 label: 'Keduanya Belum',
-                value: trackingStudents.filter(s => (!s.users || s.users.length === 0) && (!s.enrollments || s.enrollments.filter(e => e.status === 'active').length === 0)).length,
+                value: trackingStudents.filter(s => !s.hasAccount && !s.hasEkskul).length,
                 icon: XCircle,
                 color: 'text-pixel-pink',
                 bg: 'bg-pixel-pink/15',
@@ -538,12 +596,12 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y-2 divide-pixel-gray/20">
                       {filteredTrackingStudents.map((student) => {
-                        const hasAccount = student.users && student.users.length > 0
-                        const activeEnrollments = student.enrollments?.filter(e => e.status === 'active') || []
-                        const hasEkskul = activeEnrollments.length > 0
+                        const hasAccount = student.hasAccount
+                        const hasEkskul = student.hasEkskul
+                        const activeEnrollmentsCount = student.activeEnrollmentsCount
 
                         return (
-                          <tr key={student.id} className="hover:bg-pixel-panel-light">
+                          <tr key={student.nis} className="hover:bg-pixel-panel-light">
                             <td className="p-4 font-mono text-pixel-lavender text-base">{student.nis}</td>
                             <td className="p-4 text-pixel-white font-semibold">{student.full_name}</td>
                             <td className="p-4 text-pixel-peach">{student.class}</td>
@@ -567,7 +625,7 @@ export default function AdminDashboard() {
                               {hasEkskul ? (
                                 <div className="flex items-center gap-1.5">
                                   <CheckCircle2 className="w-4 h-4 text-pixel-green" />
-                                  <span className="font-retro text-base text-pixel-green">{activeEnrollments.length} Ekskul</span>
+                                  <span className="font-retro text-base text-pixel-green">{activeEnrollmentsCount} Ekskul</span>
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-1.5">
