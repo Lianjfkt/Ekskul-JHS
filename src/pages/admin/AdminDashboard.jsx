@@ -59,7 +59,7 @@ export default function AdminDashboard() {
         .select('*')
       if (mErr) throw mErr
 
-      // 2. Fetch students (Data pendaftaran aktif, profil, beserta user dan ekskul)
+      // 2. Fetch students (Data profil pendaftaran)
       const { data: studentsData, error: sErr } = await supabase
         .from('students')
         .select(`
@@ -69,10 +69,15 @@ export default function AdminDashboard() {
           class,
           gender,
           phone,
-          users:users!student_id (id, email),
-          enrollments:enrollments (id, status)
+          users:users!student_id (id, email)
         `)
       if (sErr) throw sErr
+
+      // 3. Fetch enrollments (Data pendaftaran ekskul)
+      const { data: enrollmentsData, error: enErr } = await supabase
+        .from('enrollments')
+        .select('id, student_id, status')
+      if (enErr) throw enErr
 
       const merged = []
 
@@ -81,7 +86,8 @@ export default function AdminDashboard() {
         const s = (studentsData || []).find(x => x.nis === m.nis)
         
         const hasAccount = s ? (s.users && s.users.length > 0) : false
-        const activeEnrollmentsCount = s?.enrollments ? s.enrollments.filter(e => e.status === 'active').length : 0
+        const studentEnrollments = s ? (enrollmentsData || []).filter(e => e.student_id === s.id) : []
+        const activeEnrollmentsCount = studentEnrollments.filter(e => e.status === 'active').length
         const hasEkskul = activeEnrollmentsCount > 0
 
         merged.push({
@@ -95,7 +101,7 @@ export default function AdminDashboard() {
           hasEkskul,
           activeEnrollmentsCount,
           users: s?.users || [],
-          enrollments: s?.enrollments || []
+          enrollments: studentEnrollments
         })
       })
 
