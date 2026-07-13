@@ -42,6 +42,7 @@ export default function AdminDashboard() {
   const [trackingLoading, setTrackingLoading] = useState(false)
   const [trackingFilter, setTrackingFilter] = useState('all') // 'all', 'no_account', 'no_ekskul', 'both_missing'
   const [searchTrackingQuery, setSearchTrackingQuery] = useState('')
+  const [trackingError, setTrackingError] = useState('')
 
   useEffect(() => {
     fetchStats()
@@ -52,11 +53,12 @@ export default function AdminDashboard() {
 
   const fetchTrackingData = async () => {
     setTrackingLoading(true)
+    setTrackingError('')
     try {
       // 1. Fetch student_master (Data acuan resmi sekolah)
       const { data: masterData, error: mErr } = await supabase
         .from('student_master')
-        .select('*')
+        .select('nis, full_name, class, gender, phone')
       if (mErr) throw mErr
 
       // 2. Fetch students (Data profil pendaftaran)
@@ -110,6 +112,7 @@ export default function AdminDashboard() {
       setTrackingStudents(merged)
     } catch (err) {
       console.error('Error fetching tracking data:', err.message)
+      setTrackingError(err.message)
     } finally {
       setTrackingLoading(false)
     }
@@ -471,6 +474,12 @@ export default function AdminDashboard() {
               Refresh
             </Button>
           </div>
+
+          {trackingError && (
+            <div className="p-4 border-2 border-pixel-red bg-pixel-red/10 text-pixel-red font-retro text-lg">
+              Gagal memuat data tracking: {trackingError}
+            </div>
+          )}
           {/* Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
