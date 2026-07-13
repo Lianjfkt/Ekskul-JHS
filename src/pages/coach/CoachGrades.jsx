@@ -20,7 +20,7 @@ export default function CoachGrades() {
  const [managedEkskuls, setManagedEkskuls] = useState([])
  const [selectedEkskul, setSelectedEkskul] = useState('')
  const [selectedSemester, setSelectedSemester] = useState('Pertengahan Semester Ganjil')
- const [selectedAcademicYear, setSelectedAcademicYear] = useState('2025/2026')
+ const [selectedAcademicYear, setSelectedAcademicYear] = useState('2026/2027')
 
  // Data States
  const [students, setStudents] = useState([])
@@ -297,7 +297,7 @@ export default function CoachGrades() {
  id="ta_select"
  value={selectedAcademicYear}
  onChange={(e) => setSelectedAcademicYear(e.target.value)}
- placeholder="Contoh: 2025/2026"
+ placeholder="Contoh: 2026/2027"
  className="h-11 rounded-none"
  />
  </div>

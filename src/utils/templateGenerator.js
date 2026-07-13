@@ -131,9 +131,9 @@ export function downloadEnrollmentTemplate(ekskulList = []) {
   // Sheet 1 – Data
   const headers = ['nis *', 'extracurricular_name *', 'semester *', 'academic_year *']
   const examples = [
-    ['10001', ekskulList[0]?.name || 'Futsal', 'Ganjil', '2025/2026'],
-    ['10002', ekskulList[1]?.name || 'Pramuka', 'Ganjil', '2025/2026'],
-    ['10003', ekskulList[0]?.name || 'Futsal', 'Genap', '2025/2026'],
+    ['10001', ekskulList[0]?.name || 'Futsal', 'Ganjil', '2026/2027'],
+    ['10002', ekskulList[1]?.name || 'Pramuka', 'Ganjil', '2026/2027'],
+    ['10003', ekskulList[0]?.name || 'Futsal', 'Genap', '2026/2027'],
   ]
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...examples])
@@ -154,7 +154,7 @@ export function downloadEnrollmentTemplate(ekskulList = []) {
     ['nis *', 'NIS siswa yang sudah terdaftar di sistem. Wajib diisi.'],
     ['extracurricular_name *', 'Nama ekskul — HARUS SAMA PERSIS dengan Sheet "Daftar Ekskul". Wajib diisi.'],
     ['semester *', 'Isi dengan: Ganjil atau Genap. Wajib diisi.'],
-    ['academic_year *', 'Format: YYYY/YYYY, contoh: 2025/2026. Wajib diisi.'],
+    ['academic_year *', 'Format: YYYY/YYYY, contoh: 2026/2027. Wajib diisi.'],
     ['', ''],
     ['Tips', 'Copy nama ekskul dari Sheet "Daftar Ekskul" untuk menghindari typo.'],
     ['', 'NIS harus sudah terdaftar sebagai siswa terlebih dahulu.'],

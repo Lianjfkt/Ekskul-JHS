@@ -538,9 +538,9 @@ export default function RecapManagement() {
  // Find total active students registered in this ekskul
  const totalPeserta = enrollments.filter(en => en.extracurricular_id === ekskulId).length
 
- // Extract academic year & semester from enrollments, default to 2025/2026 & Genap
+ // Extract academic year & semester from enrollments, default to 2026/2027 & Genap
  const sampleEnroll = enrollments.find(en => en.extracurricular_id === ekskulId)
- const academicYear = sampleEnroll?.academic_year || '2025/2026'
+ const academicYear = sampleEnroll?.academic_year || '2026/2027'
  const semester = sampleEnroll?.semester || 'Genap'
 
  const periodeLabel = formatPeriodIndo(periodKey)

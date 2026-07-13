@@ -54,7 +54,7 @@ export default function StudentExtracurriculars() {
  // Enrollment Form State
  const [enrollForm, setEnrollForm] = useState({
  semester: 'Ganjil',
- academic_year: '2025/2026'
+ academic_year: '2026/2027'
  })
 
  useEffect(() => {
@@ -459,7 +459,7 @@ export default function StudentExtracurriculars() {
  <Input
  id="academic_year"
  required
- placeholder="Contoh: 2025/2026"
+ placeholder="Contoh: 2026/2027"
  value={enrollForm.academic_year}
  onChange={e => setEnrollForm({...enrollForm, academic_year: e.target.value})}
  />

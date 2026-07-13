@@ -268,7 +268,7 @@ export function validateEnrollmentRows(rows, existingNis = [], ekskulList = []) 
 
     // Validate academic_year format
     if (!/^\d{4}\/\d{4}$/.test(academic_year)) {
-      rowErrors.push('Tahun ajaran harus format YYYY/YYYY (contoh: 2025/2026)')
+      rowErrors.push('Tahun ajaran harus format YYYY/YYYY (contoh: 2026/2027)')
     }
 
     const cleanRow = {

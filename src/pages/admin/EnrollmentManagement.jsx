@@ -37,7 +37,7 @@ export default function EnrollmentManagement() {
  student_id: '',
  extracurricular_id: '',
  semester: 'Ganjil',
- academic_year: '2025/2026',
+ academic_year: '2026/2027',
  status: 'active'
  })
 
@@ -94,7 +94,7 @@ export default function EnrollmentManagement() {
  student_id: '',
  extracurricular_id: extracurriculars[0]?.id || '',
  semester: 'Ganjil',
- academic_year: '2025/2026',
+ academic_year: '2026/2027',
  status: 'active'
  })
  setFormStudentSearch('')
@@ -506,7 +506,7 @@ export default function EnrollmentManagement() {
  <Input
  id="ta_select"
  required
- placeholder="Contoh: 2025/2026"
+ placeholder="Contoh: 2026/2027"
  value={form.academic_year}
  onChange={e => setForm({...form, academic_year: e.target.value})}
  />
