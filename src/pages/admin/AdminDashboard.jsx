@@ -61,34 +61,51 @@ export default function AdminDashboard() {
         .select('nis, full_name, class, gender, phone')
       if (mErr) throw mErr
 
-      // 2. Fetch students (Data profil pendaftaran)
+      // 2. Fetch students (Data profil pendaftaran - TANPA relasi)
       const { data: studentsData, error: sErr } = await supabase
         .from('students')
-        .select(`
-          id,
-          nis,
-          full_name,
-          class,
-          gender,
-          phone,
-          users:users!student_id (id, email)
-        `)
+        .select('id, nis, full_name, class, gender, phone')
       if (sErr) throw sErr
 
-      // 3. Fetch enrollments (Data pendaftaran ekskul)
+      // 3. Fetch users (Data akun login - TERPISAH)
+      const { data: usersData, error: uErr } = await supabase
+        .from('users')
+        .select('id, email, student_id, role')
+        .eq('role', 'student')
+      if (uErr) throw uErr
+
+      // 4. Fetch enrollments (Data pendaftaran ekskul)
       const { data: enrollmentsData, error: enErr } = await supabase
         .from('enrollments')
         .select('id, student_id, status')
       if (enErr) throw enErr
 
+      // Buat lookup maps untuk performa
+      const usersByStudentId = {}
+      for (const u of (usersData || [])) {
+        if (u.student_id) {
+          if (!usersByStudentId[u.student_id]) usersByStudentId[u.student_id] = []
+          usersByStudentId[u.student_id].push(u)
+        }
+      }
+
+      const enrollmentsByStudentId = {}
+      for (const e of (enrollmentsData || [])) {
+        if (e.student_id) {
+          if (!enrollmentsByStudentId[e.student_id]) enrollmentsByStudentId[e.student_id] = []
+          enrollmentsByStudentId[e.student_id].push(e)
+        }
+      }
+
       const merged = []
 
       // Gabungkan data dari masterData (Hanya memproses total siswa yang ada di master siswa)
-      (masterData || []).forEach(m => {
+      for (const m of (masterData || [])) {
         const s = (studentsData || []).find(x => x.nis === m.nis)
         
-        const hasAccount = s ? (s.users && s.users.length > 0) : false
-        const studentEnrollments = s ? (enrollmentsData || []).filter(e => e.student_id === s.id) : []
+        const studentUsers = s ? (usersByStudentId[s.id] || []) : []
+        const hasAccount = studentUsers.length > 0
+        const studentEnrollments = s ? (enrollmentsByStudentId[s.id] || []) : []
         const activeEnrollmentsCount = studentEnrollments.filter(e => e.status === 'active').length
         const hasEkskul = activeEnrollmentsCount > 0
 
@@ -102,10 +119,10 @@ export default function AdminDashboard() {
           hasAccount,
           hasEkskul,
           activeEnrollmentsCount,
-          users: s?.users || [],
+          users: studentUsers,
           enrollments: studentEnrollments
         })
-      })
+      }
 
       // Urutkan berdasarkan nama
       merged.sort((a, b) => a.full_name.localeCompare(b.full_name))
