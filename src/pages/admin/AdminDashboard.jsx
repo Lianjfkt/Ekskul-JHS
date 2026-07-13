@@ -75,12 +75,10 @@ export default function AdminDashboard() {
       if (sErr) throw sErr
 
       const merged = []
-      const processedNis = new Set()
 
-      // Gabungkan data dari masterData
+      // Gabungkan data dari masterData (Hanya memproses total siswa yang ada di master siswa)
       (masterData || []).forEach(m => {
         const s = (studentsData || []).find(x => x.nis === m.nis)
-        processedNis.add(m.nis)
         
         const hasAccount = s ? (s.users && s.users.length > 0) : false
         const activeEnrollmentsCount = s?.enrollments ? s.enrollments.filter(e => e.status === 'active').length : 0
@@ -99,29 +97,6 @@ export default function AdminDashboard() {
           users: s?.users || [],
           enrollments: s?.enrollments || []
         })
-      })
-
-      // Jika ada data di studentsData yang tidak terdaftar di masterData (discrepancy fallback)
-      (studentsData || []).forEach(s => {
-        if (!processedNis.has(s.nis)) {
-          const hasAccount = s.users && s.users.length > 0
-          const activeEnrollmentsCount = s.enrollments ? s.enrollments.filter(e => e.status === 'active').length : 0
-          const hasEkskul = activeEnrollmentsCount > 0
-
-          merged.push({
-            id: s.id,
-            nis: s.nis,
-            full_name: s.full_name,
-            class: s.class,
-            gender: s.gender,
-            phone: s.phone,
-            hasAccount,
-            hasEkskul,
-            activeEnrollmentsCount,
-            users: s.users || [],
-            enrollments: s.enrollments || []
-          })
-        }
       })
 
       // Urutkan berdasarkan nama
@@ -273,17 +248,14 @@ export default function AdminDashboard() {
 
     if (!matchesSearch) return false
 
-    const hasAccount = st.users && st.users.length > 0
-    const hasEkskul = st.enrollments && st.enrollments.filter(e => e.status === 'active').length > 0
+    const hasAccount = st.hasAccount
+    const hasEkskul = st.hasEkskul
 
     if (trackingFilter === 'no_account') {
       return !hasAccount
     }
     if (trackingFilter === 'no_ekskul') {
-      return !hasEkskul
-    }
-    if (trackingFilter === 'both_missing') {
-      return !hasAccount && !hasEkskul
+      return hasAccount && !hasEkskul
     }
     return true
   })
@@ -494,10 +466,10 @@ export default function AdminDashboard() {
             </Button>
           </div>
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
               {
-                label: 'Total Siswa',
+                label: 'Total Siswa (Master)',
                 value: trackingStudents.length,
                 icon: UsersIcon,
                 color: 'text-pixel-blue',
@@ -516,21 +488,12 @@ export default function AdminDashboard() {
               },
               {
                 label: 'Belum Daftar Ekskul',
-                value: trackingStudents.filter(s => !s.hasEkskul).length,
+                value: trackingStudents.filter(s => s.hasAccount && !s.hasEkskul).length,
                 icon: AlertCircle,
                 color: 'text-pixel-orange',
                 bg: 'bg-pixel-orange/15',
                 border: 'border-pixel-orange',
                 filter: 'no_ekskul'
-              },
-              {
-                label: 'Keduanya Belum',
-                value: trackingStudents.filter(s => !s.hasAccount && !s.hasEkskul).length,
-                icon: XCircle,
-                color: 'text-pixel-pink',
-                bg: 'bg-pixel-pink/15',
-                border: 'border-pixel-pink',
-                filter: 'both_missing'
               }
             ].map((card) => {
               const Icon = card.icon
