@@ -12,8 +12,11 @@ import {
   GraduationCap, Activity, UserCheck, BookOpen, 
   ArrowRight, Plus, Upload, Users as UsersIcon, Clock,
   Megaphone, ShieldAlert, Trash2, Eye, EyeOff, Search,
-  AlertCircle, CheckCircle2, XCircle, RefreshCw, UserX
+  AlertCircle, CheckCircle2, XCircle, RefreshCw, UserX, BarChart as BarChartIcon
 } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts'
 
 export default function AdminDashboard() {
   const { user } = useAuthStore()
@@ -43,6 +46,10 @@ export default function AdminDashboard() {
   const [trackingFilter, setTrackingFilter] = useState('all') // 'all', 'no_account', 'no_ekskul', 'both_missing'
   const [searchTrackingQuery, setSearchTrackingQuery] = useState('')
   const [trackingError, setTrackingError] = useState('')
+
+  // Laporan & Statistik State
+  const [extracurricularStats, setExtracurricularStats] = useState([])
+  const [mandatoryViolations, setMandatoryViolations] = useState([])
 
   useEffect(() => {
     fetchStats()
@@ -77,8 +84,19 @@ export default function AdminDashboard() {
       // 4. Fetch enrollments (Data pendaftaran ekskul)
       const { data: enrollmentsData, error: enErr } = await supabase
         .from('enrollments')
-        .select('id, student_id, status')
+        .select(`
+          id, 
+          student_id, 
+          status,
+          extracurricular:extracurricular_id (name)
+        `)
       if (enErr) throw enErr
+
+      // 5. Fetch all extracurriculars for complete stats (even if 0 enrollments)
+      const { data: allEkskulData, error: allEksErr } = await supabase
+        .from('extracurriculars')
+        .select('id, name')
+      if (allEksErr) throw allEksErr
 
       // Buat lookup maps untuk performa
       const usersByStudentId = {}
@@ -99,15 +117,44 @@ export default function AdminDashboard() {
 
       const merged = []
 
+      }
+
       // Gabungkan data dari masterData (Hanya memproses total siswa yang ada di master siswa)
+      const violations = []
+
       for (const m of (masterData || [])) {
         const s = (studentsData || []).find(x => x.nis === m.nis)
         
         const studentUsers = s ? (usersByStudentId[s.id] || []) : []
         const hasAccount = studentUsers.length > 0
         const studentEnrollments = s ? (enrollmentsByStudentId[s.id] || []) : []
-        const activeEnrollmentsCount = studentEnrollments.filter(e => e.status === 'active').length
+        const activeEnrollments = studentEnrollments.filter(e => e.status === 'active')
+        const activeEnrollmentsCount = activeEnrollments.length
         const hasEkskul = activeEnrollmentsCount > 0
+
+        const enrolledNames = activeEnrollments.map(e => e.extracurricular?.name?.toLowerCase())
+
+        // Cek pelanggaran ekskul wajib
+        let violationType = null
+        if (m.class === '7') {
+          if (!enrolledNames.some(name => name?.includes('pramuka'))) {
+            violationType = 'Wajib Pramuka'
+          }
+        } else if (m.class === '8') {
+          if (!enrolledNames.some(name => name?.includes('karate') || name?.includes('taekwondo'))) {
+            violationType = 'Wajib Karate / Taekwondo'
+          }
+        }
+
+        if (violationType) {
+          violations.push({
+            nis: m.nis,
+            full_name: m.full_name,
+            class: m.class,
+            violationType,
+            enrolled: activeEnrollments.map(e => e.extracurricular?.name).join(', ') || '-'
+          })
+        }
 
         merged.push({
           id: s?.id || null,
@@ -123,6 +170,37 @@ export default function AdminDashboard() {
           enrollments: studentEnrollments
         })
       }
+
+      // Hitung statistik ekskul
+      const statsMap = {}
+      allEkskulData?.forEach(ekskul => {
+        statsMap[ekskul.name] = 0
+      })
+      
+      enrollmentsData?.forEach(e => {
+        if (e.status === 'active' && e.extracurricular?.name) {
+          const name = e.extracurricular.name
+          if (statsMap[name] !== undefined) {
+            statsMap[name] += 1
+          } else {
+            statsMap[name] = 1
+          }
+        }
+      })
+
+      const statsArray = Object.keys(statsMap).map(name => ({
+        name,
+        jumlahSiswa: statsMap[name]
+      })).sort((a, b) => b.jumlahSiswa - a.jumlahSiswa)
+
+      setExtracurricularStats(statsArray)
+
+      // Urutkan violations berdasarkan kelas lalu nama
+      violations.sort((a, b) => {
+        if (a.class === b.class) return a.full_name.localeCompare(b.full_name)
+        return a.class.localeCompare(b.class)
+      })
+      setMandatoryViolations(violations)
 
       // Urutkan berdasarkan nama
       merged.sort((a, b) => a.full_name.localeCompare(b.full_name))
@@ -344,6 +422,7 @@ export default function AdminDashboard() {
         {[
           { key: 'dashboard', label: 'DASHBOARD' },
           { key: 'tracking', label: 'TRACKING SISWA' },
+          { key: 'laporan', label: 'LAPORAN & STATISTIK' },
           { key: 'announcements', label: 'PENGUMUMAN' },
           { key: 'logs', label: 'AUDIT LOG' },
         ].map(tab => (
@@ -664,6 +743,142 @@ export default function AdminDashboard() {
               )}
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Tab: Laporan & Statistik */}
+      {activeTab === 'laporan' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h2 className="font-pixel text-[10px] text-pixel-yellow pixel-text-shadow uppercase">Laporan & Statistik</h2>
+              <p className="font-retro text-lg text-pixel-lavender mt-1">Statistik pendaftaran dan pelanggaran ekskul wajib.</p>
+            </div>
+            <Button variant="outline" onClick={fetchTrackingData} className="gap-2" disabled={trackingLoading}>
+              <RefreshCw className={`w-4 h-4 ${trackingLoading ? 'animate-spin' : ''}`} />
+              Refresh Data
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Chart Column */}
+            <Card className="flex flex-col">
+              <CardHeader className="border-b-2 border-pixel-gray/30 bg-pixel-navy/20 pb-4">
+                <CardTitle className="font-pixel text-[10px] text-pixel-peach uppercase flex items-center gap-2">
+                  <BarChartIcon className="w-5 h-5 text-pixel-blue" />
+                  Statistik Pendaftaran Ekskul
+                </CardTitle>
+                <CardDescription className="font-retro text-base text-pixel-lavender">
+                  Jumlah siswa aktif per ekstrakurikuler
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6 flex-1 min-h-[400px]">
+                {trackingLoading ? (
+                  <div className="h-full flex items-center justify-center font-retro text-lg text-pixel-lavender">
+                    <span className="pixel-blink">MEMUAT GRAFIK...</span>
+                  </div>
+                ) : extracurricularStats.length === 0 ? (
+                  <div className="h-full flex items-center justify-center font-retro text-lg text-pixel-lavender">
+                    Belum ada data pendaftaran ekskul.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={extracurricularStats}
+                      margin={{ top: 20, right: 30, left: 0, bottom: 60 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#4f5b72" opacity={0.3} />
+                      <XAxis 
+                        dataKey="name" 
+                        stroke="#b8c0e0" 
+                        tick={{ fontFamily: "'VT323', monospace", fontSize: 16 }}
+                        angle={-45}
+                        textAnchor="end"
+                      />
+                      <YAxis 
+                        stroke="#b8c0e0" 
+                        tick={{ fontFamily: "'VT323', monospace", fontSize: 16 }}
+                        allowDecimals={false}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1b233a', 
+                          border: '2px solid #4f5b72',
+                          fontFamily: "'VT323', monospace",
+                          fontSize: '18px'
+                        }}
+                        itemStyle={{ color: '#ffb3a7' }}
+                      />
+                      <Bar 
+                        dataKey="jumlahSiswa" 
+                        name="Jumlah Siswa" 
+                        fill="#6488ea" 
+                        radius={[4, 4, 0, 0]} 
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Mandatory Violations Column */}
+            <Card className="flex flex-col">
+              <CardHeader className="border-b-2 border-pixel-gray/30 bg-pixel-navy/20 pb-4">
+                <CardTitle className="font-pixel text-[10px] text-pixel-peach uppercase flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-pixel-red" />
+                  Siswa Belum Mengambil Ekskul Wajib
+                </CardTitle>
+                <CardDescription className="font-retro text-base text-pixel-lavender">
+                  Kelas 7 wajib Pramuka. Kelas 8 wajib Karate/Taekwondo.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 flex-1">
+                {trackingLoading ? (
+                  <div className="p-8 text-center font-retro text-lg text-pixel-lavender">
+                    <span className="pixel-blink">MEMERIKSA KEPATUHAN...</span>
+                  </div>
+                ) : mandatoryViolations.length === 0 ? (
+                  <div className="p-8 text-center font-retro text-lg text-pixel-lavender">
+                    <CheckCircle2 className="w-12 h-12 text-pixel-green mx-auto mb-3" />
+                    Bagus! Semua siswa kelas 7 & 8 telah mendaftar ekskul wajib mereka.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto h-[400px] overflow-y-auto pixel-scroll">
+                    <table className="w-full text-left border-collapse font-retro text-lg relative">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="border-b-3 border-pixel-gray bg-pixel-navy font-pixel text-[7px] text-pixel-lavender uppercase tracking-wider">
+                          <th className="p-4">Siswa</th>
+                          <th className="p-4">Pelanggaran</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y-2 divide-pixel-gray/20">
+                        {mandatoryViolations.map((v, i) => (
+                          <tr key={v.nis || i} className="hover:bg-pixel-panel-light">
+                            <td className="p-4">
+                              <p className="font-semibold text-pixel-white">{v.full_name}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="font-mono text-base text-pixel-lavender">{v.nis}</span>
+                                <span className="text-pixel-peach text-sm px-1.5 py-0.5 border border-pixel-peach bg-pixel-peach/10">Kelas {v.class}</span>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <span className="inline-flex items-center gap-1.5 font-retro text-base text-pixel-red border border-pixel-red bg-pixel-red/10 px-2 py-1 mb-1">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                {v.violationType}
+                              </span>
+                              <p className="text-sm text-pixel-lavender/70">
+                                Ekskul Saat Ini: {v.enrolled}
+                              </p>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 
