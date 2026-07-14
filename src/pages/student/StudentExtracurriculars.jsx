@@ -151,6 +151,12 @@ export default function StudentExtracurriculars() {
  return
  }
 
+ const activeAndPendingCount = enrollments.filter(e => e.status === 'active' || e.status === 'pending').length
+ if (activeAndPendingCount >= 3) {
+ setErrorMsg('Gagal: Anda telah mencapai batas maksimal pendaftaran (3 Ekstrakurikuler).')
+ return
+ }
+
  setSubmitting(true)
  try {
  // 1. Update Student Profile Data

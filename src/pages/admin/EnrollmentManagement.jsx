@@ -125,6 +125,15 @@ export default function EnrollmentManagement() {
  throw new Error('Siswa tersebut sudah terdaftar di ekskul ini pada semester dan tahun ajaran yang dipilih.')
  }
 
+ const studentActivePendingCount = enrollments.filter(en => 
+ en.student_id === form.student_id && 
+ (en.status === 'active' || en.status === 'pending')
+ ).length
+
+ if (studentActivePendingCount >= 3) {
+ throw new Error('Gagal: Siswa ini sudah mencapai batas maksimal pendaftaran (3 Ekstrakurikuler).')
+ }
+
  const { error } = await supabase
  .from('enrollments')
  .insert([form])

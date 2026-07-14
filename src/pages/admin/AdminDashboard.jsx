@@ -17,6 +17,8 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
+import { useQuery } from '@tanstack/react-query'
+
 
 export default function AdminDashboard() {
   const { user } = useAuthStore()
@@ -41,175 +43,60 @@ export default function AdminDashboard() {
   const [searchLogQuery, setSearchLogQuery] = useState('')
 
   // Student Tracking state
-  const [trackingStudents, setTrackingStudents] = useState([])
-  const [trackingLoading, setTrackingLoading] = useState(false)
   const [trackingFilter, setTrackingFilter] = useState('all') // 'all', 'no_account', 'no_ekskul', 'both_missing'
   const [searchTrackingQuery, setSearchTrackingQuery] = useState('')
-  const [trackingError, setTrackingError] = useState('')
-
-  // Laporan & Statistik State
-  const [extracurricularStats, setExtracurricularStats] = useState([])
-  const [mandatoryViolations, setMandatoryViolations] = useState([])
 
   useEffect(() => {
     fetchStats()
     loadAnnouncements()
     loadAuditLogs()
-    fetchTrackingData()
   }, [])
 
-  const fetchTrackingData = async () => {
-    setTrackingLoading(true)
-    setTrackingError('')
-    try {
-      // 1. Fetch student_master (Data acuan resmi sekolah)
-      const { data: masterData, error: mErr } = await supabase
-        .from('student_master')
-        .select('nis, full_name, class, gender, phone')
-      if (mErr) throw mErr
-
-      // 2. Fetch students (Data profil pendaftaran - TANPA relasi)
-      const { data: studentsData, error: sErr } = await supabase
-        .from('students')
-        .select('id, nis, full_name, class, gender, phone')
-      if (sErr) throw sErr
-
-      // 3. Fetch users (Data akun login - TERPISAH)
-      const { data: usersData, error: uErr } = await supabase
-        .from('users')
-        .select('id, email, student_id, role')
-        .eq('role', 'student')
-      if (uErr) throw uErr
-
-      // 4. Fetch enrollments (Data pendaftaran ekskul)
-      const { data: enrollmentsData, error: enErr } = await supabase
-        .from('enrollments')
-        .select(`
-          id, 
-          student_id, 
-          status,
-          extracurricular:extracurricular_id (name)
-        `)
-      if (enErr) throw enErr
-
-      // 5. Fetch all extracurriculars for complete stats (even if 0 enrollments)
-      const { data: allEkskulData, error: allEksErr } = await supabase
-        .from('extracurriculars')
-        .select('id, name')
-      if (allEksErr) throw allEksErr
-
-      // Buat lookup maps untuk performa
-      const usersByStudentId = {}
-      for (const u of (usersData || [])) {
-        if (u.student_id) {
-          if (!usersByStudentId[u.student_id]) usersByStudentId[u.student_id] = []
-          usersByStudentId[u.student_id].push(u)
-        }
-      }
-
-      const enrollmentsByStudentId = {}
-      for (const e of (enrollmentsData || [])) {
-        if (e.student_id) {
-          if (!enrollmentsByStudentId[e.student_id]) enrollmentsByStudentId[e.student_id] = []
-          enrollmentsByStudentId[e.student_id].push(e)
-        }
-      }
-
-      const merged = []
-
-      // Gabungkan data dari masterData (Hanya memproses total siswa yang ada di master siswa)
-      const violations = []
-
-      for (const m of (masterData || [])) {
-        const s = (studentsData || []).find(x => x.nis === m.nis)
-        
-        const studentUsers = s ? (usersByStudentId[s.id] || []) : []
-        const hasAccount = studentUsers.length > 0
-        const studentEnrollments = s ? (enrollmentsByStudentId[s.id] || []) : []
-        const activeEnrollments = studentEnrollments.filter(e => e.status === 'active')
-        const activeEnrollmentsCount = activeEnrollments.length
-        const hasEkskul = activeEnrollmentsCount > 0
-
-        const enrolledNames = activeEnrollments.map(e => e.extracurricular?.name?.toLowerCase())
-
-        // Cek pelanggaran ekskul wajib
-        let violationType = null
-        if (m.class === '7') {
-          if (!enrolledNames.some(name => name?.includes('pramuka'))) {
-            violationType = 'Wajib Pramuka'
-          }
-        } else if (m.class === '8') {
-          if (!enrolledNames.some(name => name?.includes('karate') || name?.includes('taekwondo'))) {
-            violationType = 'Wajib Karate / Taekwondo'
-          }
-        }
-
-        if (violationType) {
-          violations.push({
-            nis: m.nis,
-            full_name: m.full_name,
-            class: m.class,
-            violationType,
-            enrolled: activeEnrollments.map(e => e.extracurricular?.name).join(', ') || '-'
-          })
-        }
-
-        merged.push({
-          id: s?.id || null,
-          nis: m.nis,
-          full_name: m.full_name,
-          class: m.class,
-          gender: m.gender,
-          phone: m.phone,
-          hasAccount,
-          hasEkskul,
-          activeEnrollmentsCount,
-          users: studentUsers,
-          enrollments: studentEnrollments
-        })
-      }
-
-      // Hitung statistik ekskul
-      const statsMap = {}
-      allEkskulData?.forEach(ekskul => {
-        statsMap[ekskul.name] = 0
-      })
-      
-      enrollmentsData?.forEach(e => {
-        if (e.status === 'active' && e.extracurricular?.name) {
-          const name = e.extracurricular.name
-          if (statsMap[name] !== undefined) {
-            statsMap[name] += 1
-          } else {
-            statsMap[name] = 1
-          }
-        }
-      })
-
-      const statsArray = Object.keys(statsMap).map(name => ({
-        name,
-        jumlahSiswa: statsMap[name]
-      })).sort((a, b) => b.jumlahSiswa - a.jumlahSiswa)
-
-      setExtracurricularStats(statsArray)
-
-      // Urutkan violations berdasarkan kelas lalu nama
-      violations.sort((a, b) => {
-        if (a.class === b.class) return a.full_name.localeCompare(b.full_name)
-        return a.class.localeCompare(b.class)
-      })
-      setMandatoryViolations(violations)
-
-      // Urutkan berdasarkan nama
-      merged.sort((a, b) => a.full_name.localeCompare(b.full_name))
-      setTrackingStudents(merged)
-    } catch (err) {
-      console.error('Error fetching tracking data:', err.message)
-      setTrackingError(err.message)
-    } finally {
-      setTrackingLoading(false)
+  // 1. Fetch Tracking Data via RPC & React Query
+  const { 
+    data: trackingStudents = [], 
+    isLoading: trackingLoading, 
+    error: trackErr, 
+    refetch: fetchTrackingData 
+  } = useQuery({
+    queryKey: ['trackingStudents'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_student_tracking_data')
+      if (error) throw error
+      return data || []
     }
-  }
+  })
+  const trackingError = trackErr?.message || ''
+
+  // 2. Fetch Ekskul Stats via RPC & React Query
+  const { 
+    data: extracurricularStats = []
+  } = useQuery({
+    queryKey: ['ekskulStats'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_ekskul_stats')
+      if (error) throw error
+      return data || []
+    }
+  })
+
+  // 3. Hitung Mandatory Violations secara reaktif
+  const mandatoryViolations = trackingStudents.filter(student => {
+    const enrolledNames = student.enrolled_ekskuls?.toLowerCase() || ''
+    
+    if (student.class === '7') {
+      if (!enrolledNames.includes('pramuka')) {
+        student.violationType = 'Wajib Pramuka'
+        return true
+      }
+    } else if (student.class === '8') {
+      if (!enrolledNames.includes('karate') && !enrolledNames.includes('taekwondo')) {
+        student.violationType = 'Wajib Karate / Taekwondo'
+        return true
+      }
+    }
+    return false
+  })
 
   const fetchStats = async () => {
     setLoading(true)
@@ -350,8 +237,8 @@ export default function AdminDashboard() {
 
     if (!matchesSearch) return false
 
-    const hasAccount = st.hasAccount
-    const hasEkskul = st.hasEkskul
+    const hasAccount = st.has_account
+    const hasEkskul = st.active_enrollments_count > 0
 
     if (trackingFilter === 'no_account') {
       return !hasAccount
@@ -588,7 +475,7 @@ export default function AdminDashboard() {
               },
               {
                 label: 'Belum Punya Akun',
-                value: trackingStudents.filter(s => !s.hasAccount).length,
+                value: trackingStudents.filter(s => !s.has_account).length,
                 icon: UserX,
                 color: 'text-pixel-red',
                 bg: 'bg-pixel-red/15',
@@ -597,7 +484,7 @@ export default function AdminDashboard() {
               },
               {
                 label: 'Belum Daftar Ekskul',
-                value: trackingStudents.filter(s => s.hasAccount && !s.hasEkskul).length,
+                value: trackingStudents.filter(s => s.has_account && s.active_enrollments_count === 0).length,
                 icon: AlertCircle,
                 color: 'text-pixel-orange',
                 bg: 'bg-pixel-orange/15',
@@ -668,9 +555,9 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y-2 divide-pixel-gray/20">
                       {filteredTrackingStudents.map((student) => {
-                        const hasAccount = student.hasAccount
-                        const hasEkskul = student.hasEkskul
-                        const activeEnrollmentsCount = student.activeEnrollmentsCount
+                        const hasAccount = student.has_account
+                        const hasEkskul = student.active_enrollments_count > 0
+                        const activeEnrollmentsCount = student.active_enrollments_count
 
                         return (
                           <tr key={student.nis} className="hover:bg-pixel-panel-light">
@@ -682,8 +569,8 @@ export default function AdminDashboard() {
                                 <div className="flex items-center gap-1.5">
                                   <CheckCircle2 className="w-4 h-4 text-pixel-green" />
                                   <span className="font-retro text-base text-pixel-green">Sudah</span>
-                                  <span className="font-retro text-sm text-pixel-lavender/60 truncate max-w-[120px]" title={student.users[0]?.email}>
-                                    ({student.users[0]?.email})
+                                  <span className="font-retro text-sm text-pixel-lavender/60 truncate max-w-[120px]" title={student.user_email}>
+                                    ({student.user_email})
                                   </span>
                                 </div>
                               ) : (
@@ -808,7 +695,7 @@ export default function AdminDashboard() {
                         itemStyle={{ color: '#ffb3a7' }}
                       />
                       <Bar 
-                        dataKey="jumlahSiswa" 
+                        dataKey="jumlah_siswa" 
                         name="Jumlah Siswa" 
                         fill="#6488ea" 
                         radius={[4, 4, 0, 0]} 
@@ -865,7 +752,7 @@ export default function AdminDashboard() {
                                 {v.violationType}
                               </span>
                               <p className="text-sm text-pixel-lavender/70">
-                                Ekskul Saat Ini: {v.enrolled}
+                                Ekskul Saat Ini: {v.enrolled_ekskuls || '-'}
                               </p>
                             </td>
                           </tr>
