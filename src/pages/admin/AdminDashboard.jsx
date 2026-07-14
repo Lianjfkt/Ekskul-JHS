@@ -117,8 +117,6 @@ export default function AdminDashboard() {
 
       const merged = []
 
-      }
-
       // Gabungkan data dari masterData (Hanya memproses total siswa yang ada di master siswa)
       const violations = []
 
