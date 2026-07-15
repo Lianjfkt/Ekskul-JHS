@@ -69,14 +69,18 @@ export default function Login() {
           <div className="h-2 bg-pixel-blue" />
           
           <CardHeader className="space-y-3 flex flex-col items-center pt-8 pb-5 border-b-4 border-pixel-gray">
-            {/* School Logo */}
+            {/* School Logo with white circle background */}
             <div className="relative">
+              {/* Outer blue glow */}
               <div className="absolute inset-0 rounded-full blur-xl opacity-50 bg-pixel-blue scale-125" />
-              <img
-                src="/logo.png"
-                alt="Logo JHS Global Madani"
-                className="relative w-28 h-28 object-contain drop-shadow-[0_0_16px_rgba(100,136,234,0.8)]"
-              />
+              {/* White circle background */}
+              <div className="relative w-32 h-32 rounded-full bg-white flex items-center justify-center shadow-[0_0_24px_rgba(255,255,255,0.35)]">
+                <img
+                  src="/logo.png"
+                  alt="Logo JHS Global Madani"
+                  className="w-28 h-28 object-contain"
+                />
+              </div>
             </div>
             <CardTitle className="text-base font-pixel text-pixel-white pixel-text-shadow text-center leading-loose tracking-wide" style={{ textShadow: '0 0 12px rgba(100,136,234,0.9), 2px 2px 0 #0a0f1e' }}>
               Ekskul JHS GM
