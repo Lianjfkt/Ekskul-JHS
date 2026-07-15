@@ -68,21 +68,21 @@ export default function Login() {
           {/* Top pixel accent bar */}
           <div className="h-2 bg-pixel-blue" />
           
-          <CardHeader className="space-y-3 flex flex-col items-center pt-8 pb-4 border-b-4 border-pixel-gray">
+          <CardHeader className="space-y-3 flex flex-col items-center pt-8 pb-5 border-b-4 border-pixel-gray">
             {/* School Logo */}
             <div className="relative">
-              <div className="absolute inset-0 rounded-full blur-xl opacity-40 bg-pixel-blue scale-110" />
+              <div className="absolute inset-0 rounded-full blur-xl opacity-50 bg-pixel-blue scale-125" />
               <img
                 src="/logo.png"
                 alt="Logo JHS Global Madani"
-                className="relative w-24 h-24 object-contain drop-shadow-[0_0_12px_rgba(100,136,234,0.6)]"
+                className="relative w-28 h-28 object-contain drop-shadow-[0_0_16px_rgba(100,136,234,0.8)]"
               />
             </div>
-            <CardTitle className="text-sm font-pixel text-pixel-blue pixel-text-shadow text-center leading-loose">
+            <CardTitle className="text-base font-pixel text-pixel-white pixel-text-shadow text-center leading-loose tracking-wide" style={{ textShadow: '0 0 12px rgba(100,136,234,0.9), 2px 2px 0 #0a0f1e' }}>
               Ekskul JHS GM
             </CardTitle>
-            <CardDescription className="text-pixel-lavender font-retro text-xl text-center">
-              Aplikasi Layanan Kegiatan Ekstrakurikuler Junior High School
+            <CardDescription className="text-pixel-peach font-retro text-xl text-center font-semibold" style={{ textShadow: '1px 1px 4px rgba(0,0,0,0.8)' }}>
+              Aplikasi Layanan Kegiatan Ekstrakurikuler<br />Junior High School Global Madani
             </CardDescription>
           </CardHeader>
           
