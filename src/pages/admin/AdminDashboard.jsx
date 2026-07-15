@@ -98,6 +98,11 @@ export default function AdminDashboard() {
     return false
   })
 
+  // 4. Hitung jumlah siswa per kelas
+  const class7Count = trackingStudents.filter(s => s.class === '7').length;
+  const class8Count = trackingStudents.filter(s => s.class === '8').length;
+  const class9Count = trackingStudents.filter(s => s.class === '9').length;
+
   const fetchStats = async () => {
     setLoading(true)
     try {
@@ -643,6 +648,37 @@ export default function AdminDashboard() {
               <RefreshCw className={`w-4 h-4 ${trackingLoading ? 'animate-spin' : ''}`} />
               Refresh Data
             </Button>
+          </div>
+
+          {/* Summary Students per Class */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="bg-pixel-navy/20 border-pixel-blue">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-retro text-sm text-pixel-lavender">Siswa Kelas 7</p>
+                  <p className="font-pixel text-xl text-pixel-blue pixel-text-shadow">{trackingLoading ? '...' : class7Count}</p>
+                </div>
+                <UsersIcon className="w-8 h-8 text-pixel-blue/50" />
+              </CardContent>
+            </Card>
+            <Card className="bg-pixel-navy/20 border-pixel-green">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-retro text-sm text-pixel-lavender">Siswa Kelas 8</p>
+                  <p className="font-pixel text-xl text-pixel-green pixel-text-shadow">{trackingLoading ? '...' : class8Count}</p>
+                </div>
+                <UsersIcon className="w-8 h-8 text-pixel-green/50" />
+              </CardContent>
+            </Card>
+            <Card className="bg-pixel-navy/20 border-pixel-peach">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-retro text-sm text-pixel-lavender">Siswa Kelas 9</p>
+                  <p className="font-pixel text-xl text-pixel-peach pixel-text-shadow">{trackingLoading ? '...' : class9Count}</p>
+                </div>
+                <UsersIcon className="w-8 h-8 text-pixel-peach/50" />
+              </CardContent>
+            </Card>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
