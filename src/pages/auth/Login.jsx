@@ -50,6 +50,16 @@ export default function Login() {
         ))}
       </div>
 
+      {/* Large watermark / shadow logo behind card */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <img
+          src="/logo.png"
+          alt=""
+          className="w-[520px] h-[520px] object-contain opacity-[0.04] select-none"
+          style={{ filter: 'blur(2px)' }}
+        />
+      </div>
+
       {/* Pixel grid overlay */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(95,87,79,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(95,87,79,0.08)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
 
@@ -59,12 +69,14 @@ export default function Login() {
           <div className="h-2 bg-pixel-blue" />
           
           <CardHeader className="space-y-3 flex flex-col items-center pt-8 pb-4 border-b-4 border-pixel-gray">
-            {/* Pixel art icon */}
-            <div className="w-16 h-16 bg-pixel-blue border-4 border-pixel-gray flex items-center justify-center shadow-pixel">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-pixel-navy" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M12 14l9-5-9-5-9 5 9 5z" />
-                <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M12 14l9-5-9-5-9 5 9 5zm0 0v7" />
-              </svg>
+            {/* School Logo */}
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full blur-xl opacity-40 bg-pixel-blue scale-110" />
+              <img
+                src="/logo.png"
+                alt="Logo JHS Global Madani"
+                className="relative w-24 h-24 object-contain drop-shadow-[0_0_12px_rgba(100,136,234,0.6)]"
+              />
             </div>
             <CardTitle className="text-sm font-pixel text-pixel-blue pixel-text-shadow text-center leading-loose">
               Ekskul JHS GM
