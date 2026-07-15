@@ -25,6 +25,7 @@ const ParentExtracurriculars = lazy(() => import('../pages/parent/ParentExtracur
 const ParentExtracurricularDetail = lazy(() => import('../pages/parent/ParentExtracurricularDetail'))
 const ParentAttendance = lazy(() => import('../pages/parent/ParentAttendance'))
 const ParentGrades = lazy(() => import('../pages/parent/ParentGrades'))
+const Profile = lazy(() => import('../pages/shared/Profile'))
 
 export default function AppRouter() {
   return (
@@ -69,6 +70,11 @@ export default function AppRouter() {
             <Route path="/parent/extracurriculars/:id" element={<ParentExtracurricularDetail />} />
             <Route path="/parent/attendance" element={<ParentAttendance />} />
             <Route path="/parent/grades" element={<ParentGrades />} />
+          </Route>
+
+          {/* Shared Routes for all authenticated users */}
+          <Route element={<ProtectedRoute allowedRoles={['admin', 'coach', 'student', 'parent']} />}>
+            <Route path="/profile" element={<Profile />} />
           </Route>
         </Route>
         

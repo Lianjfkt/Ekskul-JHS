@@ -18,6 +18,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 import { useQuery } from '@tanstack/react-query'
+import { jsPDF } from 'jspdf'
+import 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 
 
 export default function AdminDashboard() {
@@ -110,6 +113,58 @@ export default function AdminDashboard() {
   const class8Count = trackingStudents.filter(s => s.class?.trim().startsWith('8')).length;
   const class9Count = trackingStudents.filter(s => s.class?.trim().startsWith('9')).length;
 
+  const exportViolationsToPDF = (filteredData) => {
+    const doc = new jsPDF()
+    
+    // Header
+    doc.setFontSize(16)
+    doc.text('Laporan Siswa Belum Mengambil Ekskul Wajib', 14, 20)
+    doc.setFontSize(10)
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 28)
+
+    const tableData = filteredData.map((v, index) => [
+      index + 1,
+      v.nis,
+      v.full_name,
+      v.class,
+      v.violationType,
+      v.enrolled_ekskuls || '-'
+    ])
+
+    doc.autoTable({
+      startY: 35,
+      head: [['No', 'NIS', 'Nama Siswa', 'Kelas', 'Pelanggaran', 'Ekskul Saat Ini']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185] },
+      styles: { fontSize: 9 }
+    })
+
+    doc.save('Laporan_Pelanggaran_Ekskul_Wajib.pdf')
+  }
+
+  const exportViolationsToExcel = (filteredData) => {
+    const tableData = filteredData.map((v, index) => ({
+      'No': index + 1,
+      'NIS': v.nis,
+      'Nama Siswa': v.full_name,
+      'Kelas': v.class,
+      'Pelanggaran': v.violationType,
+      'Ekskul Saat Ini': v.enrolled_ekskuls || '-'
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(tableData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Pelanggaran Ekskul Wajib")
+    
+    // Adjust column widths
+    const colWidths = [{wch: 5}, {wch: 15}, {wch: 35}, {wch: 10}, {wch: 25}, {wch: 30}]
+    ws['!cols'] = colWidths
+
+    XLSX.writeFile(wb, 'Laporan_Pelanggaran_Ekskul_Wajib.xlsx')
+  }
+
+  // --- Functions ---
   const fetchStats = async () => {
     setLoading(true)
     try {
@@ -833,45 +888,67 @@ export default function AdminDashboard() {
                     return 0
                   })
                   return (
-                    <div className="overflow-x-auto h-[400px] overflow-y-auto pixel-scroll">
-                      <table className="w-full text-left border-collapse font-retro text-lg relative">
-                        <thead className="sticky top-0 z-10">
-                          <tr className="border-b-3 border-pixel-gray bg-pixel-navy font-pixel text-[7px] text-pixel-lavender uppercase tracking-wider">
-                            <th className="p-4">Siswa</th>
-                            <th className="p-4">Pelanggaran</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y-2 divide-pixel-gray/20">
-                          {filtered.length === 0 ? (
-                            <tr>
-                              <td colSpan={2} className="p-8 text-center text-pixel-lavender">
-                                <Search className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                                Tidak ada hasil yang cocok.
-                              </td>
+                    <div className="flex flex-col h-[400px]">
+                      {/* Export Buttons */}
+                      <div className="flex justify-end gap-2 p-2 bg-pixel-navy/30 border-b border-pixel-gray/30">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="font-pixel text-[7px] text-pixel-green border-pixel-green hover:bg-pixel-green hover:text-pixel-navy rounded-none h-7"
+                          onClick={() => exportViolationsToExcel(filtered)}
+                        >
+                          EXCEL
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="font-pixel text-[7px] text-pixel-red border-pixel-red hover:bg-pixel-red hover:text-pixel-navy rounded-none h-7"
+                          onClick={() => exportViolationsToPDF(filtered)}
+                        >
+                          PDF
+                        </Button>
+                      </div>
+                      
+                      <div className="overflow-x-auto flex-1 overflow-y-auto pixel-scroll relative">
+                        <table className="w-full text-left border-collapse font-retro text-lg relative">
+                          <thead className="sticky top-0 z-10">
+                            <tr className="border-b-3 border-pixel-gray bg-pixel-navy font-pixel text-[7px] text-pixel-lavender uppercase tracking-wider">
+                              <th className="p-4">Siswa</th>
+                              <th className="p-4">Pelanggaran</th>
                             </tr>
-                          ) : filtered.map((v, i) => (
-                            <tr key={v.nis || i} className="hover:bg-pixel-panel-light">
-                              <td className="p-4">
-                                <p className="font-semibold text-pixel-white">{v.full_name}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className="font-mono text-base text-pixel-lavender">{v.nis}</span>
-                                  <span className="text-pixel-peach text-sm px-1.5 py-0.5 border border-pixel-peach bg-pixel-peach/10">Kelas {v.class}</span>
-                                </div>
-                              </td>
-                              <td className="p-4">
-                                <span className="inline-flex items-center gap-1.5 font-retro text-base text-pixel-red border border-pixel-red bg-pixel-red/10 px-2 py-1 mb-1">
-                                  <AlertCircle className="w-3.5 h-3.5" />
-                                  {v.violationType}
-                                </span>
-                                <p className="text-sm text-pixel-lavender/70">
-                                  Ekskul Saat Ini: {v.enrolled_ekskuls || '-'}
-                                </p>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      <div className="px-4 py-2 border-t border-pixel-gray/30 bg-pixel-navy/30 font-retro text-sm text-pixel-lavender text-right">
+                          </thead>
+                          <tbody className="divide-y-2 divide-pixel-gray/20">
+                            {filtered.length === 0 ? (
+                              <tr>
+                                <td colSpan={2} className="p-8 text-center text-pixel-lavender">
+                                  <Search className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                                  Tidak ada hasil yang cocok.
+                                </td>
+                              </tr>
+                            ) : filtered.map((v, i) => (
+                              <tr key={v.nis || i} className="hover:bg-pixel-panel-light">
+                                <td className="p-4">
+                                  <p className="font-semibold text-pixel-white">{v.full_name}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="font-mono text-base text-pixel-lavender">{v.nis}</span>
+                                    <span className="text-pixel-peach text-sm px-1.5 py-0.5 border border-pixel-peach bg-pixel-peach/10">Kelas {v.class}</span>
+                                  </div>
+                                </td>
+                                <td className="p-4">
+                                  <span className="inline-flex items-center gap-1.5 font-retro text-base text-pixel-red border border-pixel-red bg-pixel-red/10 px-2 py-1 mb-1">
+                                    <AlertCircle className="w-3.5 h-3.5" />
+                                    {v.violationType}
+                                  </span>
+                                  <p className="text-sm text-pixel-lavender/70">
+                                    Ekskul Saat Ini: {v.enrolled_ekskuls || '-'}
+                                  </p>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="px-4 py-2 border-t border-pixel-gray/30 bg-pixel-navy/30 font-retro text-sm text-pixel-lavender text-right shrink-0">
                         Menampilkan {filtered.length} dari {mandatoryViolations.length} pelanggaran
                       </div>
                     </div>

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { Menu, LogOut, User as UserIcon, Bell } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useParentChildren } from '../../hooks/useParentChildren'
@@ -108,12 +109,15 @@ export default function Navbar({ onMenuClick }) {
           </button>
         )}
         
-        <div className="hidden sm:flex items-center gap-2 font-retro text-lg text-pixel-peach bg-pixel-navy px-3 py-1.5 border-2 border-pixel-gray">
+        <Link 
+          to="/profile"
+          className="hidden sm:flex items-center gap-2 font-retro text-lg text-pixel-peach bg-pixel-navy px-3 py-1.5 border-2 border-pixel-gray hover:border-pixel-blue hover:text-pixel-blue transition-colors cursor-pointer"
+        >
           <div className="w-6 h-6 bg-pixel-blue/20 flex items-center justify-center border border-pixel-blue">
             <UserIcon className="w-3.5 h-3.5 text-pixel-blue" />
           </div>
           <span className="max-w-[120px] truncate">{userData?.full_name || user?.email}</span>
-        </div>
+        </Link>
         
         <Button 
           variant="outline" 
