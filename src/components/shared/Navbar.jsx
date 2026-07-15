@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Menu, LogOut, User as UserIcon, Bell } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useParentChildren } from '../../hooks/useParentChildren'
+import NotificationBell from './NotificationBell'
 import { Button } from '../ui/button'
 import {
   Select,
@@ -102,11 +103,8 @@ export default function Navbar({ onMenuClick }) {
       </div>
 
       <div className="flex items-center gap-3">
-        {(role === 'student' || role === 'parent') && (
-          <button className="p-2 relative text-pixel-lavender hover:text-pixel-yellow rounded-none border-2 border-transparent hover:border-pixel-gray hover:bg-pixel-panel-light">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-pixel-red"></span>
-          </button>
+        {(role === 'student' || role === 'parent' || role === 'coach' || role === 'admin') && (
+          <NotificationBell />
         )}
         
         <Link 

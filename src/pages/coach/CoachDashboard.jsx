@@ -5,18 +5,25 @@ import { supabase } from '../../lib/supabaseClient'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import AnnouncementBanner from '../../components/shared/AnnouncementBanner'
 import { 
- Activity, CalendarDays, ClipboardCheck, GraduationCap, 
- ArrowRight, Users, PlayCircle, Clock
+  Activity, CalendarDays, ClipboardCheck, GraduationCap, 
+  ArrowRight, Users, PlayCircle, Clock, AlertTriangle, TrendingUp
 } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer
+} from 'recharts'
 
 export default function CoachDashboard() {
  const { user } = useAuthStore()
  const [loading, setLoading] = useState(true)
  const [managedEkskuls, setManagedEkskuls] = useState([])
  const [stats, setStats] = useState({
- totalSessions: 0,
- totalStudents: 0
+  totalSessions: 0,
+  totalStudents: 0
  })
+  
+  // Data for charts and warnings
+  const [attendanceTrend, setAttendanceTrend] = useState([])
+  const [attendanceWarnings, setAttendanceWarnings] = useState([])
 
  useEffect(() => {
  if (user) {
@@ -53,10 +60,84 @@ export default function CoachDashboard() {
  .eq('status', 'active')
  if (stErr) throw stErr
 
- setStats({
- totalSessions: sessionCount || 0,
- totalStudents: studentCount || 0
- })
+      setStats({
+        totalSessions: sessionCount || 0,
+        totalStudents: studentCount || 0
+      })
+      
+      // 4. Fetch recent sessions for chart
+      const { data: recentSessions } = await supabase
+        .from('sessions')
+        .select(`id, date, topic, extracurricular_id, extracurriculars (name)`)
+        .in('extracurricular_id', ekskulIds)
+        .order('date', { ascending: false })
+        .limit(8)
+        
+      let chartData = []
+      if (recentSessions && recentSessions.length > 0) {
+        const sessionIds = recentSessions.map(s => s.id)
+        const { data: atts } = await supabase
+          .from('attendances')
+          .select('session_id, status')
+          .in('session_id', sessionIds)
+          
+        chartData = [...recentSessions].reverse().map(session => {
+          const sessionAtts = atts?.filter(a => a.session_id === session.id) || []
+          const total = sessionAtts.length
+          const present = sessionAtts.filter(a => a.status === 'hadir').length
+          const percentage = total > 0 ? Math.round((present / total) * 100) : 0
+          return {
+            name: new Date(session.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+            topic: session.topic,
+            ekskul: session.extracurriculars?.name,
+            kehadiran: percentage,
+            total_siswa: total
+          }
+        })
+      }
+      setAttendanceTrend(chartData)
+      
+      // 5. Identify students with < 75% attendance
+      const { data: activeStudents } = await supabase
+        .from('enrollments')
+        .select('student_id, students(full_name, class), extracurricular_id, extracurriculars(name)')
+        .in('extracurricular_id', ekskulIds)
+        .eq('status', 'active')
+        
+      let warnings = []
+      if (activeStudents && activeStudents.length > 0) {
+        const { data: allSessions } = await supabase.from('sessions').select('id, extracurricular_id').in('extracurricular_id', ekskulIds)
+        if (allSessions && allSessions.length > 0) {
+           const allSessionIds = allSessions.map(s => s.id)
+           const { data: allAtts } = await supabase.from('attendances').select('student_id, session_id, status').in('session_id', allSessionIds)
+           
+           if (allAtts) {
+              activeStudents.forEach(enr => {
+                 const ekskulSessions = allSessions.filter(s => s.extracurricular_id === enr.extracurricular_id)
+                 const ekskulSessionIds = ekskulSessions.map(s => s.id)
+                 const studentAtts = allAtts.filter(a => a.student_id === enr.student_id && ekskulSessionIds.includes(a.session_id))
+                 
+                 // Warn only if there are at least 3 sessions
+                 if (studentAtts.length >= 3) { 
+                    const total = studentAtts.length
+                    const present = studentAtts.filter(a => a.status === 'hadir').length
+                    const percentage = Math.round((present / total) * 100)
+                    if (percentage < 75) {
+                       warnings.push({
+                          id: enr.student_id + enr.extracurricular_id, // unique key
+                          name: enr.students?.full_name,
+                          class: enr.students?.class,
+                          ekskul: enr.extracurriculars?.name,
+                          percentage
+                       })
+                    }
+                 }
+              })
+           }
+        }
+      }
+      setAttendanceWarnings(warnings.sort((a,b) => a.percentage - b.percentage))
+
  }
  } catch (err) {
  console.error('Error fetching coach dashboard data:', err.message)
@@ -159,6 +240,54 @@ export default function CoachDashboard() {
  ))}
  </div>
  )}
+
+        {/* Attendance Trend Chart */}
+        {!loading && attendanceTrend.length > 0 && (
+          <div className="mt-8">
+            <h2 className="font-pixel text-[10px] pixel-text-shadow leading-loose text-pixel-white mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-pixel-blue" />
+              Tren Kehadiran Sesi Terakhir
+            </h2>
+            <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel">
+              <CardContent className="p-6 h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={attendanceTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#4f5b72" opacity={0.3} vertical={false} />
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="#b8c0e0" 
+                      tick={{ fontFamily: "'VT323', monospace", fontSize: 14 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis 
+                      stroke="#b8c0e0" 
+                      tick={{ fontFamily: "'VT323', monospace", fontSize: 14 }}
+                      axisLine={false}
+                      tickLine={false}
+                      domain={[0, 100]}
+                      tickFormatter={(val) => `${val}%`}
+                    />
+                    <RechartsTooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#1b233a', 
+                        border: '2px solid #4f5b72',
+                        fontFamily: "'VT323', monospace",
+                      }}
+                      formatter={(value, name) => [
+                        name === 'kehadiran' ? `${value}%` : value, 
+                        name === 'kehadiran' ? 'Kehadiran' : 'Siswa'
+                      ]}
+                      labelStyle={{ color: '#ffb3a7', marginBottom: '4px' }}
+                    />
+                    <Legend wrapperStyle={{ fontFamily: "'VT323', monospace", paddingTop: '10px' }} />
+                    <Bar dataKey="kehadiran" name="Kehadiran" fill="#6488ea" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        )}
  </div>
 
  {/* Quick Actions */}
@@ -197,6 +326,40 @@ export default function CoachDashboard() {
  </Link>
  </CardContent>
  </Card>
+
+          {/* Low Attendance Warnings */}
+          {!loading && attendanceWarnings.length > 0 && (
+            <div className="pt-2">
+              <h2 className="font-pixel text-[10px] pixel-text-shadow leading-loose text-pixel-white mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-pixel-red" />
+                Perlu Perhatian Khusus
+              </h2>
+              <Card className="border-pixel-red/50 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+                <div className="bg-pixel-red/20 text-pixel-red text-xs p-3 font-retro font-semibold border-b border-pixel-red/30 flex items-center justify-between">
+                  <span>Kehadiran &lt; 75%</span>
+                  <span className="bg-pixel-red text-white px-2 py-0.5 rounded">{attendanceWarnings.length} Siswa</span>
+                </div>
+                <CardContent className="p-0">
+                  <div className="max-h-[300px] overflow-y-auto pixel-scroll divide-y divide-pixel-gray/30">
+                    {attendanceWarnings.map(student => (
+                      <div key={student.id} className="p-4 hover:bg-pixel-navy/30 transition-colors">
+                        <div className="flex justify-between items-start mb-1">
+                          <p className="font-semibold text-pixel-white text-sm">{student.name}</p>
+                          <span className={`font-mono font-bold text-sm ${student.percentage < 50 ? 'text-pixel-red' : 'text-pixel-yellow'}`}>
+                            {student.percentage}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs text-pixel-lavender">
+                          <span>{student.ekskul}</span>
+                          <span className="bg-pixel-gray/50 px-1.5 py-0.5 rounded text-[10px]">{student.class}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
  </div>
 
  </div>
