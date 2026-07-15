@@ -12,7 +12,7 @@ import {
   GraduationCap, Activity, UserCheck, BookOpen, 
   ArrowRight, Plus, Upload, Users as UsersIcon, Clock,
   Megaphone, ShieldAlert, Trash2, Eye, EyeOff, Search,
-  AlertCircle, CheckCircle2, XCircle, RefreshCw, UserX, BarChart as BarChartIcon
+  AlertCircle, CheckCircle2, XCircle, RefreshCw, UserX, BarChart as BarChartIcon, Bell
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -162,6 +162,36 @@ export default function AdminDashboard() {
     ws['!cols'] = colWidths
 
     XLSX.writeFile(wb, 'Laporan_Pelanggaran_Ekskul_Wajib.xlsx')
+  }
+
+  const handleSendReminder = async (studentId, studentName, violationType) => {
+    try {
+      const { data: targetUsers, error } = await supabase
+        .from('users')
+        .select('id, role')
+        .eq('student_id', studentId)
+        
+      if (error) throw error;
+      
+      if (!targetUsers || targetUsers.length === 0) {
+        alert(`Siswa ${studentName} atau Orang Tua belum memiliki akun di sistem.`);
+        return;
+      }
+      
+      const notifications = targetUsers.map(u => ({
+        user_id: u.id,
+        title: 'Peringatan Ekskul Wajib',
+        message: `Sistem mendeteksi bahwa ${u.role === 'student' ? 'kamu' : 'anak Anda'} (${studentName}) ${violationType}. Harap segera mendaftar ekskul yang diwajibkan.`,
+      }))
+      
+      const { error: insertError } = await supabase.from('notifications').insert(notifications)
+      
+      if (insertError) throw insertError;
+      alert(`Pengingat berhasil dikirim ke ${targetUsers.length} akun terkait.`);
+    } catch (err) {
+      console.error(err)
+      alert('Gagal mengirim pengingat: ' + err.message);
+    }
   }
 
   // --- Functions ---
@@ -939,9 +969,17 @@ export default function AdminDashboard() {
                                     <AlertCircle className="w-3.5 h-3.5" />
                                     {v.violationType}
                                   </span>
-                                  <p className="text-sm text-pixel-lavender/70">
+                                  <p className="text-sm text-pixel-lavender/70 mb-2">
                                     Ekskul Saat Ini: {v.enrolled_ekskuls || '-'}
                                   </p>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => handleSendReminder(v.id, v.full_name, v.violationType)}
+                                    className="font-pixel text-[6px] py-0 h-6 border-pixel-yellow text-pixel-yellow hover:bg-pixel-yellow hover:text-pixel-navy rounded-none gap-1"
+                                  >
+                                    <Bell className="w-3 h-3" /> INGATKAN
+                                  </Button>
                                 </td>
                               </tr>
                             ))}
