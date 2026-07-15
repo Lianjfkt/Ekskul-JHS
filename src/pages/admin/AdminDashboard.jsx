@@ -46,6 +46,11 @@ export default function AdminDashboard() {
   const [trackingFilter, setTrackingFilter] = useState('all') // 'all', 'no_account', 'no_ekskul', 'both_missing'
   const [searchTrackingQuery, setSearchTrackingQuery] = useState('')
 
+  // Violations search/sort/filter state
+  const [violationSearch, setViolationSearch] = useState('')
+  const [violationClassFilter, setViolationClassFilter] = useState('all') // 'all', '7', '8'
+  const [violationSort, setViolationSort] = useState('name_asc') // 'name_asc', 'name_desc', 'class_asc', 'class_desc'
+
   useEffect(() => {
     fetchStats()
     loadAnnouncements()
@@ -750,10 +755,57 @@ export default function AdminDashboard() {
                 <CardTitle className="font-pixel text-[10px] text-pixel-peach uppercase flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-pixel-red" />
                   Siswa Belum Mengambil Ekskul Wajib
+                  {!trackingLoading && mandatoryViolations.length > 0 && (
+                    <span className="ml-auto font-pixel text-[8px] text-pixel-red border border-pixel-red bg-pixel-red/10 px-2 py-0.5">
+                      {mandatoryViolations.length} SISWA
+                    </span>
+                  )}
                 </CardTitle>
                 <CardDescription className="font-retro text-base text-pixel-lavender">
                   Kelas 7 wajib Pramuka. Kelas 8 wajib Karate/Taekwondo.
                 </CardDescription>
+                {/* Search, Filter & Sort Controls */}
+                {!trackingLoading && mandatoryViolations.length > 0 && (
+                  <div className="flex flex-col gap-2 mt-3">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-pixel-lavender" />
+                      <input
+                        type="text"
+                        placeholder="Cari nama atau NIS..."
+                        value={violationSearch}
+                        onChange={e => setViolationSearch(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 bg-pixel-navy border-2 border-pixel-gray focus:border-pixel-blue outline-none font-retro text-base text-pixel-white placeholder:text-pixel-lavender/50"
+                      />
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {/* Class Filter */}
+                      {['all', '7', '8'].map(f => (
+                        <button
+                          key={f}
+                          onClick={() => setViolationClassFilter(f)}
+                          className={`font-pixel text-[7px] px-2 py-1 border-2 transition-colors ${
+                            violationClassFilter === f
+                              ? 'bg-pixel-red/20 border-pixel-red text-pixel-red'
+                              : 'border-pixel-gray text-pixel-lavender hover:border-pixel-red/50'
+                          }`}
+                        >
+                          {f === 'all' ? 'SEMUA' : `KELAS ${f}`}
+                        </button>
+                      ))}
+                      {/* Sort */}
+                      <select
+                        value={violationSort}
+                        onChange={e => setViolationSort(e.target.value)}
+                        className="ml-auto font-pixel text-[7px] px-2 py-1 bg-pixel-navy border-2 border-pixel-gray text-pixel-lavender focus:border-pixel-blue outline-none cursor-pointer"
+                      >
+                        <option value="name_asc">NAMA A-Z</option>
+                        <option value="name_desc">NAMA Z-A</option>
+                        <option value="class_asc">KELAS NAIK</option>
+                        <option value="class_desc">KELAS TURUN</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="p-0 flex-1">
                 {trackingLoading ? (
@@ -765,40 +817,66 @@ export default function AdminDashboard() {
                     <CheckCircle2 className="w-12 h-12 text-pixel-green mx-auto mb-3" />
                     Bagus! Semua siswa kelas 7 & 8 telah mendaftar ekskul wajib mereka.
                   </div>
-                ) : (
-                  <div className="overflow-x-auto h-[400px] overflow-y-auto pixel-scroll">
-                    <table className="w-full text-left border-collapse font-retro text-lg relative">
-                      <thead className="sticky top-0 z-10">
-                        <tr className="border-b-3 border-pixel-gray bg-pixel-navy font-pixel text-[7px] text-pixel-lavender uppercase tracking-wider">
-                          <th className="p-4">Siswa</th>
-                          <th className="p-4">Pelanggaran</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y-2 divide-pixel-gray/20">
-                        {mandatoryViolations.map((v, i) => (
-                          <tr key={v.nis || i} className="hover:bg-pixel-panel-light">
-                            <td className="p-4">
-                              <p className="font-semibold text-pixel-white">{v.full_name}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="font-mono text-base text-pixel-lavender">{v.nis}</span>
-                                <span className="text-pixel-peach text-sm px-1.5 py-0.5 border border-pixel-peach bg-pixel-peach/10">Kelas {v.class}</span>
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <span className="inline-flex items-center gap-1.5 font-retro text-base text-pixel-red border border-pixel-red bg-pixel-red/10 px-2 py-1 mb-1">
-                                <AlertCircle className="w-3.5 h-3.5" />
-                                {v.violationType}
-                              </span>
-                              <p className="text-sm text-pixel-lavender/70">
-                                Ekskul Saat Ini: {v.enrolled_ekskuls || '-'}
-                              </p>
-                            </td>
+                ) : (() => {
+                  // Apply search + filter + sort
+                  let filtered = mandatoryViolations.filter(v => {
+                    const q = violationSearch.toLowerCase().trim()
+                    const matchSearch = !q || v.full_name?.toLowerCase().includes(q) || v.nis?.includes(q)
+                    const matchClass = violationClassFilter === 'all' || v.class?.trim().startsWith(violationClassFilter)
+                    return matchSearch && matchClass
+                  })
+                  filtered = [...filtered].sort((a, b) => {
+                    if (violationSort === 'name_asc') return a.full_name?.localeCompare(b.full_name)
+                    if (violationSort === 'name_desc') return b.full_name?.localeCompare(a.full_name)
+                    if (violationSort === 'class_asc') return a.class?.localeCompare(b.class)
+                    if (violationSort === 'class_desc') return b.class?.localeCompare(a.class)
+                    return 0
+                  })
+                  return (
+                    <div className="overflow-x-auto h-[400px] overflow-y-auto pixel-scroll">
+                      <table className="w-full text-left border-collapse font-retro text-lg relative">
+                        <thead className="sticky top-0 z-10">
+                          <tr className="border-b-3 border-pixel-gray bg-pixel-navy font-pixel text-[7px] text-pixel-lavender uppercase tracking-wider">
+                            <th className="p-4">Siswa</th>
+                            <th className="p-4">Pelanggaran</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        </thead>
+                        <tbody className="divide-y-2 divide-pixel-gray/20">
+                          {filtered.length === 0 ? (
+                            <tr>
+                              <td colSpan={2} className="p-8 text-center text-pixel-lavender">
+                                <Search className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                                Tidak ada hasil yang cocok.
+                              </td>
+                            </tr>
+                          ) : filtered.map((v, i) => (
+                            <tr key={v.nis || i} className="hover:bg-pixel-panel-light">
+                              <td className="p-4">
+                                <p className="font-semibold text-pixel-white">{v.full_name}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="font-mono text-base text-pixel-lavender">{v.nis}</span>
+                                  <span className="text-pixel-peach text-sm px-1.5 py-0.5 border border-pixel-peach bg-pixel-peach/10">Kelas {v.class}</span>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <span className="inline-flex items-center gap-1.5 font-retro text-base text-pixel-red border border-pixel-red bg-pixel-red/10 px-2 py-1 mb-1">
+                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  {v.violationType}
+                                </span>
+                                <p className="text-sm text-pixel-lavender/70">
+                                  Ekskul Saat Ini: {v.enrolled_ekskuls || '-'}
+                                </p>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="px-4 py-2 border-t border-pixel-gray/30 bg-pixel-navy/30 font-retro text-sm text-pixel-lavender text-right">
+                        Menampilkan {filtered.length} dari {mandatoryViolations.length} pelanggaran
+                      </div>
+                    </div>
+                  )
+                })()}
               </CardContent>
             </Card>
           </div>
