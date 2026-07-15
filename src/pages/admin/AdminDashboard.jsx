@@ -164,12 +164,12 @@ export default function AdminDashboard() {
     XLSX.writeFile(wb, 'Laporan_Pelanggaran_Ekskul_Wajib.xlsx')
   }
 
-  const handleSendReminder = async (studentId, studentName, violationType) => {
+  const handleSendReminder = async (studentNis, studentName, violationType) => {
     try {
       const { data: targetUsers, error } = await supabase
         .from('users')
-        .select('id, role')
-        .eq('student_id', studentId)
+        .select('id, role, students!inner(nis)')
+        .eq('students.nis', studentNis)
         
       if (error) throw error;
       
@@ -975,7 +975,7 @@ export default function AdminDashboard() {
                                   <Button 
                                     size="sm" 
                                     variant="outline"
-                                    onClick={() => handleSendReminder(v.id, v.full_name, v.violationType)}
+                                    onClick={() => handleSendReminder(v.nis, v.full_name, v.violationType)}
                                     className="font-pixel text-[6px] py-0 h-6 border-pixel-yellow text-pixel-yellow hover:bg-pixel-yellow hover:text-pixel-navy rounded-none gap-1"
                                   >
                                     <Bell className="w-3 h-3" /> INGATKAN
