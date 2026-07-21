@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { 
  Search, Plus, Trash2, Edit2, CalendarDays, BookOpen, 
- X, Check, ShieldAlert, FileText, ChevronRight
+ X, Check, ShieldAlert, FileText, ChevronRight, Trophy
 } from 'lucide-react'
 
 export default function CoachSessions() {
@@ -19,6 +19,7 @@ export default function CoachSessions() {
  // Data States
  const [sessions, setSessions] = useState([])
  const [managedEkskuls, setManagedEkskuls] = useState([])
+ const [enrolledStudents, setEnrolledStudents] = useState([])
 
  // Modal States
  const [isModalOpen, setIsModalOpen] = useState(false)
@@ -30,7 +31,10 @@ export default function CoachSessions() {
  session_date: new Date().toISOString().split('T')[0],
  topic: '',
  notes: '',
- coaches_present: []
+ coaches_present: [],
+ is_special_training: false,
+ event_name: '',
+ selected_students: []
  })
 
  useEffect(() => {
@@ -38,6 +42,12 @@ export default function CoachSessions() {
  fetchData()
  }
  }, [user])
+
+ useEffect(() => {
+   if (form.extracurricular_id && form.is_special_training) {
+     fetchEnrolledStudents(form.extracurricular_id)
+   }
+ }, [form.extracurricular_id, form.is_special_training])
 
  const fetchData = async () => {
  setLoading(true)
@@ -81,16 +91,45 @@ export default function CoachSessions() {
  }
  }
 
-  const handleOpenModal = (session = null) => {
+ const fetchEnrolledStudents = async (ekskulId) => {
+   try {
+     const { data, error } = await supabase
+       .from('enrollments')
+       .select('student_id, student:student_id (id, nis, full_name, class)')
+       .eq('extracurricular_id', ekskulId)
+       .eq('status', 'active')
+       .order('student(full_name)', { ascending: true })
+     
+     if (error) throw error
+     setEnrolledStudents(data ? data.map(d => d.student) : [])
+   } catch (err) {
+     console.error('Failed to load students', err)
+   }
+ }
+
+  const handleOpenModal = async (session = null) => {
   if (session) {
   setSelectedSession(session)
   const presentCoaches = session.session_coaches ? session.session_coaches.map(sc => sc.coach?.id).filter(Boolean) : []
+  
+  let preSelectedStudents = []
+  if (session.is_special_training) {
+    const { data: participants } = await supabase
+      .from('special_session_participants')
+      .select('student_id')
+      .eq('session_id', session.id)
+    if (participants) preSelectedStudents = participants.map(p => p.student_id)
+  }
+
   setForm({
   extracurricular_id: session.extracurricular_id,
   session_date: session.session_date,
   topic: session.topic || '',
   notes: session.notes || '',
-  coaches_present: presentCoaches.length > 0 ? presentCoaches : [user.id]
+  coaches_present: presentCoaches.length > 0 ? presentCoaches : [user.id],
+  is_special_training: session.is_special_training || false,
+  event_name: session.event_name || '',
+  selected_students: preSelectedStudents
   })
   } else {
   setSelectedSession(null)
@@ -99,7 +138,10 @@ export default function CoachSessions() {
   session_date: new Date().toISOString().split('T')[0],
   topic: '',
   notes: '',
-  coaches_present: [user.id]
+  coaches_present: [user.id],
+  is_special_training: false,
+  event_name: '',
+  selected_students: []
   })
   }
   setIsModalOpen(true)
@@ -115,8 +157,34 @@ export default function CoachSessions() {
     return
   }
 
+  if (form.is_special_training) {
+    if (!form.event_name.trim()) {
+      setErrorMsg('Nama event perlombaan wajib diisi untuk sesi latihan khusus.')
+      return
+    }
+    if (form.selected_students.length === 0) {
+      setErrorMsg('Harap pilih minimal 1 siswa untuk sesi latihan khusus ini.')
+      return
+    }
+  }
+
   try {
   let sessionId = selectedSession?.id
+
+  // CEK LIMIT 3 SESI KHUSUS UNTUK EVENT BARU
+  if (form.is_special_training && (!selectedSession || selectedSession.event_name !== form.event_name)) {
+    const { count, error: countErr } = await supabase
+      .from('sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('extracurricular_id', form.extracurricular_id)
+      .eq('is_special_training', true)
+      .ilike('event_name', form.event_name.trim())
+    
+    if (countErr) throw countErr
+    if (count >= 3) {
+      throw new Error(`Batas maksimal 3 sesi latihan khusus untuk event "${form.event_name}" sudah tercapai.`)
+    }
+  }
 
   if (selectedSession) {
   // Edit Mode
@@ -126,17 +194,16 @@ export default function CoachSessions() {
   extracurricular_id: form.extracurricular_id,
   session_date: form.session_date,
   topic: form.topic,
-  notes: form.notes
+  notes: form.notes,
+  is_special_training: form.is_special_training,
+  event_name: form.is_special_training ? form.event_name : null
   })
   .eq('id', selectedSession.id)
   if (error) throw error
 
-  // Hapus relasi pelatih lama
-  const { error: delErr } = await supabase
-  .from('session_coaches')
-  .delete()
-  .eq('session_id', selectedSession.id)
-  if (delErr) throw delErr
+  // Hapus relasi pelatih & siswa lama
+  await supabase.from('session_coaches').delete().eq('session_id', selectedSession.id)
+  await supabase.from('special_session_participants').delete().eq('session_id', selectedSession.id)
 
   setSuccessMsg('Sesi latihan berhasil diperbarui.')
   } else {
@@ -149,7 +216,9 @@ export default function CoachSessions() {
   session_date: form.session_date,
   topic: form.topic,
   notes: form.notes,
-  created_by: user.id
+  created_by: user.id,
+  is_special_training: form.is_special_training,
+  event_name: form.is_special_training ? form.event_name : null
   }
   ])
   .select()
@@ -164,11 +233,18 @@ export default function CoachSessions() {
     session_id: sessionId,
     coach_id: cId
   }))
-
-  const { error: insErr } = await supabase
-  .from('session_coaches')
-  .insert(coachesToInsert)
+  const { error: insErr } = await supabase.from('session_coaches').insert(coachesToInsert)
   if (insErr) throw insErr
+
+  // Insert special students jika ada
+  if (form.is_special_training && form.selected_students.length > 0) {
+    const studentsToInsert = form.selected_students.map(sId => ({
+      session_id: sessionId,
+      student_id: sId
+    }))
+    const { error: spErr } = await supabase.from('special_session_participants').insert(studentsToInsert)
+    if (spErr) throw spErr
+  }
 
   setIsModalOpen(false)
   fetchData()
@@ -191,6 +267,14 @@ export default function CoachSessions() {
  } catch (err) {
  setErrorMsg(err.message)
  }
+ }
+
+ const handleStudentCheckbox = (studentId, checked) => {
+   if (checked) {
+     setForm(f => ({...f, selected_students: [...f.selected_students, studentId]}))
+   } else {
+     setForm(f => ({...f, selected_students: f.selected_students.filter(id => id !== studentId)}))
+   }
  }
 
  return (
@@ -252,18 +336,32 @@ export default function CoachSessions() {
   ) : (
   sessions.map(session => (
   <tr key={session.id} className="hover:bg-pixel-panel-light">
-  <td className="px-6 py-4 font-mono font-semibold text-pixel-white flex items-center gap-1.5 mt-2">
-  <CalendarDays className="w-4 h-4 text-primary" />
-  {new Date(session.session_date).toLocaleDateString('id-ID', {
-  weekday: 'short',
-  year: 'numeric',
-  month: 'short',
-  day: 'numeric'
-  })}
+  <td className="px-6 py-4 font-mono font-semibold text-pixel-white">
+  <div className="flex flex-col gap-1 mt-2">
+    <div className="flex items-center gap-1.5">
+      <CalendarDays className="w-4 h-4 text-primary" />
+      {new Date(session.session_date).toLocaleDateString('id-ID', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+      })}
+    </div>
+    {session.is_special_training && (
+      <span className="inline-flex items-center gap-1 text-[10px] uppercase font-retro bg-pixel-orange/20 text-pixel-orange px-1.5 py-0.5 rounded-sm self-start">
+        <Trophy className="w-3 h-3" /> Latihan Khusus
+      </span>
+    )}
+  </div>
   </td>
   <td className="px-6 py-4 font-bold text-pixel-white">{session.extracurricular?.name}</td>
   <td className="px-6 py-4 text-pixel-yellow font-semibold">{session.session_coaches && session.session_coaches.length > 0 ? session.session_coaches.map(sc => sc.coach?.full_name).filter(Boolean).join(', ') : 'Tidak diketahui'}</td>
-  <td className="px-6 py-4 font-semibold text-pixel-white">{session.topic || 'Sesi Umum'}</td>
+  <td className="px-6 py-4 font-semibold text-pixel-white">
+    {session.topic || 'Sesi Umum'}
+    {session.is_special_training && session.event_name && (
+      <div className="text-xs text-pixel-lavender mt-0.5 font-mono">Event: {session.event_name}</div>
+    )}
+  </td>
   <td className="px-6 py-4 text-pixel-lavender max-w-xs truncate">{session.notes || '-'}</td>
   <td className="px-6 py-4 text-right space-x-2">
   <Button onClick={() => handleOpenModal(session)} variant="ghost" size="icon" className="h-8 w-8 hover:bg-pixel-panel-light hover:text-primary">
@@ -286,8 +384,8 @@ export default function CoachSessions() {
  {/* --- MODAL TAMBAH/EDIT SESI --- */}
  {isModalOpen && (
  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
- <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-md overflow-hidden pixel-slide-in">
- <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy">
+ <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-lg max-h-[90vh] overflow-y-auto pixel-slide-in">
+ <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy sticky top-0 z-10">
  <h3 className="font-bold text-pixel-white text-lg flex items-center gap-2">
  <FileText className="w-5 h-5 text-primary" />
  {selectedSession ? 'Ubah Sesi Latihan' : 'Buat Sesi Latihan Baru'}
@@ -296,7 +394,7 @@ export default function CoachSessions() {
  <X className="w-4 h-4" />
  </Button>
  </div>
- <form onSubmit={handleSubmit} className="p-6 space-y-4">
+ <form onSubmit={handleSubmit} className="p-6 space-y-5">
  
   {/* Pilih Ekskul */}
   <div className="space-y-1.5">
@@ -309,7 +407,7 @@ export default function CoachSessions() {
   onChange={e => {
     const selectedId = e.target.value
     const eksObj = managedEkskuls.find(ex => ex.id === selectedId)
-    setForm({...form, extracurricular_id: selectedId, coaches_present: [eksObj?.coach?.id || user.id].filter(Boolean)})
+    setForm({...form, extracurricular_id: selectedId, coaches_present: [eksObj?.coach?.id || user.id].filter(Boolean), selected_students: []})
   }}
   >
   {managedEkskuls.map(e => (
@@ -317,6 +415,60 @@ export default function CoachSessions() {
   ))}
   </select>
   </div>
+
+  {/* Checkbox Sesi Latihan Khusus */}
+  <div className="flex items-start gap-2 p-3 bg-pixel-orange/10 border border-pixel-orange/30">
+    <input 
+      type="checkbox" 
+      id="is_special" 
+      checked={form.is_special_training}
+      onChange={e => setForm({...form, is_special_training: e.target.checked})}
+      className="mt-1 h-4 w-4 accent-pixel-orange"
+    />
+    <div>
+      <label htmlFor="is_special" className="font-retro text-base text-pixel-orange cursor-pointer">Sesi Latihan Khusus (Persiapan Lomba)</label>
+      <p className="text-xs text-pixel-lavender mt-1">Latihan khusus di luar jadwal reguler, dibatasi max 3x pertemuan per event.</p>
+    </div>
+  </div>
+
+  {form.is_special_training && (
+    <div className="space-y-4 p-4 border border-pixel-orange/30 bg-pixel-panel-light relative">
+      <Trophy className="absolute top-4 right-4 w-12 h-12 text-pixel-orange/10 pointer-events-none" />
+      <div className="space-y-1.5">
+        <Label htmlFor="event_name">Nama Event / Perlombaan</Label>
+        <Input
+          id="event_name"
+          placeholder="Contoh: O2SN 2026, Porseni Kota"
+          value={form.event_name}
+          onChange={e => setForm({...form, event_name: e.target.value})}
+          className="border-pixel-orange/50 focus-visible:ring-pixel-orange"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Pilih Siswa Peserta Latihan Khusus</Label>
+        <div className="max-h-48 overflow-y-auto border border-pixel-gray/30 bg-pixel-navy p-2 space-y-1">
+          {enrolledStudents.length === 0 ? (
+            <div className="p-2 text-xs text-pixel-lavender text-center">Belum ada siswa terdaftar / Sedang memuat...</div>
+          ) : (
+            enrolledStudents.map(student => (
+              <label key={student.id} className="flex items-center gap-2 p-1.5 hover:bg-pixel-panel-light cursor-pointer text-sm text-pixel-peach">
+                <input 
+                  type="checkbox" 
+                  checked={form.selected_students.includes(student.id)}
+                  onChange={e => handleStudentCheckbox(student.id, e.target.checked)}
+                  className="accent-pixel-blue"
+                />
+                <span className="font-mono text-pixel-lavender">{student.nis}</span> - 
+                <span className="font-semibold text-pixel-white">{student.full_name}</span> 
+                <span className="text-xs text-pixel-gray">({student.class})</span>
+              </label>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )}
 
   {/* Pilih Pelatih yang Memimpin Sesi (Multi-select Checkbox) */}
   {(() => {
@@ -409,7 +561,7 @@ export default function CoachSessions() {
  />
  </div>
 
- <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2">
+ <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel mt-2 py-2">
  <Button type="button" onClick={() => setIsModalOpen(false)} variant="outline">Batal</Button>
  <Button type="submit">Simpan Sesi</Button>
  </div>

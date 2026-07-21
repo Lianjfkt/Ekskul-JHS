@@ -235,7 +235,9 @@ export default function RecapManagement() {
       id: s.id,
       session_date: s.session_date,
       topic: s.topic,
-      notes: s.notes
+      notes: s.notes,
+      is_special_training: s.is_special_training,
+      event_name: s.event_name
      })
     })
    })
@@ -520,14 +522,18 @@ export default function RecapManagement() {
  }
 
  const exportCoachSessionsToExcel = () => {
-  const rows = coachSessionReportRows.map(r => [
-   r.coachName,
-   r.coachEmail,
-   r.ekskulName,
-   formatPeriodIndo(r.periodKey),
-   r.sessionsCount,
-   r.sessionsList.map(s => `${s.session_date} (${s.topic || 'Sesi Latihan'})`).join('; ')
-  ])
+   const rows = coachSessionReportRows.map(r => [
+    r.coachName,
+    r.coachEmail,
+    r.ekskulName,
+    formatPeriodIndo(r.periodKey),
+    r.sessionsCount,
+    r.sessionsList.map(s => {
+      const topicStr = s.topic || 'Sesi Latihan';
+      const badge = s.is_special_training && s.event_name ? ` [KHUSUS: ${s.event_name}]` : '';
+      return `${s.session_date} (${topicStr}${badge})`
+    }).join('; ')
+   ])
   const headers = ['Nama Pelatih', 'Email Pelatih', 'Ekstrakurikuler', 'Periode', 'Jumlah Sesi', 'Daftar Sesi']
   exportToExcel(rows, headers, 'Laporan Sesi Pelatih', 'rekap_sesi_pelatih.xlsx')
  }
@@ -574,15 +580,15 @@ export default function RecapManagement() {
  .filter(Boolean)
  .join(', ')
 
- data.push([
- index + 1,
- formattedDate,
- '14.00', // Default Waktu Mulai
- '15.30', // Default Waktu Selesai
- s.topic || '-',
- '', // Kolom Tanda Tangan
- absentList || 'Nihil'
- ])
+  data.push([
+  index + 1,
+  formattedDate,
+  '14.00', // Default Waktu Mulai
+  '15.30', // Default Waktu Selesai
+  s.is_special_training ? `[KHUSUS: ${s.event_name}] ${s.topic || '-'}` : (s.topic || '-'),
+  '', // Kolom Tanda Tangan
+  absentList || 'Nihil'
+  ])
  })
 
  // Create Worksheet & apply structural properties

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { 
  ClipboardCheck, Calendar, ShieldAlert, Check, 
- Users, AlertCircle, Save, Info
+ Users, AlertCircle, Save, Info, Trophy
 } from 'lucide-react'
 
 export default function CoachAttendances() {
@@ -68,7 +68,7 @@ export default function CoachAttendances() {
  try {
  const { data, error } = await supabase
  .from('sessions')
- .select('id, session_date, topic')
+ .select('id, session_date, topic, is_special_training, event_name')
  .eq('extracurricular_id', ekskulId)
  .order('session_date', { ascending: false })
  if (error) throw error
@@ -100,18 +100,35 @@ export default function CoachAttendances() {
  setErrorMsg('')
  setSuccessMsg('')
  try {
- // 1. Get all students active in the extracurricular
- const { data: enrollments, error: enErr } = await supabase
- .from('enrollments')
- .select(`
- student_id,
- student:student_id (id, nis, full_name, class)
- `)
- .eq('extracurricular_id', ekskulId)
- .eq('status', 'active')
- if (enErr) throw enErr
+ // Check if session is special
+ const sessionObj = sessions.find(s => s.id === sessionId)
+ let studentList = []
+
+ if (sessionObj && sessionObj.is_special_training) {
+   // 1a. Get ONLY students invited to this special training
+   const { data: specialParticipants, error: spErr } = await supabase
+     .from('special_session_participants')
+     .select(`
+       student_id,
+       student:student_id (id, nis, full_name, class)
+     `)
+     .eq('session_id', sessionId)
+   if (spErr) throw spErr
+   studentList = specialParticipants ? specialParticipants.map(sp => sp.student) : []
+ } else {
+   // 1b. Get all students active in the extracurricular
+   const { data: enrollments, error: enErr } = await supabase
+   .from('enrollments')
+   .select(`
+   student_id,
+   student:student_id (id, nis, full_name, class)
+   `)
+   .eq('extracurricular_id', ekskulId)
+   .eq('status', 'active')
+   if (enErr) throw enErr
+   studentList = enrollments ? enrollments.map(e => e.student) : []
+ }
  
- const studentList = enrollments ? enrollments.map(e => e.student) : []
  setStudents(studentList)
 
  // 2. Get existing attendance for this session
@@ -273,7 +290,7 @@ export default function CoachAttendances() {
  ) : (
  sessions.map(s => (
  <option key={s.id} value={s.id}>
- {new Date(s.session_date).toLocaleDateString('id-ID')} - {s.topic || 'Sesi Umum'}
+ {new Date(s.session_date).toLocaleDateString('id-ID')} - {s.is_special_training ? `[KHUSUS] ${s.event_name}` : s.topic || 'Sesi Umum'}
  </option>
  ))
  )}
@@ -306,7 +323,7 @@ export default function CoachAttendances() {
  ) : students.length === 0 ? (
  <div className="p-8 text-center text-pixel-lavender bg-pixel-panel rounded-none border border-pixel-gray/30 shadow-pixel-sm flex flex-col items-center gap-2">
  <Users className="w-10 h-10 text-pixel-peach" />
- <span>Belum ada siswa yang mendaftar di ekskul ini.</span>
+ <span>Belum ada siswa yang mendaftar di ekskul ini atau terpilih di sesi ini.</span>
  </div>
  ) : (
  <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
