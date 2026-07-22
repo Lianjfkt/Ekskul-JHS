@@ -11,6 +11,7 @@ const UsersManagement = lazy(() => import('../pages/admin/UsersManagement'))
 const EkskulManagement = lazy(() => import('../pages/admin/EkskulManagement'))
 const EnrollmentManagement = lazy(() => import('../pages/admin/EnrollmentManagement'))
 const RecapManagement = lazy(() => import('../pages/admin/RecapManagement'))
+const ComplianceManagement = lazy(() => import('../pages/admin/ComplianceManagement'))
 const CoachDashboard = lazy(() => import('../pages/coach/CoachDashboard'))
 const CoachSessions = lazy(() => import('../pages/coach/CoachSessions'))
 const CoachAttendances = lazy(() => import('../pages/coach/CoachAttendances'))
@@ -47,6 +48,7 @@ export default function AppRouter() {
             <Route path="/admin/extracurriculars" element={<EkskulManagement />} />
             <Route path="/admin/enrollments" element={<EnrollmentManagement />} />
             <Route path="/admin/recap" element={<RecapManagement />} />
+            <Route path="/admin/compliance" element={<ComplianceManagement />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['coach']} />}>

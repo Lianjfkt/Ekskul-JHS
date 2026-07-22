@@ -8,7 +8,8 @@ import {
   GraduationCap,
   Users,
   BookOpen,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ShieldAlert
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -24,6 +25,7 @@ export default function Sidebar({ isOpen }) {
       { name: 'Ekskul', path: '/admin/extracurriculars', icon: Activity },
       { name: 'Pendaftaran', path: '/admin/enrollments', icon: BookOpen },
       { name: 'Rekap & Laporan', path: '/admin/recap', icon: FileSpreadsheet },
+      { name: 'Kepatuhan Siswa', path: '/admin/compliance', icon: ShieldAlert },
     ],
     coach: [
       { name: 'Dashboard', path: '/coach/dashboard', icon: LayoutDashboard },
