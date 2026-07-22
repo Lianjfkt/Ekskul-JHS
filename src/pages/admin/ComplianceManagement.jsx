@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { 
   ShieldAlert, AlertTriangle, CheckCircle, Search, 
   Bell, Download, RefreshCw, Calendar, ClipboardCheck, 
-  GraduationCap, AlertCircle
+  GraduationCap, AlertCircle, Eye, X
 } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import 'jspdf-autotable'
@@ -26,6 +26,9 @@ export default function ComplianceManagement() {
   const [sessions, setSessions] = useState([])
   const [attendances, setAttendances] = useState([])
   const [grades, setGrades] = useState([])
+
+  // Modal State for Absence Detail
+  const [selectedAbsenceDetail, setSelectedAbsenceDetail] = useState(null)
 
   useEffect(() => {
     fetchData()
@@ -72,6 +75,19 @@ export default function ComplianceManagement() {
     }
   }
 
+  // --- Helper to determine if an extracurricular is Mandatory (Wajib) or Elective (Pilihan) for a student ---
+  const getEkskulType = (studentClass, ekskulName) => {
+    const grade = studentClass?.trim().charAt(0)
+    const nameLower = ekskulName?.toLowerCase() || ''
+    if (grade === '7' && nameLower.includes('pramuka')) {
+      return 'Wajib'
+    }
+    if (grade === '8' && (nameLower.includes('karate') || nameLower.includes('taekwondo'))) {
+      return 'Wajib'
+    }
+    return 'Pilihan'
+  }
+
   // --- Utility functions for schedule conflict detection ---
   const parseSchedule = (scheduleText) => {
     if (!scheduleText) return []
@@ -111,7 +127,6 @@ export default function ComplianceManagement() {
 
     // 1. Schedule Conflicts
     const conflicts = []
-    // Group active enrollments by student
     const studentEnrollments = {}
     enrollments.forEach(en => {
       if (!studentEnrollments[en.student_id]) {
@@ -125,7 +140,6 @@ export default function ComplianceManagement() {
       const student = students.find(s => s.id === studentId)
       if (!student || ens.length < 2) return
 
-      // Compare pairs
       for (let i = 0; i < ens.length; i++) {
         for (let j = i + 1; j < ens.length; j++) {
           const e1 = ens[i].extracurricular
@@ -145,7 +159,9 @@ export default function ComplianceManagement() {
                   full_name: student.full_name,
                   class: student.class,
                   ekskul1: e1.name,
+                  ekskul1Type: getEkskulType(student.class, e1.name),
                   ekskul2: e2.name,
+                  ekskul2Type: getEkskulType(student.class, e2.name),
                   schedule1: e1.schedule,
                   schedule2: e2.schedule,
                   conflictDetail: `${dayName} (${Math.floor(s1.startMinutes/60).toString().padStart(2, '0')}:${(s1.startMinutes%60).toString().padStart(2, '0')}-${Math.floor(s1.endMinutes/60).toString().padStart(2, '0')}:${(s1.endMinutes%60).toString().padStart(2, '0')} vs ${Math.floor(s2.startMinutes/60).toString().padStart(2, '0')}:${(s2.startMinutes%60).toString().padStart(2, '0')}-${Math.floor(s2.endMinutes/60).toString().padStart(2, '0')}:${(s2.endMinutes%60).toString().padStart(2, '0')})`
@@ -166,16 +182,16 @@ export default function ComplianceManagement() {
       const ekskul = en.extracurricular
       if (!student || !ekskul) return
 
-      // Find sessions of this ekskul
       const ekskulSessions = sessions.filter(s => s.extracurricular_id === ekskul.id)
       const totalSessions = ekskulSessions.length
       if (totalSessions === 0) return
 
-      // Get student's attendance records for these sessions
       const sessionIds = ekskulSessions.map(s => s.id)
       const studentAtts = attendances.filter(a => a.student_id === student.id && sessionIds.includes(a.session_id))
       const attendedCount = studentAtts.filter(a => a.status === 'hadir').length
       const percentage = Math.round((attendedCount / totalSessions) * 100)
+
+      const ekskulType = getEkskulType(student.class, ekskul.name)
 
       if (percentage < 80) {
         lowAttendance.push({
@@ -185,6 +201,8 @@ export default function ComplianceManagement() {
           full_name: student.full_name,
           class: student.class,
           ekskulName: ekskul.name,
+          ekskulId: ekskul.id,
+          ekskulType,
           attended: attendedCount,
           total: totalSessions,
           percentage
@@ -192,16 +210,20 @@ export default function ComplianceManagement() {
       }
 
       // Check consecutive absences (3x Alpha)
-      // Sort student attendances by session date
       const sortedAtts = ekskulSessions.map(session => {
         const att = studentAtts.find(a => a.session_id === session.id)
-        return att ? att.status : null
-      }).filter(Boolean)
+        return {
+          session_date: session.session_date,
+          topic: session.topic,
+          status: att ? att.status : 'alpha', // assume alpha if no attendance record but session existed
+          notes: att ? att.notes : 'Tidak ada keterangan'
+        }
+      })
 
       let maxConsecutiveAlpha = 0
       let currentConsecutiveAlpha = 0
-      sortedAtts.forEach(status => {
-        if (status === 'alpha') {
+      sortedAtts.forEach(att => {
+        if (att.status === 'alpha') {
           currentConsecutiveAlpha++
           if (currentConsecutiveAlpha > maxConsecutiveAlpha) {
             maxConsecutiveAlpha = currentConsecutiveAlpha
@@ -219,6 +241,8 @@ export default function ComplianceManagement() {
           full_name: student.full_name,
           class: student.class,
           ekskulName: ekskul.name,
+          ekskulId: ekskul.id,
+          ekskulType,
           consecutiveCount: maxConsecutiveAlpha
         })
       }
@@ -271,6 +295,7 @@ export default function ComplianceManagement() {
           full_name: student.full_name,
           class: student.class,
           ekskulName: gr.extracurricular?.name || '-',
+          ekskulType: getEkskulType(student.class, gr.extracurricular?.name),
           score: gr.attitude_score,
           notes: gr.notes || 'Tanpa catatan'
         })
@@ -299,12 +324,36 @@ export default function ComplianceManagement() {
 
   const filteredItems = getFilteredData()
 
+  // --- Action: Show detailed absence logs ---
+  const handleShowAbsenceDetail = (studentId, ekskulId, studentName, ekskulName, type) => {
+    const ekskulSessions = sessions.filter(s => s.extracurricular_id === ekskulId)
+    const sessionIds = ekskulSessions.map(s => s.id)
+    const studentAtts = attendances.filter(a => a.student_id === studentId && sessionIds.includes(a.session_id))
+    
+    // Construct all logs
+    const logs = ekskulSessions.map(session => {
+      const att = studentAtts.find(a => a.session_id === session.id)
+      return {
+        date: session.session_date,
+        topic: session.topic || 'Tanpa topik',
+        status: att ? att.status : 'alpha', // Default alpha if no record is created yet
+        notes: att?.notes || '-'
+      }
+    })
+
+    setSelectedAbsenceDetail({
+      studentName,
+      ekskulName,
+      type,
+      logs
+    })
+  }
+
   // --- Reminder Action ---
   const handleSendReminder = async (studentNis, studentName, violationMessage) => {
     setSuccessMsg('')
     setErrorMsg('')
     try {
-      // Find all accounts linked to this student (student user + parent user)
       const { data: targetUsers, error } = await supabase
         .from('users')
         .select('id, role, students!inner(nis)')
@@ -345,8 +394,8 @@ export default function ComplianceManagement() {
         'NIS': item.nis,
         'Nama Siswa': item.full_name,
         'Kelas': item.class,
-        'Ekskul 1': item.ekskul1,
-        'Ekskul 2': item.ekskul2,
+        'Ekskul 1': `${item.ekskul1} (${item.ekskul1Type})`,
+        'Ekskul 2': `${item.ekskul2} (${item.ekskul2Type})`,
         'Detail Bentrokan': item.conflictDetail
       }))
     } else if (activeTab === 'low_attendance') {
@@ -357,6 +406,7 @@ export default function ComplianceManagement() {
         'Nama Siswa': item.full_name,
         'Kelas': item.class,
         'Nama Ekskul': item.ekskulName,
+        'Sifat Ekskul': item.ekskulType,
         'Kehadiran Sesi': `${item.attended}/${item.total}`,
         'Persentase Kehadiran': `${item.percentage}%`
       }))
@@ -368,6 +418,7 @@ export default function ComplianceManagement() {
         'Nama Siswa': item.full_name,
         'Kelas': item.class,
         'Nama Ekskul': item.ekskulName,
+        'Sifat Ekskul': item.ekskulType,
         'Alpha Berturut-Turut': `${item.consecutiveCount} Kali`
       }))
     } else if (activeTab === 'missing_mandatory') {
@@ -388,6 +439,7 @@ export default function ComplianceManagement() {
         'Nama Siswa': item.full_name,
         'Kelas': item.class,
         'Nama Ekskul': item.ekskulName,
+        'Sifat Ekskul': item.ekskulType,
         'Nilai Sikap': item.score,
         'Catatan Pelatih': item.notes
       }))
@@ -411,21 +463,21 @@ export default function ComplianceManagement() {
       fileName = 'Laporan_Jadwal_Bertabrakan.pdf'
       headers = [['No', 'NIS', 'Nama Siswa', 'Kelas', 'Ekskul 1', 'Ekskul 2', 'Detail Bentrokan']]
       body = filteredItems.map((item, idx) => [
-        idx + 1, item.nis, item.full_name, item.class, item.ekskul1, item.ekskul2, item.conflictDetail
+        idx + 1, item.nis, item.full_name, item.class, `${item.ekskul1} (${item.ekskul1Type})`, `${item.ekskul2} (${item.ekskul2Type})`, item.conflictDetail
       ])
     } else if (activeTab === 'low_attendance') {
       title = 'Laporan Siswa dengan Kehadiran di Bawah 80%'
       fileName = 'Laporan_Absensi_Rendah.pdf'
-      headers = [['No', 'NIS', 'Nama Siswa', 'Kelas', 'Nama Ekskul', 'Sesi Hadir', 'Persentase']]
+      headers = [['No', 'NIS', 'Nama Siswa', 'Kelas', 'Nama Ekskul', 'Jenis', 'Sesi Hadir', 'Persentase']]
       body = filteredItems.map((item, idx) => [
-        idx + 1, item.nis, item.full_name, item.class, item.ekskulName, `${item.attended}/${item.total}`, `${item.percentage}%`
+        idx + 1, item.nis, item.full_name, item.class, item.ekskulName, item.ekskulType, `${item.attended}/${item.total}`, `${item.percentage}%`
       ])
     } else if (activeTab === 'consecutive_absences') {
       title = 'Laporan Siswa dengan Alpha 3x Berturut-Turut'
       fileName = 'Laporan_Alpha_Berturut.pdf'
-      headers = [['No', 'NIS', 'Nama Siswa', 'Kelas', 'Nama Ekskul', 'Alpha Berturut']]
+      headers = [['No', 'NIS', 'Nama Siswa', 'Kelas', 'Nama Ekskul', 'Jenis', 'Alpha Berturut']]
       body = filteredItems.map((item, idx) => [
-        idx + 1, item.nis, item.full_name, item.class, item.ekskulName, `${item.consecutiveCount} Kali`
+        idx + 1, item.nis, item.full_name, item.class, item.ekskulName, item.ekskulType, `${item.consecutiveCount} Kali`
       ])
     } else if (activeTab === 'missing_mandatory') {
       title = 'Laporan Siswa Belum Mengambil Ekskul Wajib'
@@ -437,9 +489,9 @@ export default function ComplianceManagement() {
     } else if (activeTab === 'low_attitude') {
       title = 'Laporan Siswa dengan Nilai Sikap di Bawah 70'
       fileName = 'Laporan_Nilai_Sikap_Rendah.pdf'
-      headers = [['No', 'NIS', 'Nama Siswa', 'Kelas', 'Nama Ekskul', 'Nilai Sikap', 'Catatan Pelatih']]
+      headers = [['No', 'NIS', 'Nama Siswa', 'Kelas', 'Nama Ekskul', 'Jenis', 'Nilai Sikap', 'Catatan Pelatih']]
       body = filteredItems.map((item, idx) => [
-        idx + 1, item.nis, item.full_name, item.class, item.ekskulName, item.score, item.notes
+        idx + 1, item.nis, item.full_name, item.class, item.ekskulName, item.ekskulType, item.score, item.notes
       ])
     }
 
@@ -632,6 +684,7 @@ export default function ComplianceManagement() {
                     {activeTab === 'low_attendance' && (
                       <>
                         <th className="p-4">Ekstrakurikuler</th>
+                        <th className="p-4">Jenis</th>
                         <th className="p-4">Detail Sesi</th>
                         <th className="p-4 text-pixel-red">Persentase</th>
                       </>
@@ -639,6 +692,7 @@ export default function ComplianceManagement() {
                     {activeTab === 'consecutive_absences' && (
                       <>
                         <th className="p-4">Ekstrakurikuler</th>
+                        <th className="p-4">Jenis</th>
                         <th className="p-4 text-pixel-red">Ketidakhadiran Alpha</th>
                       </>
                     )}
@@ -651,6 +705,7 @@ export default function ComplianceManagement() {
                     {activeTab === 'low_attitude' && (
                       <>
                         <th className="p-4">Ekstrakurikuler</th>
+                        <th className="p-4">Jenis</th>
                         <th className="p-4 text-pixel-red">Nilai Sikap</th>
                         <th className="p-4">Catatan Guru</th>
                       </>
@@ -671,8 +726,14 @@ export default function ComplianceManagement() {
                       {activeTab === 'schedule_conflicts' && (
                         <>
                           <td className="p-4">
-                            <div className="text-pixel-white">{item.ekskul1} <span className="text-xs text-pixel-lavender">({item.schedule1})</span></div>
-                            <div className="text-pixel-white mt-1">{item.ekskul2} <span className="text-xs text-pixel-lavender">({item.schedule2})</span></div>
+                            <div className="text-pixel-white">
+                              {item.ekskul1} <span className="text-xs text-pixel-blue bg-pixel-blue/10 px-1.5 py-0.5 border border-pixel-blue/20">{item.ekskul1Type}</span>
+                              <div className="text-sm text-pixel-lavender/70 mt-0.5">Jadwal: {item.schedule1}</div>
+                            </div>
+                            <div className="text-pixel-white mt-2">
+                              {item.ekskul2} <span className="text-xs text-pixel-blue bg-pixel-blue/10 px-1.5 py-0.5 border border-pixel-blue/20">{item.ekskul2Type}</span>
+                              <div className="text-sm text-pixel-lavender/70 mt-0.5">Jadwal: {item.schedule2}</div>
+                            </div>
                           </td>
                           <td className="p-4 font-semibold text-pixel-red">{item.conflictDetail}</td>
                         </>
@@ -681,7 +742,28 @@ export default function ComplianceManagement() {
                       {activeTab === 'low_attendance' && (
                         <>
                           <td className="p-4 text-pixel-white">{item.ekskulName}</td>
-                          <td className="p-4 text-pixel-lavender">{item.attended} dari {item.total} Sesi</td>
+                          <td className="p-4">
+                            <span className={`text-xs px-2 py-0.5 border ${
+                              item.ekskulType === 'Wajib' 
+                                ? 'text-pixel-red border-pixel-red/30 bg-pixel-red/5' 
+                                : 'text-pixel-green border-pixel-green/30 bg-pixel-green/5'
+                            }`}>
+                              {item.ekskulType}
+                            </span>
+                          </td>
+                          <td className="p-4 text-pixel-lavender">
+                            <div className="flex items-center gap-2">
+                              <span>{item.attended} dari {item.total} Sesi</span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleShowAbsenceDetail(item.student_id, item.ekskulId, item.full_name, item.ekskulName, item.ekskulType)}
+                                className="font-pixel text-[5px] h-5 py-0 border-pixel-blue text-pixel-blue hover:bg-pixel-blue hover:text-pixel-navy rounded-none flex items-center gap-0.5"
+                              >
+                                <Eye className="w-2.5 h-2.5" /> DETAIL
+                              </Button>
+                            </div>
+                          </td>
                           <td className="p-4 font-mono font-bold text-pixel-red">{item.percentage}% Kehadiran</td>
                         </>
                       )}
@@ -689,7 +771,28 @@ export default function ComplianceManagement() {
                       {activeTab === 'consecutive_absences' && (
                         <>
                           <td className="p-4 text-pixel-white">{item.ekskulName}</td>
-                          <td className="p-4 font-semibold text-pixel-red">{item.consecutiveCount} Sesi Alpha Berturut-turut</td>
+                          <td className="p-4">
+                            <span className={`text-xs px-2 py-0.5 border ${
+                              item.ekskulType === 'Wajib' 
+                                ? 'text-pixel-red border-pixel-red/30 bg-pixel-red/5' 
+                                : 'text-pixel-green border-pixel-green/30 bg-pixel-green/5'
+                            }`}>
+                              {item.ekskulType}
+                            </span>
+                          </td>
+                          <td className="p-4 text-pixel-red">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold">{item.consecutiveCount} Sesi Alpha Berturut-turut</span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleShowAbsenceDetail(item.student_id, item.ekskulId, item.full_name, item.ekskulName, item.ekskulType)}
+                                className="font-pixel text-[5px] h-5 py-0 border-pixel-blue text-pixel-blue hover:bg-pixel-blue hover:text-pixel-navy rounded-none flex items-center gap-0.5"
+                              >
+                                <Eye className="w-2.5 h-2.5" /> DETAIL
+                              </Button>
+                            </div>
+                          </td>
                         </>
                       )}
 
@@ -703,6 +806,15 @@ export default function ComplianceManagement() {
                       {activeTab === 'low_attitude' && (
                         <>
                           <td className="p-4 text-pixel-white">{item.ekskulName}</td>
+                          <td className="p-4">
+                            <span className={`text-xs px-2 py-0.5 border ${
+                              item.ekskulType === 'Wajib' 
+                                ? 'text-pixel-red border-pixel-red/30 bg-pixel-red/5' 
+                                : 'text-pixel-green border-pixel-green/30 bg-pixel-green/5'
+                            }`}>
+                              {item.ekskulType}
+                            </span>
+                          </td>
                           <td className="p-4 font-mono font-bold text-pixel-red">{item.score} / 100</td>
                           <td className="p-4 text-sm text-pixel-lavender max-w-[200px] truncate" title={item.notes}>{item.notes}</td>
                         </>
@@ -717,13 +829,13 @@ export default function ComplianceManagement() {
                             if (activeTab === 'schedule_conflicts') {
                               message = `Jadwal ekskul bentrok antara ${item.ekskul1} dan ${item.ekskul2} (${item.conflictDetail})`
                             } else if (activeTab === 'low_attendance') {
-                              message = `Kehadiran ekskul ${item.ekskulName} kurang dari batas minimum (${item.percentage}%)`
+                              message = `Kehadiran ekskul ${item.ekskulName} (${item.ekskulType}) kurang dari batas minimum (${item.percentage}%)`
                             } else if (activeTab === 'consecutive_absences') {
-                              message = `Telah alpha sebanyak ${item.consecutiveCount} sesi berturut-turut di ekskul ${item.ekskulName}`
+                              message = `Telah alpha sebanyak ${item.consecutiveCount} sesi berturut-turut di ekskul ${item.ekskulName} (${item.ekskulType})`
                             } else if (activeTab === 'missing_mandatory') {
                               message = `Belum mendaftar ekskul wajib yang ditentukan (${item.violationType})`
                             } else if (activeTab === 'low_attitude') {
-                              message = `Nilai sikap berada di bawah batas ketertiban (Skor: ${item.score}) di ekskul ${item.ekskulName}`
+                              message = `Nilai sikap berada di bawah batas ketertiban (Skor: ${item.score}) di ekskul ${item.ekskulName} (${item.ekskulType})`
                             }
                             handleSendReminder(item.nis, item.full_name, message)
                           }}
@@ -740,6 +852,92 @@ export default function ComplianceManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal Detail Absensi */}
+      {selectedAbsenceDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="w-full max-w-2xl bg-pixel-panel border-4 border-pixel-gray rounded-none shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            {/* Header */}
+            <div className="bg-pixel-navy border-b-4 border-pixel-gray p-4 flex justify-between items-center shrink-0">
+              <h2 className="font-pixel text-[8px] text-pixel-blue pixel-text-shadow flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-pixel-green" />
+                RIWAYAT ABSENSI DETAIL
+              </h2>
+              <button 
+                onClick={() => setSelectedAbsenceDetail(null)}
+                className="text-pixel-peach hover:text-pixel-red border-2 border-transparent hover:border-pixel-red p-1 bg-pixel-panel-light rounded-none"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            {/* Body Info */}
+            <div className="p-4 border-b-2 border-pixel-gray/20 bg-pixel-navy/20 shrink-0">
+              <p className="font-retro text-lg text-pixel-white">Siswa: <span className="font-bold">{selectedAbsenceDetail.studentName}</span></p>
+              <div className="flex items-center gap-3 mt-1 font-retro text-base text-pixel-lavender">
+                <span>Ekstrakurikuler: <span className="text-pixel-white font-bold">{selectedAbsenceDetail.ekskulName}</span></span>
+                <span className={`text-xs px-2 py-0.2 border ${
+                  selectedAbsenceDetail.type === 'Wajib' 
+                    ? 'text-pixel-red border-pixel-red/30 bg-pixel-red/5' 
+                    : 'text-pixel-green border-pixel-green/30 bg-pixel-green/5'
+                }`}>
+                  Ekskul {selectedAbsenceDetail.type}
+                </span>
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto pixel-scroll p-4 space-y-3">
+              {selectedAbsenceDetail.logs.length === 0 ? (
+                <p className="text-center font-retro text-pixel-lavender py-6">Belum ada sesi latihan tercatat untuk ekskul ini.</p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedAbsenceDetail.logs.map((log, index) => {
+                    const isAbsent = log.status !== 'hadir'
+                    return (
+                      <div 
+                        key={index}
+                        className={`p-3 border-2 flex flex-col sm:flex-row justify-between sm:items-center gap-2 rounded-none font-retro ${
+                          log.status === 'hadir'
+                            ? 'border-pixel-green/20 bg-pixel-green/5'
+                            : log.status === 'izin'
+                            ? 'border-pixel-yellow/20 bg-pixel-yellow/5'
+                            : 'border-pixel-red/20 bg-pixel-red/5'
+                        }`}
+                      >
+                        <div>
+                          <p className="text-pixel-white font-bold">{new Date(log.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                          <p className="text-sm text-pixel-lavender mt-0.5">Topik: {log.topic}</p>
+                          {isAbsent && <p className="text-xs text-pixel-peach/70 mt-1">Keterangan: {log.notes}</p>}
+                        </div>
+                        <span className={`font-pixel text-[6px] px-2.5 py-1 text-center self-start sm:self-center rounded-none border ${
+                          log.status === 'hadir'
+                            ? 'border-pixel-green text-pixel-green bg-pixel-green/10'
+                            : log.status === 'izin'
+                            ? 'border-pixel-yellow text-pixel-yellow bg-pixel-yellow/10'
+                            : 'border-pixel-red text-pixel-red bg-pixel-red/10'
+                        }`}>
+                          {log.status.toUpperCase()}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 bg-pixel-navy border-t-4 border-pixel-gray text-right shrink-0">
+              <Button 
+                onClick={() => setSelectedAbsenceDetail(null)}
+                className="font-pixel text-[7px] bg-pixel-gray text-pixel-navy hover:bg-pixel-navy hover:text-pixel-peach rounded-none h-8"
+              >
+                TUTUP
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
