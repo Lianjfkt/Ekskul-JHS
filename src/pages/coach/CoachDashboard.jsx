@@ -371,7 +371,7 @@ export default function CoachDashboard() {
  </Card>
 
            {/* Low Attendance Warnings */}
-           {!loading && attendanceWarnings.length > 0 && (
+           {!loading && (
              <div className="pt-2">
                <h2 className="font-pixel text-[10px] pixel-text-shadow leading-loose text-pixel-white mb-4 flex items-center gap-2">
                  <AlertTriangle className="w-4 h-4 text-pixel-red" />
@@ -400,41 +400,43 @@ export default function CoachDashboard() {
                  </div>
                  <CardContent className="p-0">
                    <div className="max-h-[360px] overflow-y-auto pixel-scroll divide-y divide-pixel-gray/30">
-                     {attendanceWarnings
-                       .filter(w => !selectedEkskulFilter || w.ekskulId === selectedEkskulFilter)
-                       .map(student => (
-                       <div key={student.id} className={`p-4 hover:bg-pixel-navy/30 transition-colors border-l-2 ${
-                         student.warningLevel === 'TEGURAN' ? 'border-l-pixel-red' : 'border-l-amber-500'
-                       }`}>
-                         <div className="flex justify-between items-start mb-1">
-                           <p className="font-semibold text-pixel-white text-sm">{student.name}</p>
-                           <span className={`font-mono font-bold text-sm ${student.percentage < 60 ? 'text-pixel-red' : 'text-amber-400'}`}>
-                             {student.percentage}%
-                           </span>
-                         </div>
-                         <div className="flex justify-between items-center text-xs text-pixel-lavender">
-                           <span>{student.ekskul}{student.isMandatory ? ' (Wajib)' : ''}</span>
-                           <span className="bg-pixel-gray/50 px-1.5 py-0.5 rounded text-[10px]">{student.class}</span>
-                         </div>
-                         <div className="mt-1 flex flex-wrap gap-1 items-center">
-                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                             student.warningLevel === 'TEGURAN'
-                               ? 'bg-pixel-red/20 text-pixel-red'
-                               : 'bg-amber-900/30 text-amber-400'
-                           }`}>
-                             {student.warningLevel}
-                           </span>
-                           {student.warningReasons?.map((reason, ri) => (
-                             <span key={ri} className="text-[9px] bg-pixel-navy text-pixel-lavender border border-pixel-gray/30 px-1 py-0.5 rounded">
-                               {reason}
+                     {attendanceWarnings.filter(w => !selectedEkskulFilter || w.ekskulId === selectedEkskulFilter).length > 0 ? (
+                       attendanceWarnings
+                         .filter(w => !selectedEkskulFilter || w.ekskulId === selectedEkskulFilter)
+                         .map(student => (
+                         <div key={student.id} className={`p-4 hover:bg-pixel-navy/30 transition-colors border-l-2 ${
+                           student.warningLevel === 'TEGURAN' ? 'border-l-pixel-red' : 'border-l-amber-500'
+                         }`}>
+                           <div className="flex justify-between items-start mb-1">
+                             <p className="font-semibold text-pixel-white text-sm">{student.name}</p>
+                             <span className={`font-mono font-bold text-sm ${student.percentage < 60 ? 'text-pixel-red' : 'text-amber-400'}`}>
+                               {student.percentage}%
                              </span>
-                           ))}
+                           </div>
+                           <div className="flex justify-between items-center text-xs text-pixel-lavender">
+                             <span>{student.ekskul}{student.isMandatory ? ' (Wajib)' : ''}</span>
+                             <span className="bg-pixel-gray/50 px-1.5 py-0.5 rounded text-[10px]">{student.class}</span>
+                           </div>
+                           <div className="mt-1 flex flex-wrap gap-1 items-center">
+                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                               student.warningLevel === 'TEGURAN'
+                                 ? 'bg-pixel-red/20 text-pixel-red'
+                                 : 'bg-amber-900/30 text-amber-400'
+                             }`}>
+                               {student.warningLevel}
+                             </span>
+                             {student.warningReasons?.map((reason, ri) => (
+                               <span key={ri} className="text-[9px] bg-pixel-navy text-pixel-lavender border border-pixel-gray/30 px-1 py-0.5 rounded">
+                                 {reason}
+                               </span>
+                             ))}
+                           </div>
                          </div>
-                       </div>
-                     ))}
-                     {attendanceWarnings.filter(w => !selectedEkskulFilter || w.ekskulId === selectedEkskulFilter).length === 0 && (
-                       <div className="p-6 text-center text-pixel-lavender text-xs">
-                         Tidak ada siswa bermasalah di ekskul ini. 🎉
+                       ))
+                     ) : (
+                       <div className="p-6 text-center text-pixel-lavender text-xs space-y-2">
+                         <CheckCircle className="w-8 h-8 text-pixel-green mx-auto" />
+                         <p>Tidak ada siswa bermasalah di ekskul ini. 🎉</p>
                        </div>
                      )}
                    </div>
