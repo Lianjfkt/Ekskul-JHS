@@ -69,9 +69,9 @@ export default function CoachDashboard() {
       // 4. Fetch recent sessions for chart
       const { data: recentSessions } = await supabase
         .from('sessions')
-        .select(`id, date, topic, extracurricular_id, extracurriculars (name)`)
+        .select(`id, session_date, topic, extracurricular_id, extracurriculars (name)`)
         .in('extracurricular_id', ekskulIds)
-        .order('date', { ascending: false })
+        .order('session_date', { ascending: false })
         .limit(8)
         
       let chartData = []
@@ -88,7 +88,7 @@ export default function CoachDashboard() {
           const present = sessionAtts.filter(a => a.status === 'hadir').length
           const percentage = total > 0 ? Math.round((present / total) * 100) : 0
           return {
-            name: new Date(session.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+            name: new Date(session.session_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
             topic: session.topic,
             ekskul: session.extracurriculars?.name,
             kehadiran: percentage,
@@ -105,9 +105,9 @@ export default function CoachDashboard() {
         .in('extracurricular_id', ekskulIds)
         .eq('status', 'active')
         
-      let warnings = []
+      const warnings = []
       if (activeStudents && activeStudents.length > 0) {
-        const { data: allSessions } = await supabase.from('sessions').select('id, date, extracurricular_id').in('extracurricular_id', ekskulIds)
+        const { data: allSessions } = await supabase.from('sessions').select('id, session_date, extracurricular_id').in('extracurricular_id', ekskulIds)
         if (allSessions && allSessions.length > 0) {
            const allSessionIds = allSessions.map(s => s.id)
            const { data: allAtts } = await supabase.from('attendances').select('student_id, session_id, status').in('session_id', allSessionIds)
@@ -131,7 +131,7 @@ export default function CoachDashboard() {
                  // Hitung alpha berturut-turut
                  const sortedSessions = ekskulSessions
                    .slice() // jangan mutasi
-                   .sort((a, b) => new Date(b.date) - new Date(a.date))
+                   .sort((a, b) => new Date(b.session_date) - new Date(a.session_date))
                  let consecutiveAlpha = 0
                  for (const session of sortedSessions) {
                    const att = allAtts.find(a => a.session_id === session.id && a.student_id === enr.student_id)
