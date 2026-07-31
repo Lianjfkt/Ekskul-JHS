@@ -29,7 +29,6 @@ import {
  TrendingDown,
  Minus
 } from 'lucide-react'
-import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
 import {
  ResponsiveContainer,
@@ -632,7 +631,8 @@ export default function RecapManagement() {
 
  // ─── Excel Exports ─────────────────────────────────────────────────────────
 
- const exportToExcel = (rows, headers, sheetName, filename) => {
+ const exportToExcel = async (rows, headers, sheetName, filename) => {
+  const XLSX = await import('xlsx')
   const wb = XLSX.utils.book_new()
   const data = [headers, ...rows]
   const ws = XLSX.utils.aoa_to_sheet(data)
@@ -692,7 +692,8 @@ export default function RecapManagement() {
   exportToExcel(rows, ['Nama Pelatih','Email Pelatih','Ekstrakurikuler','Periode','Jumlah Sesi','Daftar Sesi'], 'Laporan Sesi Pelatih', 'rekap_sesi_pelatih.xlsx')
  }
 
- const exportCoachSessionsDetailToExcel = (rowGroup) => {
+ const exportCoachSessionsDetailToExcel = async (rowGroup) => {
+  const XLSX = await import('xlsx')
   const { coachName, ekskulName, periodKey, sessionsList, ekskulId } = rowGroup
   const totalPeserta = enrollments.filter(en => en.extracurricular_id === ekskulId).length
   const sampleEnroll = enrollments.find(en => en.extracurricular_id === ekskulId)
