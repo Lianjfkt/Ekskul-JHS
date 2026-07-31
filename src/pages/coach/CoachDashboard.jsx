@@ -37,7 +37,7 @@ export default function CoachDashboard() {
  // 1. Fetch extracurriculars managed by this coach
  const { data: ekskuls, error: eErr } = await supabase
  .from('extracurriculars')
- .select('*')
+ .select('*, is_mandatory, mandatory_class')
  .or(`coach_id.eq.${user.id},coach_id_2.eq.${user.id},coach_id_3.eq.${user.id}`)
  if (eErr) throw eErr
  setManagedEkskuls(ekskuls || [])
@@ -106,37 +106,67 @@ export default function CoachDashboard() {
         
       let warnings = []
       if (activeStudents && activeStudents.length > 0) {
-        const { data: allSessions } = await supabase.from('sessions').select('id, extracurricular_id').in('extracurricular_id', ekskulIds)
+        const { data: allSessions } = await supabase.from('sessions').select('id, date, extracurricular_id').in('extracurricular_id', ekskulIds)
         if (allSessions && allSessions.length > 0) {
            const allSessionIds = allSessions.map(s => s.id)
            const { data: allAtts } = await supabase.from('attendances').select('student_id, session_id, status').in('session_id', allSessionIds)
            
            if (allAtts) {
               activeStudents.forEach(enr => {
-                 const ekskulSessions = allSessions.filter(s => s.extracurricular_id === enr.extracurricular_id)
+                 const ekskul = ekskuls.find(e => e.id === enr.extracurricular_id)
+                 const isMandatory = ekskul?.is_mandatory || false
+                 const ekskulSessions = allSessions
+                   .filter(s => s.extracurricular_id === enr.extracurricular_id)
                  const ekskulSessionIds = ekskulSessions.map(s => s.id)
                  const studentAtts = allAtts.filter(a => a.student_id === enr.student_id && ekskulSessionIds.includes(a.session_id))
                  
-                 // Warn only if there are at least 3 sessions
-                 if (studentAtts.length >= 3) { 
-                    const total = studentAtts.length
-                    const present = studentAtts.filter(a => a.status === 'hadir').length
-                    const percentage = Math.round((present / total) * 100)
-                    if (percentage < 75) {
-                       warnings.push({
-                          id: enr.student_id + enr.extracurricular_id, // unique key
-                          name: enr.students?.full_name,
-                          class: enr.students?.class,
-                          ekskul: enr.extracurriculars?.name,
-                          percentage
-                       })
-                    }
+                 if (studentAtts.length === 0) return
+
+                 const total = studentAtts.length
+                 const present = studentAtts.filter(a => a.status === 'hadir').length
+                 const alphaCount = studentAtts.filter(a => a.status === 'alpha').length
+                 const percentage = Math.round((present / total) * 100)
+
+                 // Hitung alpha berturut-turut
+                 const sortedSessions = ekskulSessions
+                   .slice() // jangan mutasi
+                   .sort((a, b) => new Date(b.date) - new Date(a.date))
+                 let consecutiveAlpha = 0
+                 for (const session of sortedSessions) {
+                   const att = allAtts.find(a => a.session_id === session.id && a.student_id === enr.student_id)
+                   if (!att || att.status === 'alpha') consecutiveAlpha++
+                   else break
+                 }
+
+                 // Threshold berbeda: wajib vs pilihan
+                 const shouldWarn = isMandatory
+                   ? (alphaCount >= 1 || percentage < 80)
+                   : (consecutiveAlpha >= 3 || percentage < 70)
+
+                 if (shouldWarn) {
+                    const warningLevel = isMandatory
+                      ? (alphaCount >= 3 || percentage < 70 ? 'TEGURAN' : 'PERINGATAN')
+                      : (consecutiveAlpha >= 5 || percentage < 55 ? 'TEGURAN' : 'PERINGATAN')
+                    warnings.push({
+                       id: enr.student_id + enr.extracurricular_id,
+                       name: enr.students?.full_name,
+                       class: enr.students?.class,
+                       ekskul: enr.extracurriculars?.name,
+                       percentage,
+                       consecutiveAlpha,
+                       alphaCount,
+                       isMandatory,
+                       warningLevel
+                    })
                  }
               })
            }
         }
       }
-      setAttendanceWarnings(warnings.sort((a,b) => a.percentage - b.percentage))
+      setAttendanceWarnings(warnings.sort((a,b) => {
+        if (a.warningLevel !== b.warningLevel) return a.warningLevel === 'TEGURAN' ? -1 : 1
+        return a.percentage - b.percentage
+      }))
 
  }
  } catch (err) {
@@ -327,39 +357,50 @@ export default function CoachDashboard() {
  </CardContent>
  </Card>
 
-          {/* Low Attendance Warnings */}
-          {!loading && attendanceWarnings.length > 0 && (
-            <div className="pt-2">
-              <h2 className="font-pixel text-[10px] pixel-text-shadow leading-loose text-pixel-white mb-4 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-pixel-red" />
-                Perlu Perhatian Khusus
-              </h2>
-              <Card className="border-pixel-red/50 shadow-pixel-sm bg-pixel-panel overflow-hidden">
-                <div className="bg-pixel-red/20 text-pixel-red text-xs p-3 font-retro font-semibold border-b border-pixel-red/30 flex items-center justify-between">
-                  <span>Kehadiran &lt; 75%</span>
-                  <span className="bg-pixel-red text-white px-2 py-0.5 rounded">{attendanceWarnings.length} Siswa</span>
-                </div>
-                <CardContent className="p-0">
-                  <div className="max-h-[300px] overflow-y-auto pixel-scroll divide-y divide-pixel-gray/30">
-                    {attendanceWarnings.map(student => (
-                      <div key={student.id} className="p-4 hover:bg-pixel-navy/30 transition-colors">
-                        <div className="flex justify-between items-start mb-1">
-                          <p className="font-semibold text-pixel-white text-sm">{student.name}</p>
-                          <span className={`font-mono font-bold text-sm ${student.percentage < 50 ? 'text-pixel-red' : 'text-pixel-yellow'}`}>
-                            {student.percentage}%
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs text-pixel-lavender">
-                          <span>{student.ekskul}</span>
-                          <span className="bg-pixel-gray/50 px-1.5 py-0.5 rounded text-[10px]">{student.class}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+           {/* Low Attendance Warnings */}
+           {!loading && attendanceWarnings.length > 0 && (
+             <div className="pt-2">
+               <h2 className="font-pixel text-[10px] pixel-text-shadow leading-loose text-pixel-white mb-4 flex items-center gap-2">
+                 <AlertTriangle className="w-4 h-4 text-pixel-red" />
+                 Siswa Perlu Perhatian
+               </h2>
+               <Card className="border-pixel-red/50 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+                 <div className="bg-pixel-red/20 text-pixel-red text-xs p-3 font-retro font-semibold border-b border-pixel-red/30 flex items-center justify-between">
+                   <span>Warning Kehadiran</span>
+                   <span className="bg-pixel-red text-white px-2 py-0.5 rounded">{attendanceWarnings.length} Siswa</span>
+                 </div>
+                 <CardContent className="p-0">
+                   <div className="max-h-[360px] overflow-y-auto pixel-scroll divide-y divide-pixel-gray/30">
+                     {attendanceWarnings.map(student => (
+                       <div key={student.id} className={`p-4 hover:bg-pixel-navy/30 transition-colors border-l-2 ${
+                         student.warningLevel === 'TEGURAN' ? 'border-l-pixel-red' : 'border-l-amber-500'
+                       }`}>
+                         <div className="flex justify-between items-start mb-1">
+                           <p className="font-semibold text-pixel-white text-sm">{student.name}</p>
+                           <span className={`font-mono font-bold text-sm ${student.percentage < 60 ? 'text-pixel-red' : 'text-amber-400'}`}>
+                             {student.percentage}%
+                           </span>
+                         </div>
+                         <div className="flex justify-between items-center text-xs text-pixel-lavender">
+                           <span>{student.ekskul}{student.isMandatory ? ' (Wajib)' : ''}</span>
+                           <span className="bg-pixel-gray/50 px-1.5 py-0.5 rounded text-[10px]">{student.class}</span>
+                         </div>
+                         <div className="mt-1">
+                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                             student.warningLevel === 'TEGURAN'
+                               ? 'bg-pixel-red/20 text-pixel-red'
+                               : 'bg-amber-900/30 text-amber-400'
+                           }`}>
+                             {student.warningLevel} {student.consecutiveAlpha > 0 ? `· ${student.consecutiveAlpha}× berturut` : ''}
+                           </span>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 </CardContent>
+               </Card>
+             </div>
+           )}
  </div>
 
  </div>

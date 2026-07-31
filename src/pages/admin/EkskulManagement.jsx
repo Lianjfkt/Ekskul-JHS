@@ -31,7 +31,9 @@ export default function EkskulManagement() {
     coach_id: '',
     coach_id_2: '',
     coach_id_3: '',
-    is_active: true
+    is_active: true,
+    is_mandatory: false,
+    mandatory_class: ''
   })
 
   useEffect(() => {
@@ -78,7 +80,9 @@ export default function EkskulManagement() {
         coach_id: ekskul.coach_id || '',
         coach_id_2: ekskul.coach_id_2 || '',
         coach_id_3: ekskul.coach_id_3 || '',
-        is_active: ekskul.is_active !== undefined ? ekskul.is_active : true
+        is_active: ekskul.is_active !== undefined ? ekskul.is_active : true,
+        is_mandatory: ekskul.is_mandatory || false,
+        mandatory_class: ekskul.mandatory_class || ''
       })
     } else {
       setSelectedEkskul(null)
@@ -89,7 +93,9 @@ export default function EkskulManagement() {
         coach_id: coaches[0]?.id || '',
         coach_id_2: '',
         coach_id_3: '',
-        is_active: true
+        is_active: true,
+        is_mandatory: false,
+        mandatory_class: ''
       })
     }
     setIsModalOpen(true)
@@ -118,7 +124,9 @@ export default function EkskulManagement() {
             coach_id: form.coach_id || null,
             coach_id_2: form.coach_id_2 || null,
             coach_id_3: form.coach_id_3 || null,
-            is_active: form.is_active
+            is_active: form.is_active,
+            is_mandatory: form.is_mandatory,
+            mandatory_class: form.is_mandatory ? (form.mandatory_class || null) : null
           })
           .eq('id', selectedEkskul.id)
         if (error) throw error
@@ -134,7 +142,9 @@ export default function EkskulManagement() {
               coach_id: form.coach_id || null,
               coach_id_2: form.coach_id_2 || null,
               coach_id_3: form.coach_id_3 || null,
-              is_active: form.is_active
+              is_active: form.is_active,
+              is_mandatory: form.is_mandatory,
+              mandatory_class: form.is_mandatory ? (form.mandatory_class || null) : null
             }
           ])
         if (error) throw error
@@ -242,12 +252,19 @@ export default function EkskulManagement() {
                 <CardContent className="p-5 space-y-4">
                   {/* Status Badge */}
                   <div className="flex justify-between items-start">
-                    <span className={`pixel-badge ${
-                      ekskul.is_active ? 'border-pixel-green text-pixel-green bg-pixel-green/10' : 'border-pixel-gray text-pixel-lavender'
-                    }`}>
-                      <Activity className="w-3 h-3 inline mr-1" />
-                      {ekskul.is_active ? 'AKTIF' : 'OFF'}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className={`pixel-badge ${
+                        ekskul.is_active ? 'border-pixel-green text-pixel-green bg-pixel-green/10' : 'border-pixel-gray text-pixel-lavender'
+                      }`}>
+                        <Activity className="w-3 h-3 inline mr-1" />
+                        {ekskul.is_active ? 'AKTIF' : 'OFF'}
+                      </span>
+                      {ekskul.is_mandatory && (
+                        <span className="pixel-badge border-indigo-500 text-indigo-300 bg-indigo-900/30 text-[10px]">
+                          WAJIB{ekskul.mandatory_class ? ` KLS ${ekskul.mandatory_class}` : ''}
+                        </span>
+                      )}
+                    </div>
                     
                     <div className="flex gap-1">
                       <Button onClick={() => handleToggleStatus(ekskul)} variant="ghost" size="icon" className="h-8 w-8">
@@ -385,7 +402,40 @@ export default function EkskulManagement() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
+              {/* Mandatory ekskul toggle */}
+              <div className="space-y-3 pt-2 border-t border-pixel-gray/30">
+                <p className="text-xs text-pixel-lavender font-semibold uppercase tracking-wide">Pengaturan Wajib</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="e_mandatory"
+                    checked={form.is_mandatory}
+                    onChange={e => setForm({...form, is_mandatory: e.target.checked, mandatory_class: e.target.checked ? form.mandatory_class : ''})}
+                    className="h-4 w-4 accent-indigo-500"
+                  />
+                  <Label htmlFor="e_mandatory" className="cursor-pointer select-none">Ekskul Wajib (absen = langsung peringatan)</Label>
+                </div>
+                {form.is_mandatory && (
+                  <div className="space-y-1">
+                    <Label htmlFor="e_mandatory_class">Kelas yang Diwajibkan</Label>
+                    <select
+                      id="e_mandatory_class"
+                      className="pixel-input flex h-10 w-full rounded-none px-3 py-2 font-retro text-lg"
+                      value={form.mandatory_class}
+                      onChange={e => setForm({...form, mandatory_class: e.target.value})}
+                    >
+                      <option value="">-- Semua Kelas --</option>
+                      <option value="7">Kelas 7</option>
+                      <option value="8">Kelas 8</option>
+                      <option value="9">Kelas 9</option>
+                      <option value="7,8">Kelas 7 & 8</option>
+                      <option value="all">Semua Kelas</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   id="e_active"
