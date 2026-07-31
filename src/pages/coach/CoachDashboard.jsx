@@ -24,6 +24,7 @@ export default function CoachDashboard() {
   // Data for charts and warnings
   const [attendanceTrend, setAttendanceTrend] = useState([])
   const [attendanceWarnings, setAttendanceWarnings] = useState([])
+  const [selectedEkskulFilter, setSelectedEkskulFilter] = useState('')
 
  useEffect(() => {
  if (user) {
@@ -147,8 +148,19 @@ export default function CoachDashboard() {
                     const warningLevel = isMandatory
                       ? (alphaCount >= 3 || percentage < 70 ? 'TEGURAN' : 'PERINGATAN')
                       : (consecutiveAlpha >= 5 || percentage < 55 ? 'TEGURAN' : 'PERINGATAN')
+                    
+                    const warningReasons = []
+                    if (isMandatory) {
+                      if (alphaCount >= 1) warningReasons.push(`${alphaCount}x Alpha`)
+                      if (percentage < 80) warningReasons.push(`Kehadiran ${percentage}% (min. 80%)`)
+                    } else {
+                      if (consecutiveAlpha >= 3) warningReasons.push(`${consecutiveAlpha}x Alpha Berturut`)
+                      if (percentage < 70) warningReasons.push(`Kehadiran ${percentage}% (min. 70%)`)
+                    }
+
                     warnings.push({
                        id: enr.student_id + enr.extracurricular_id,
+                       ekskulId: enr.extracurricular_id,
                        name: enr.students?.full_name,
                        class: enr.students?.class,
                        ekskul: enr.extracurriculars?.name,
@@ -156,7 +168,8 @@ export default function CoachDashboard() {
                        consecutiveAlpha,
                        alphaCount,
                        isMandatory,
-                       warningLevel
+                       warningLevel,
+                       warningReasons
                     })
                  }
               })
@@ -365,13 +378,31 @@ export default function CoachDashboard() {
                  Siswa Perlu Perhatian
                </h2>
                <Card className="border-pixel-red/50 shadow-pixel-sm bg-pixel-panel overflow-hidden">
-                 <div className="bg-pixel-red/20 text-pixel-red text-xs p-3 font-retro font-semibold border-b border-pixel-red/30 flex items-center justify-between">
-                   <span>Warning Kehadiran</span>
-                   <span className="bg-pixel-red text-white px-2 py-0.5 rounded">{attendanceWarnings.length} Siswa</span>
+                 <div className="bg-pixel-red/20 text-pixel-red text-xs p-3 font-retro font-semibold border-b border-pixel-red/30 space-y-2">
+                   <div className="flex items-center justify-between">
+                     <span>Warning Kehadiran</span>
+                     <span className="bg-pixel-red text-white px-2 py-0.5 rounded">
+                       {attendanceWarnings.filter(w => !selectedEkskulFilter || w.ekskulId === selectedEkskulFilter).length} Siswa
+                     </span>
+                   </div>
+                   <div>
+                     <select
+                       value={selectedEkskulFilter}
+                       onChange={e => setSelectedEkskulFilter(e.target.value)}
+                       className="w-full text-[11px] bg-pixel-panel border border-pixel-red/30 rounded px-2 py-1 text-pixel-peach focus:outline-none"
+                     >
+                       <option value="">Semua Ekskul Asuhan</option>
+                       {managedEkskuls.map(e => (
+                         <option key={e.id} value={e.id}>{e.name}</option>
+                       ))}
+                     </select>
+                   </div>
                  </div>
                  <CardContent className="p-0">
                    <div className="max-h-[360px] overflow-y-auto pixel-scroll divide-y divide-pixel-gray/30">
-                     {attendanceWarnings.map(student => (
+                     {attendanceWarnings
+                       .filter(w => !selectedEkskulFilter || w.ekskulId === selectedEkskulFilter)
+                       .map(student => (
                        <div key={student.id} className={`p-4 hover:bg-pixel-navy/30 transition-colors border-l-2 ${
                          student.warningLevel === 'TEGURAN' ? 'border-l-pixel-red' : 'border-l-amber-500'
                        }`}>
@@ -385,17 +416,27 @@ export default function CoachDashboard() {
                            <span>{student.ekskul}{student.isMandatory ? ' (Wajib)' : ''}</span>
                            <span className="bg-pixel-gray/50 px-1.5 py-0.5 rounded text-[10px]">{student.class}</span>
                          </div>
-                         <div className="mt-1">
-                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                         <div className="mt-1 flex flex-wrap gap-1 items-center">
+                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
                              student.warningLevel === 'TEGURAN'
                                ? 'bg-pixel-red/20 text-pixel-red'
                                : 'bg-amber-900/30 text-amber-400'
                            }`}>
-                             {student.warningLevel} {student.consecutiveAlpha > 0 ? `· ${student.consecutiveAlpha}× berturut` : ''}
+                             {student.warningLevel}
                            </span>
+                           {student.warningReasons?.map((reason, ri) => (
+                             <span key={ri} className="text-[9px] bg-pixel-navy text-pixel-lavender border border-pixel-gray/30 px-1 py-0.5 rounded">
+                               {reason}
+                             </span>
+                           ))}
                          </div>
                        </div>
                      ))}
+                     {attendanceWarnings.filter(w => !selectedEkskulFilter || w.ekskulId === selectedEkskulFilter).length === 0 && (
+                       <div className="p-6 text-center text-pixel-lavender text-xs">
+                         Tidak ada siswa bermasalah di ekskul ini. 🎉
+                       </div>
+                     )}
                    </div>
                  </CardContent>
                </Card>
