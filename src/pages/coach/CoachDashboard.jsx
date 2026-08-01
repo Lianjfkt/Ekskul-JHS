@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import AnnouncementBanner from '../../components/shared/AnnouncementBanner'
 import { 
   Activity, CalendarDays, ClipboardCheck, GraduationCap, 
-  ArrowRight, Users, PlayCircle, Clock, AlertTriangle, TrendingUp
+  ArrowRight, Users, Clock, AlertTriangle, TrendingUp, CheckCircle
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer

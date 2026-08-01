@@ -6,13 +6,16 @@ export const useAuthStore = create((set, get) => ({
   role: null,
   studentId: null,
   isLoading: true,
+  _isFetching: false,
 
-  fetchUser: async () => {
-    set({ isLoading: true })
+  fetchUser: async (silent = false) => {
+    if (get()._isFetching) return
+    if (!silent) set({ isLoading: true })
+    set({ _isFetching: true })
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
     if (sessionError || !session) {
-      set({ user: null, role: null, studentId: null, isLoading: false })
+      set({ user: null, role: null, studentId: null, isLoading: false, _isFetching: false })
       return
     }
 
@@ -24,7 +27,7 @@ export const useAuthStore = create((set, get) => ({
 
     if (userError) {
       console.error('Error fetching user data:', userError)
-      set({ user: null, role: null, studentId: null, isLoading: false })
+      set({ user: null, role: null, studentId: null, isLoading: false, _isFetching: false })
       return
     }
 
@@ -32,7 +35,8 @@ export const useAuthStore = create((set, get) => ({
       user: session.user, 
       role: userData.role, 
       studentId: userData.student_id, 
-      isLoading: false 
+      isLoading: false,
+      _isFetching: false
     })
   },
 
@@ -56,5 +60,22 @@ export const useAuthStore = create((set, get) => ({
     set({ isLoading: true })
     await supabase.auth.signOut()
     set({ user: null, role: null, studentId: null, isLoading: false })
-  }
+  },
+
+  // Initialize auth state listener (call once on app mount)
+  initAuthListener: () => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_OUT' || !session) {
+          set({ user: null, role: null, studentId: null, isLoading: false })
+        } else if (event === 'TOKEN_REFRESHED' && session) {
+          // Token silently refreshed in background.
+          // Just update the user object from the new session — no DB call,
+          // no isLoading change, so the current page never blanks out.
+          set(state => ({ ...state, user: session.user }))
+        }
+      }
+    )
+    return subscription
+  },
 }))

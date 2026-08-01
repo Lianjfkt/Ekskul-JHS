@@ -389,7 +389,7 @@ export default function CoachAttendances() {
  ) : (
  <div className="p-8 text-center text-pixel-lavender bg-pixel-panel rounded-none border border-pixel-gray/30 shadow-pixel-sm flex flex-col items-center gap-2">
  <Info className="w-8 h-8 text-pixel-peach" />
- <span>Buat sesi latihan terlebih dahulu pada menu"Jadwal Sesi" sebelum menginput kehadiran.</span>
+ <span>Buat sesi latihan terlebih dahulu pada menu "Jadwal Sesi" sebelum menginput kehadiran.</span>
  </div>
  )}
  </div>

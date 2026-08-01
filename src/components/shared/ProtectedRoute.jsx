@@ -5,7 +5,11 @@ export const ProtectedRoute = ({ allowedRoles }) => {
   const { user, role, isLoading } = useAuthStore()
 
   if (isLoading) {
-    return <div className="flex h-screen w-screen items-center justify-center">Loading...</div>
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-pixel-navy">
+        <span className="font-retro text-2xl text-pixel-peach pixel-blink">Memuat...</span>
+      </div>
+    )
   }
 
   if (!user) {
@@ -19,3 +23,4 @@ export const ProtectedRoute = ({ allowedRoles }) => {
 
   return <Outlet />
 }
+

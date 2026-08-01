@@ -17,10 +17,15 @@ const queryClient = new QueryClient({
 
 function App() {
   const fetchUser = useAuthStore((state) => state.fetchUser)
+  const initAuthListener = useAuthStore((state) => state.initAuthListener)
 
   useEffect(() => {
     fetchUser()
-  }, [fetchUser])
+    const subscription = initAuthListener()
+    return () => {
+      subscription?.unsubscribe()
+    }
+  }, [fetchUser, initAuthListener])
 
   return (
     <QueryClientProvider client={queryClient}>
