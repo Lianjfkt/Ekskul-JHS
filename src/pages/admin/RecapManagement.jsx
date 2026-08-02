@@ -47,6 +47,28 @@ import {
 
 const monthsIndo = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 
+function getMondayOfCurrentWeek() {
+ const d = new Date()
+ const day = d.getDay()
+ const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+ const monday = new Date(d.setDate(diff))
+ monday.setHours(0,0,0,0)
+ return monday.toISOString().split('T')[0]
+}
+
+function getSundayOfCurrentWeek() {
+ const monday = new Date(getMondayOfCurrentWeek())
+ const sunday = new Date(monday.setDate(monday.getDate() + 6))
+ sunday.setHours(23,59,59,999)
+ return sunday.toISOString().split('T')[0]
+}
+
+function formatDateIndo(dateStr) {
+ if (!dateStr) return ''
+ const d = new Date(dateStr)
+ return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 function formatMonthYearIndo(yyyymm) {
  if (!yyyymm || yyyymm === 'unknown') return 'Bulan Tidak Diketahui'
  const [year, month] = yyyymm.split('-')
@@ -161,6 +183,8 @@ export default function RecapManagement() {
  const [searchQuery, setSearchQuery] = useState('')
  const [warningTypeFilter, setWarningTypeFilter] = useState('') // 'wajib' | 'pilihan' | ''
  const [warningLevelFilter, setWarningLevelFilter] = useState('') // 'TEGURAN' | 'PERINGATAN' | ''
+ const [trackingStartDate, setTrackingStartDate] = useState(getMondayOfCurrentWeek())
+ const [trackingEndDate, setTrackingEndDate] = useState(getSundayOfCurrentWeek())
 
  useEffect(() => {
   fetchData()
@@ -332,6 +356,69 @@ export default function RecapManagement() {
    e.coachName.toLowerCase().includes(searchQuery.toLowerCase())
   )
  }, [computedStats.ekskulSummaries, searchQuery])
+
+ // ─── Tab: Fill Tracking ───────────────────────────────────────────────────
+
+ const fillTrackingRows = useMemo(() => {
+  return extracurriculars
+   .filter(e => e.is_active)
+   .map(e => {
+    const ekskulSessions = sessions.filter(s => 
+     s.extracurricular_id === e.id && 
+     s.session_date >= trackingStartDate && 
+     s.session_date <= trackingEndDate
+    )
+    
+    let hasUnfilledAttendance = false
+    const sessionDetails = ekskulSessions.map(s => {
+     const sessionAttendancesCount = attendances.filter(a => a.session_id === s.id).length
+     const isFilled = sessionAttendancesCount > 0
+     if (!isFilled) {
+      hasUnfilledAttendance = true
+     }
+     return {
+      id: s.id,
+      date: s.session_date,
+      topic: s.topic || 'Tanpa Topik',
+      isFilled
+     }
+    })
+    
+    let status = 'completed' // 'no_session' | 'unfilled_attendance' | 'completed'
+    if (ekskulSessions.length === 0) {
+     status = 'no_session'
+    } else if (hasUnfilledAttendance) {
+     status = 'unfilled_attendance'
+    }
+    
+    const coachNames = [e.coach?.full_name, e.coach2?.full_name, e.coach3?.full_name].filter(Boolean).join(', ') || 'Belum ditunjuk'
+    
+    return {
+     id: e.id,
+     name: e.name,
+     coachName: coachNames,
+     sessionsCount: ekskulSessions.length,
+     sessionDetails,
+     status
+    }
+   })
+   .filter(e =>
+    e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    e.coachName.toLowerCase().includes(searchQuery.toLowerCase())
+   )
+ }, [extracurriculars, sessions, attendances, trackingStartDate, trackingEndDate, searchQuery])
+
+ const trackingStats = useMemo(() => {
+  let noSession = 0
+  let unfilledAttendance = 0
+  let completed = 0
+  fillTrackingRows.forEach(r => {
+   if (r.status === 'no_session') noSession++
+   else if (r.status === 'unfilled_attendance') unfilledAttendance++
+   else completed++
+  })
+  return { total: fillTrackingRows.length, noSession, unfilledAttendance, completed }
+ }, [fillTrackingRows])
 
  // ─── Tab 2: Attendance Report ──────────────────────────────────────────────
 
@@ -653,6 +740,83 @@ export default function RecapManagement() {
   exportToExcel(rows, ['NIS','Nama Siswa','Kelas','Ekstrakurikuler','Semester','Tahun Ajaran','Hadir','Izin','Alpha','Total Sesi','Persentase Kehadiran'], 'Laporan Kehadiran', 'rekap_kehadiran_siswa.xlsx')
  }
 
+ const exportCoachSessionsToExcel = () => {
+  const rows = coachSessionReportRows.map(r => [
+   r.coachName, r.coachEmail, r.ekskulName, formatPeriodIndo(r.periodKey), r.sessionsCount,
+   r.sessionsList.map(s => {
+    const badge = s.is_special_training && s.event_name ? ` [KHUSUS: ${s.event_name}]` : ''
+    return `${s.session_date} (${s.topic || 'Sesi Latihan'}${badge})`
+   }).join('; ')
+  ])
+  exportToExcel(rows, ['Nama Pelatih','Email Pelatih','Ekstrakurikuler','Periode','Jumlah Sesi','Daftar Sesi'], 'Laporan Sesi Pelatih', 'rekap_sesi_pelatih.xlsx')
+ }
+
+ const exportTrackingToExcel = () => {
+  const rows = fillTrackingRows.map(r => [
+   r.name,
+   r.coachName,
+   r.sessionsCount,
+   r.status === 'no_session' ? 'Belum Membuat Sesi' : r.status === 'unfilled_attendance' ? 'Absensi Belum Diisi' : 'Lengkap',
+   r.sessionDetails.map(s => `${s.date} (${s.isFilled ? 'Lengkap' : 'Belum Absen'})`).join('; ')
+  ])
+  exportToExcel(
+   rows,
+   ['Nama Ekstrakurikuler', 'Pelatih', 'Jumlah Sesi', 'Status Pengisian', 'Detail Sesi'],
+   'Tracking Pengisian',
+   'rekap_tracking_pengisian.xlsx'
+  )
+ }
+
+ const copyAllToWhatsApp = () => {
+  const problematicRows = fillTrackingRows.filter(r => r.status !== 'completed')
+  if (problematicRows.length === 0) {
+   alert('Semua ekskul sudah melengkapi sesi dan absensi!')
+   return
+  }
+  
+  let text = `*🚨 [LAPORAN PENGISIAN EKSKUL] 🚨*\n`
+  text += `Periode: ${formatDateIndo(trackingStartDate)} s.d. ${formatDateIndo(trackingEndDate)}\n\n`
+  text += `Berikut adalah daftar ekskul yang belum melengkapi sesi/absensi:\n\n`
+  
+  problematicRows.forEach((r, idx) => {
+   text += `${idx + 1}. *${r.name}* (Pelatih: ${r.coachName})\n`
+   if (r.status === 'no_session') {
+    text += `   - Belum membuat sesi pertemuan.\n`
+   } else {
+    r.sessionDetails.forEach(s => {
+     if (!s.isFilled) {
+      text += `   - Sesi ${formatDateIndo(s.date)} (${s.topic}): Absensi belum diisi.\n`
+     }
+    })
+   }
+  })
+  
+  text += `\nMohon para pelatih terkait segera melengkapinya di aplikasi. Terima kasih.`
+  
+  navigator.clipboard.writeText(text)
+  alert('Format laporan WhatsApp berhasil disalin!')
+ }
+
+ const copySingleToWhatsApp = (row) => {
+  let text = `*Halo ${row.coachName},*\n\n`
+  text += `Mohon segera melengkapi administrasi ekskul *${row.name}* untuk periode ${formatDateIndo(trackingStartDate)} s.d. ${formatDateIndo(trackingEndDate)}:\n`
+  
+  if (row.status === 'no_session') {
+   text += `- Belum membuat sesi pertemuan di rentang tanggal tersebut.\n`
+  } else {
+   row.sessionDetails.forEach(s => {
+    if (!s.isFilled) {
+     text += `- Sesi tanggal ${formatDateIndo(s.date)} (${s.topic}): Absensi belum diisi.\n`
+    }
+   })
+  }
+  
+  text += `\nSilakan melengkapi data tersebut melalui portal pelatih. Terima kasih!`
+  
+  navigator.clipboard.writeText(text)
+  alert(`Pesan pengingat untuk ${row.name} berhasil disalin!`)
+ }
+
  const exportGradesToExcel = () => {
   const rows = gradeReportRows.map(r => [r.nis, r.studentName, r.class, r.ekskulName, r.semester, r.academicYear, r.attitude, r.skill, r.activity, r.avg, r.predikat, r.notes])
   exportToExcel(rows, ['NIS','Nama Siswa','Kelas','Ekstrakurikuler','Semester','Tahun Ajaran','Nilai Sikap','Nilai Keterampilan','Nilai Pengetahuan','Rata-rata','Predikat','Catatan'], 'Laporan Nilai', 'rekap_nilai_siswa.xlsx')
@@ -681,16 +845,6 @@ export default function RecapManagement() {
   )
  }
 
- const exportCoachSessionsToExcel = () => {
-  const rows = coachSessionReportRows.map(r => [
-   r.coachName, r.coachEmail, r.ekskulName, formatPeriodIndo(r.periodKey), r.sessionsCount,
-   r.sessionsList.map(s => {
-    const badge = s.is_special_training && s.event_name ? ` [KHUSUS: ${s.event_name}]` : ''
-    return `${s.session_date} (${s.topic || 'Sesi Latihan'}${badge})`
-   }).join('; ')
-  ])
-  exportToExcel(rows, ['Nama Pelatih','Email Pelatih','Ekstrakurikuler','Periode','Jumlah Sesi','Daftar Sesi'], 'Laporan Sesi Pelatih', 'rekap_sesi_pelatih.xlsx')
- }
 
  const exportCoachSessionsDetailToExcel = async (rowGroup) => {
   const XLSX = await import('xlsx')
@@ -764,6 +918,7 @@ export default function RecapManagement() {
 
  const tabs = [
   { id: 'overview', label: 'Ringkasan Ekskul' },
+  { id: 'fillTracking', label: 'Tracking Pengisian' },
   { id: 'warnings', label: `⚠️ Siswa Bermasalah${warningRows.length > 0 ? ` (${warningRows.length})` : ''}` },
   { id: 'attendance', label: 'Laporan Absensi Siswa' },
   { id: 'grades', label: 'Laporan Nilai Siswa' },
@@ -951,6 +1106,7 @@ export default function RecapManagement() {
         type="text"
         placeholder={
          activeTab === 'overview' ? "Cari ekskul atau pelatih..." :
+         activeTab === 'fillTracking' ? "Cari ekskul atau pelatih..." :
          activeTab === 'coachSessions' ? "Cari pelatih, ekskul atau materi..." :
          activeTab === 'activity' ? "Cari nama ekskul..." :
          "Cari nama siswa atau NIS..."
@@ -960,6 +1116,19 @@ export default function RecapManagement() {
         className="w-full text-sm pl-9 pr-4 py-2 bg-pixel-panel border border-pixel-gray rounded-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
        />
       </div>
+
+      {activeTab === 'fillTracking' && (
+       <>
+        <div className="flex items-center gap-2">
+         <span className="text-xs text-pixel-lavender">Mulai:</span>
+         <input type="date" value={trackingStartDate} onChange={e => setTrackingStartDate(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        </div>
+        <div className="flex items-center gap-2">
+         <span className="text-xs text-pixel-lavender">Selesai:</span>
+         <input type="date" value={trackingEndDate} onChange={e => setTrackingEndDate(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        </div>
+       </>
+      )}
 
       {(activeTab === 'attendance' || activeTab === 'grades') && (
        <>
@@ -1031,6 +1200,7 @@ export default function RecapManagement() {
       <Button
        onClick={
         activeTab === 'overview' ? exportEkskulToExcel :
+        activeTab === 'fillTracking' ? exportTrackingToExcel :
         activeTab === 'attendance' ? exportAttendanceToExcel :
         activeTab === 'grades' ? exportGradesToExcel :
         activeTab === 'coachSessions' ? exportCoachSessionsToExcel :
@@ -1039,6 +1209,7 @@ export default function RecapManagement() {
        }
        disabled={
         (activeTab === 'overview' && filteredEkskulSummaries.length === 0) ||
+        (activeTab === 'fillTracking' && fillTrackingRows.length === 0) ||
         (activeTab === 'attendance' && attendanceReportRows.length === 0) ||
         (activeTab === 'grades' && gradeReportRows.length === 0) ||
         (activeTab === 'coachSessions' && coachSessionReportRows.length === 0) ||
@@ -1111,6 +1282,137 @@ export default function RecapManagement() {
       </div>
      </div>
     )}
+
+     {/* ═══ TAB: Tracking Pengisian Sesi & Absensi ═══════════════════════════ */}
+     {activeTab === 'fillTracking' && (
+      <div className="space-y-6">
+       {/* Stats Cards */}
+       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+         <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+           <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider">Total Ekskul Aktif</p>
+           <h3 className="text-2xl font-extrabold text-pixel-white">{trackingStats.total}</h3>
+          </div>
+          <div className="p-2.5 bg-pixel-navy rounded-none text-pixel-blue">
+           <Users className="w-5 h-5" />
+          </div>
+         </CardContent>
+        </Card>
+
+        <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+         <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+           <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider">Belum Buat Sesi</p>
+           <h3 className="text-2xl font-extrabold text-pixel-red">{trackingStats.noSession}</h3>
+          </div>
+          <div className="p-2.5 bg-pixel-red/10 rounded-none text-pixel-red">
+           <X className="w-5 h-5" />
+          </div>
+         </CardContent>
+        </Card>
+
+        <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+         <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+           <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider">Absensi Belum Diisi</p>
+           <h3 className="text-2xl font-extrabold text-pixel-orange">{trackingStats.unfilledAttendance}</h3>
+          </div>
+          <div className="p-2.5 bg-amber-950/20 rounded-none text-pixel-orange">
+           <AlertCircle className="w-5 h-5" />
+          </div>
+         </CardContent>
+        </Card>
+
+        <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+         <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+           <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider">Lengkap</p>
+           <h3 className="text-2xl font-extrabold text-pixel-green">{trackingStats.completed}</h3>
+          </div>
+          <div className="p-2.5 bg-pixel-green/10 rounded-none text-pixel-green">
+           <CheckCircle className="w-5 h-5" />
+          </div>
+         </CardContent>
+        </Card>
+       </div>
+
+       {/* Broadcast WhatsApp & Actions */}
+       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-pixel-navy/50 p-4 border border-pixel-gray/30">
+        <div className="space-y-1">
+         <h4 className="font-bold text-sm text-pixel-white">Laporan Pengingat Mingguan</h4>
+         <p className="text-xs text-pixel-lavender">Salin format laporan pengingat untuk seluruh pelatih yang belum melengkapi data.</p>
+        </div>
+        <Button onClick={copyAllToWhatsApp} className="bg-pixel-green hover:bg-pixel-green/90 text-pixel-navy font-bold shadow-pixel-sm flex items-center gap-2">
+         <ClipboardCheck className="w-4 h-4" />
+         Salin Laporan WA (Semua)
+        </Button>
+       </div>
+
+       {/* Table */}
+       <div className="bg-pixel-panel border border-pixel-gray/30 rounded-none shadow-pixel-sm overflow-hidden">
+        <div className="overflow-x-auto">
+         <table className="w-full text-left border-collapse text-sm">
+          <thead>
+           <tr className="bg-pixel-navy/75 border-b border-pixel-gray/30 text-pixel-lavender font-semibold">
+            <th className="p-4 pl-6">Ekstrakurikuler</th>
+            <th className="p-4">Pelatih</th>
+            <th className="p-4 text-center">Jumlah Sesi</th>
+            <th className="p-4">Detail Sesi di Periode Ini</th>
+            <th className="p-4 text-center">Status</th>
+            <th className="p-4 text-center pr-6">Aksi</th>
+           </tr>
+          </thead>
+          <tbody className="divide-y-2 divide-pixel-gray/30">
+           {fillTrackingRows.length === 0 ? (
+            <tr><td colSpan="6" className="p-8 text-center text-pixel-lavender">Tidak ada ekskul yang cocok.</td></tr>
+           ) : fillTrackingRows.map(r => (
+            <tr key={r.id} className="hover:bg-pixel-navy/30">
+             <td className="p-4 pl-6 font-semibold text-pixel-white">{r.name}</td>
+             <td className="p-4 text-pixel-peach text-sm">{r.coachName}</td>
+             <td className="p-4 text-center font-bold text-pixel-white">{r.sessionsCount}</td>
+             <td className="p-4 text-sm text-pixel-lavender">
+              {r.sessionsCount === 0 ? (
+               <span className="italic text-pixel-lavender/60">Tidak ada pertemuan</span>
+              ) : (
+               <div className="space-y-1">
+                {r.sessionDetails.map((s, idx) => (
+                 <div key={s.id || idx} className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono bg-pixel-navy px-1.5 py-0.5 text-pixel-peach">{formatDateIndo(s.date)}</span>
+                  <span className="text-pixel-white text-xs truncate max-w-[200px]" title={s.topic}>{s.topic}</span>
+                  <span className={`inline-block w-2 h-2 rounded-full ${s.isFilled ? 'bg-pixel-green' : 'bg-pixel-red animate-pulse'}`} title={s.isFilled ? 'Absensi lengkap' : 'Absensi belum diisi'} />
+                 </div>
+                ))}
+               </div>
+              )}
+             </td>
+             <td className="p-4 text-center">
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-none text-[10px] font-bold uppercase ${
+               r.status === 'no_session' ? 'bg-pixel-red/10 text-pixel-red border border-pixel-red/30' :
+               r.status === 'unfilled_attendance' ? 'bg-amber-900/30 text-pixel-orange border border-pixel-orange/30' :
+               'bg-pixel-green/10 text-pixel-green border border-pixel-green/30'
+              }`}>
+               {r.status === 'no_session' ? 'Belum Buat Sesi' :
+                r.status === 'unfilled_attendance' ? 'Belum Absen' : 'Lengkap'}
+              </span>
+             </td>
+             <td className="p-4 text-center pr-6 text-2xs">
+              {r.status !== 'completed' ? (
+               <Button size="xs" variant="outline" onClick={() => copySingleToWhatsApp(r)} className="border-pixel-gray hover:bg-pixel-navy/50 text-pixel-peach text-2xs">
+                Salin Pengingat
+               </Button>
+              ) : (
+               <span className="text-pixel-green font-semibold">✓ Selesai</span>
+              )}
+             </td>
+            </tr>
+           ))}
+          </tbody>
+         </table>
+        </div>
+       </div>
+      </div>
+     )}
 
     {/* ═══ TAB: Siswa Bermasalah ════════════════════════════════════════════ */}
     {activeTab === 'warnings' && (
