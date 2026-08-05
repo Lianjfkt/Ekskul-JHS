@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParentChildren } from '../../hooks/useParentChildren'
 import { useAttendanceSummary } from '../../hooks/useAttendanceSummary'
 import { supabase } from '../../lib/supabaseClient'
@@ -250,6 +250,7 @@ export default function ParentAttendance() {
  className="w-full min-w-[300px] border-none font-sans"
  tileClassName={getTileClassName}
  tileContent={getTileContent}
+ maxDate={new Date()}
  />
  </div>
  )}

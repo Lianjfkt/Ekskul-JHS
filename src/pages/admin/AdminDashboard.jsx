@@ -90,22 +90,17 @@ export default function AdminDashboard() {
 
   // 3. Hitung Mandatory Violations secara reaktif
   // Gunakan startsWith agar cocok dengan format kelas seperti '7A', '7B', '8C', dst.
-  const mandatoryViolations = trackingStudents.filter(student => {
+  const mandatoryViolations = trackingStudents.flatMap(student => {
     const enrolledNames = student.enrolled_ekskuls?.toLowerCase() || ''
     const grade = student.class?.trim().charAt(0)
     
-    if (grade === '7') {
-      if (!enrolledNames.includes('pramuka')) {
-        student.violationType = 'Wajib Pramuka'
-        return true
-      }
-    } else if (grade === '8') {
-      if (!enrolledNames.includes('karate') && !enrolledNames.includes('taekwondo')) {
-        student.violationType = 'Wajib Karate / Taekwondo'
-        return true
-      }
+    if (grade === '7' && !enrolledNames.includes('pramuka')) {
+      return [{ ...student, violationType: 'Wajib Pramuka' }]
     }
-    return false
+    if (grade === '8' && !enrolledNames.includes('karate') && !enrolledNames.includes('taekwondo')) {
+      return [{ ...student, violationType: 'Wajib Karate / Taekwondo' }]
+    }
+    return []
   })
 
   // 4. Hitung jumlah siswa per kelas (startsWith agar cocok dengan '7A', '7B', '8C', dll.)

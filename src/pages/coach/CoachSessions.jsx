@@ -277,6 +277,16 @@ export default function CoachSessions() {
    }
  }
 
+ // Cek apakah form sudah diisi (kotor) sebelum menutup modal
+ const handleCloseModal = () => {
+   const isDirty = form.topic.trim() !== '' ||
+     form.notes.trim() !== '' ||
+     form.event_name.trim() !== '' ||
+     form.selected_students.length > 0
+   if (isDirty && !confirm('Data yang sudah diisi akan hilang. Yakin ingin menutup?')) return
+   setIsModalOpen(false)
+ }
+
  return (
  <div className="space-y-6">
  {/* Alert Status */}
@@ -390,7 +400,7 @@ export default function CoachSessions() {
  <FileText className="w-5 h-5 text-primary" />
  {selectedSession ? 'Ubah Sesi Latihan' : 'Buat Sesi Latihan Baru'}
  </h3>
- <Button onClick={() => setIsModalOpen(false)} variant="ghost" size="icon" className="h-8 w-8 rounded-none">
+ <Button onClick={handleCloseModal} variant="ghost" size="icon" className="h-8 w-8 rounded-none">
  <X className="w-4 h-4" />
  </Button>
  </div>
@@ -562,7 +572,7 @@ export default function CoachSessions() {
  </div>
 
  <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel mt-2 py-2">
- <Button type="button" onClick={() => setIsModalOpen(false)} variant="outline">Batal</Button>
+ <Button type="button" onClick={handleCloseModal} variant="outline">Batal</Button>
  <Button type="submit">Simpan Sesi</Button>
  </div>
  </form>

@@ -27,9 +27,9 @@ export function useGrades(studentId, semesterFilter = null) {
       if (error) throw error
 
       const enriched = (data || []).map(g => {
-        const avg = Math.round(
-          ((g.attitude_score || 0) + (g.skill_score || 0) + (g.activity_score || 0)) / 3
-        )
+        // Hitung rata-rata hanya dari nilai yang terisi (null tidak dihitung sebagai 0)
+        const scores = [g.attitude_score, g.skill_score, g.activity_score].filter(v => v !== null && v !== undefined)
+        const avg = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
         let predikat = 'D'
         if (avg >= 90) predikat = 'A'
         else if (avg >= 75) predikat = 'B'

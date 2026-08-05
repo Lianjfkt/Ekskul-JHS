@@ -68,6 +68,9 @@ export const useAuthStore = create((set, get) => ({
       async (event, session) => {
         if (event === 'SIGNED_OUT' || !session) {
           set({ user: null, role: null, studentId: null, isLoading: false })
+        } else if (event === 'SIGNED_IN') {
+          // Login dari tab lain — refresh data user agar state tetap sinkron
+          await get().fetchUser(true)
         } else if (event === 'TOKEN_REFRESHED' && session) {
           // Token silently refreshed in background.
           // Just update the user object from the new session — no DB call,

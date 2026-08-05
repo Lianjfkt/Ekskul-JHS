@@ -20,7 +20,13 @@ export default function CoachGrades() {
  const [managedEkskuls, setManagedEkskuls] = useState([])
  const [selectedEkskul, setSelectedEkskul] = useState('')
  const [selectedSemester, setSelectedSemester] = useState('Pertengahan Semester Ganjil')
- const [selectedAcademicYear, setSelectedAcademicYear] = useState('2026/2027')
+ // Auto-hitung tahun ajaran: Juli-Des = tahun ajaran baru, Jan-Jun = tahun ajaran lama
+ const getDefaultAcademicYear = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  return now.getMonth() >= 6 ? `${year}/${year + 1}` : `${year - 1}/${year}`
+ }
+ const [selectedAcademicYear, setSelectedAcademicYear] = useState(getDefaultAcademicYear)
 
  // Data States
  const [students, setStudents] = useState([])
@@ -81,6 +87,7 @@ export default function CoachGrades() {
  const studentList = enrollments ? enrollments.map(e => e.student) : []
 
  // 1.1 Fetch sessions to calculate attendance percentage dynamically
+ // Only count sessions that have been filled (isFilled = at least one attendance record)
  const { data: sessionsData } = await supabase
  .from('sessions')
  .select('id')
@@ -91,15 +98,22 @@ export default function CoachGrades() {
  if (sessionIds.length > 0) {
  const { data: atts } = await supabase
  .from('attendances')
- .select('student_id, status')
+ .select('student_id, status, session_id')
  .in('session_id', sessionIds)
  attendancesData = atts || []
  }
 
+ // Sesi yang sudah terisi (ada minimal 1 attendance record)
+ const filledSessionIds = new Set(
+ attendancesData.map(a => a.session_id)
+ )
+
  // Map dynamic attendance to each student object
  const enrichedStudents = studentList.map(student => {
- const studentAtts = attendancesData.filter(a => a.student_id === student.id)
- const total = studentAtts.length
+ const studentAtts = attendancesData.filter(
+ a => a.student_id === student.id && filledSessionIds.has(a.session_id)
+ )
+ const total = filledSessionIds.size // Total sesi yang sudah diisi
  const hadir = studentAtts.filter(a => a.status === 'hadir').length
  const attendancePercentage = total > 0 ? Math.round((hadir / total) * 100) : 0
  return {
@@ -181,26 +195,16 @@ export default function CoachGrades() {
  setSuccessMsg('')
 
  try {
- // 1. Delete all existing grades for this combination (to avoid duplicate inserts)
- const { error: delError } = await supabase
- .from('grades')
- .delete()
- .eq('extracurricular_id', selectedEkskul)
- .eq('semester', selectedSemester)
- .eq('academic_year', selectedAcademicYear)
- 
- if (delError) throw delError
-
- // 2. Format new grades records to insert (only map students where at least one score is entered)
- const recordsToInsert = students
- .map(student => {
+ // Upsert nilai — atomik: update jika sudah ada, insert jika baru.
+ // Requires unique constraint: UNIQUE (student_id, extracurricular_id, semester, academic_year)
+ const recordsToUpsert = students.map(student => {
  const sheet = gradesSheet[student.id] || {}
- 
+
  // Parse score strings to integers or set to null
  const att = sheet.attitude_score !== '' ? parseInt(sheet.attitude_score) : null
  const sk = sheet.skill_score !== '' ? parseInt(sheet.skill_score) : null
  const act = sheet.activity_score !== '' ? parseInt(sheet.activity_score) : null
- 
+
  return {
  student_id: student.id,
  extracurricular_id: selectedEkskul,
@@ -215,11 +219,11 @@ export default function CoachGrades() {
  }
  })
 
- if (recordsToInsert.length > 0) {
- const { error: insError } = await supabase
+ if (recordsToUpsert.length > 0) {
+ const { error: upsertError } = await supabase
  .from('grades')
- .insert(recordsToInsert)
- if (insError) throw insError
+ .upsert(recordsToUpsert, { onConflict: 'student_id,extracurricular_id,semester,academic_year' })
+ if (upsertError) throw upsertError
  }
 
  setSuccessMsg('Nilai perkembangan siswa berhasil disimpan.')
