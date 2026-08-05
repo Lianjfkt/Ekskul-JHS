@@ -26,6 +26,7 @@ export default function ComplianceManagement() {
   const [sessions, setSessions] = useState([])
   const [attendances, setAttendances] = useState([])
   const [grades, setGrades] = useState([])
+  const [specialParticipants, setSpecialParticipants] = useState([])
 
   // Modal State for Absence Detail
   const [selectedAbsenceDetail, setSelectedAbsenceDetail] = useState(null)
@@ -44,14 +45,16 @@ export default function ComplianceManagement() {
         { data: enrollmentsData, error: enErr },
         { data: sessionsData, error: sesErr },
         { data: attendancesData, error: aErr },
-        { data: gradesData, error: gErr }
+        { data: gradesData, error: gErr },
+        { data: spData, error: spErr }
       ] = await Promise.all([
         supabase.from('students').select('*').order('full_name', { ascending: true }),
         supabase.from('extracurriculars').select('*'),
         supabase.from('enrollments').select('*, extracurricular:extracurricular_id(*)').eq('status', 'active'),
         supabase.from('sessions').select('*').order('session_date', { ascending: true }),
         supabase.from('attendances').select('*'),
-        supabase.from('grades').select('*, extracurricular:extracurricular_id(*)')
+        supabase.from('grades').select('*, extracurricular:extracurricular_id(*)'),
+        supabase.from('special_session_participants').select('*')
       ])
 
       if (sErr) throw sErr
@@ -60,6 +63,7 @@ export default function ComplianceManagement() {
       if (sesErr) throw sesErr
       if (aErr) throw aErr
       if (gErr) throw gErr
+      if (spErr) throw spErr
 
       setStudents(studentsData || [])
       setExtracurriculars(ekskulData || [])
@@ -67,6 +71,7 @@ export default function ComplianceManagement() {
       setSessions(sessionsData || [])
       setAttendances(attendancesData || [])
       setGrades(gradesData || [])
+      setSpecialParticipants(spData || [])
     } catch (err) {
       console.error('Error fetching compliance data:', err.message)
       setErrorMsg('Gagal memuat data kepatuhan: ' + err.message)
@@ -182,11 +187,18 @@ export default function ComplianceManagement() {
       const ekskul = en.extracurricular
       if (!student || !ekskul) return
 
-      const ekskulSessions = sessions.filter(s => s.extracurricular_id === ekskul.id)
-      const totalSessions = ekskulSessions.length
+      // Filter hanya sesi yang sudah diisi absensinya DAN siswa terdaftar/diundang jika itu sesi khusus
+      const validSessions = sessions.filter(s => {
+        if (s.extracurricular_id !== ekskul.id) return false
+        const isFilled = attendances.some(a => a.session_id === s.id)
+        const isInvited = !s.is_special_training || specialParticipants.some(sp => sp.session_id === s.id && sp.student_id === student.id)
+        return isFilled && isInvited
+      })
+
+      const totalSessions = validSessions.length
       if (totalSessions === 0) return
 
-      const sessionIds = ekskulSessions.map(s => s.id)
+      const sessionIds = validSessions.map(s => s.id)
       const studentAtts = attendances.filter(a => a.student_id === student.id && sessionIds.includes(a.session_id))
       const attendedCount = studentAtts.filter(a => a.status === 'hadir').length
       const percentage = Math.round((attendedCount / totalSessions) * 100)
@@ -210,12 +222,12 @@ export default function ComplianceManagement() {
       }
 
       // Check consecutive absences (3x Alpha)
-      const sortedAtts = ekskulSessions.map(session => {
+      const sortedAtts = validSessions.map(session => {
         const att = studentAtts.find(a => a.session_id === session.id)
         return {
           session_date: session.session_date,
           topic: session.topic,
-          status: att ? att.status : 'alpha', // assume alpha if no attendance record but session existed
+          status: att ? att.status : 'alpha', // fallback just in case
           notes: att ? att.notes : 'Tidak ada keterangan'
         }
       })
@@ -303,7 +315,7 @@ export default function ComplianceManagement() {
     })
 
     return { conflicts, lowAttendance, consecutiveAbsences, missingMandatory, lowAttitude }
-  }, [loading, students, extracurriculars, enrollments, sessions, attendances, grades])
+  }, [loading, students, extracurriculars, enrollments, sessions, attendances, grades, specialParticipants])
 
   // --- Filtering ---
   const getFilteredData = () => {
