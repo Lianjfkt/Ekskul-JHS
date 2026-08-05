@@ -200,14 +200,16 @@ export default function RecapManagement() {
     { data: gradesData, error: gErr },
     { data: sessionsData, error: sErr },
     { data: attendancesData, error: aErr },
-    { data: coachesData, error: cErr }
+    { data: coachesData, error: cErr },
+    { data: spData, error: spErr }
    ] = await Promise.all([
     supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email), coach3:coach_id_3 (id, full_name, email)').order('name', { ascending: true }),
     supabase.from('enrollments').select('*, student:student_id (id, nis, full_name, class)').eq('status', 'active'),
     supabase.from('grades').select('*, student:student_id (id, nis, full_name, class), extracurricular:extracurricular_id (id, name)'),
     supabase.from('sessions').select('*, creator:created_by (id, full_name, email), extracurricular:extracurricular_id (id, name, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email), coach3:coach_id_3 (id, full_name, email)), session_coaches (id, coach:coach_id (id, full_name, email))').order('session_date', { ascending: false }),
     supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)'),
-    supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true })
+    supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true }),
+    supabase.from('special_session_participants').select('*')
    ])
 
    if (eErr) throw eErr
@@ -509,11 +511,17 @@ export default function RecapManagement() {
 
   let consecutive = 0
   for (const session of ekskulSessions) {
-   const att = attendances.find(a => a.session_id === session.id && a.student_id === studentId)
-   if (!att || att.status === 'alpha') {
-    consecutive++
-   } else {
-    break
+   const sessionAtts = attendances.filter(a => a.session_id === session.id)
+   const isFilled = sessionAtts.length > 0
+   const isInvited = !session.is_special_training || specialParticipants.some(sp => sp.session_id === session.id && sp.student_id === studentId)
+   
+   if (isFilled && isInvited) {
+    const att = sessionAtts.find(a => a.student_id === studentId)
+    if (att && att.status === 'alpha') {
+     consecutive++
+    } else {
+     break
+    }
    }
   }
   return consecutive
@@ -622,7 +630,7 @@ export default function RecapManagement() {
    if (a.warningLevel !== b.warningLevel) return a.warningLevel === 'TEGURAN' ? -1 : 1
    return a.percentage - b.percentage
   })
- }, [enrollments, extracurriculars, attendances, sessions, selectedEkskul, searchQuery, warningTypeFilter, warningLevelFilter])
+ }, [enrollments, extracurriculars, attendances, sessions, specialParticipants, selectedEkskul, searchQuery, warningTypeFilter, warningLevelFilter])
 
  const warningCount = useMemo(() => warningRows.length, [warningRows])
  const teguranCount = useMemo(() => warningRows.filter(r => r.warningLevel === 'TEGURAN').length, [warningRows])
