@@ -191,31 +191,24 @@ export default function CoachAttendances() {
  setSuccessMsg('')
 
  try {
- // 1. Delete all existing attendance records for this session (to avoid duplicate inserts)
- const { error: delError } = await supabase
- .from('attendances')
- .delete()
- .eq('session_id', selectedSession)
- 
- if (delError) throw delError
+  // Upsert attendance records — atomically update existing or insert new.
+  // Relies on unique constraint: unique_session_student_attendance (session_id, student_id)
+  const recordsToUpsert = students.map(student => ({
+  session_id: selectedSession,
+  student_id: student.id,
+  status: attendanceSheet[student.id]?.status || 'hadir',
+  notes: attendanceSheet[student.id]?.notes || '',
+  recorded_at: new Date().toISOString()
+  }))
 
- // 2. Format new attendance records to insert
- const recordsToInsert = students.map(student => ({
- session_id: selectedSession,
- student_id: student.id,
- status: attendanceSheet[student.id]?.status || 'hadir',
- notes: attendanceSheet[student.id]?.notes || '',
- recorded_at: new Date().toISOString()
- }))
+  if (recordsToUpsert.length > 0) {
+  const { error: upsertError } = await supabase
+   .from('attendances')
+   .upsert(recordsToUpsert, { onConflict: 'session_id,student_id' })
+  if (upsertError) throw upsertError
+  }
 
- if (recordsToInsert.length > 0) {
- const { error: insError } = await supabase
- .from('attendances')
- .insert(recordsToInsert)
- if (insError) throw insError
- }
-
- setSuccessMsg('Absensi berhasil disimpan.')
+  setSuccessMsg('Absensi berhasil disimpan.')
  } catch (err) {
  console.error(err)
  setErrorMsg('Gagal menyimpan absensi: ' + err.message)
