@@ -173,6 +173,7 @@ export default function RecapManagement() {
  const [sessions, setSessions] = useState([])
  const [attendances, setAttendances] = useState([])
  const [coaches, setCoaches] = useState([])
+ const [specialParticipants, setSpecialParticipants] = useState([])
 
  // Filters
  const [selectedEkskul, setSelectedEkskul] = useState('')
@@ -218,6 +219,7 @@ export default function RecapManagement() {
    if (sErr) throw sErr
    if (aErr) throw aErr
    if (cErr) throw cErr
+   if (spErr) throw spErr
 
    setExtracurriculars(ekskulData || [])
    setEnrollments(enrollmentsData || [])
@@ -225,6 +227,7 @@ export default function RecapManagement() {
    setSessions(sessionsData || [])
    setAttendances(attendancesData || [])
    setCoaches(coachesData || [])
+   setSpecialParticipants(spData || [])
   } catch (err) {
    console.error('Error fetching recap data:', err.message)
    setErrorMsg('Gagal memuat data laporan: ' + err.message)
