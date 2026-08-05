@@ -144,14 +144,26 @@ export default function StudentDashboard() {
 
  const { data: sessions } = await supabase
  .from('sessions')
- .select('id, session_date, topic, extracurriculars(name)')
+ .select('id, session_date, topic, is_special_training, event_name, extracurriculars(name)')
  .in('extracurricular_id', ekskulIds)
  .gte('session_date', today.toISOString().split('T')[0])
  .lte('session_date', weekEnd.toISOString().split('T')[0])
  .order('session_date', { ascending: true })
- .limit(5)
 
- setUpcomingSessions(sessions || [])
+ // Fetch special session invitations for this student
+ const { data: invites } = await supabase
+  .from('special_session_participants')
+  .select('session_id')
+  .eq('student_id', studentId)
+
+ const invitedSessionIds = new Set((invites || []).map(i => i.session_id))
+
+ const filtered = (sessions || []).filter(s => {
+  if (!s.is_special_training) return true
+  return invitedSessionIds.has(s.id)
+ }).slice(0, 5)
+
+ setUpcomingSessions(filtered)
  }
  } catch (err) {
  console.error('StudentDashboard error:', err)
