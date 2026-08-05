@@ -107,37 +107,46 @@ export default function CoachDashboard() {
         
       const warnings = []
       if (activeStudents && activeStudents.length > 0) {
-        const { data: allSessions } = await supabase.from('sessions').select('id, session_date, extracurricular_id').in('extracurricular_id', ekskulIds)
+        const { data: allSessions } = await supabase.from('sessions').select('id, session_date, extracurricular_id, is_special_training').in('extracurricular_id', ekskulIds)
         if (allSessions && allSessions.length > 0) {
            const allSessionIds = allSessions.map(s => s.id)
            const { data: allAtts } = await supabase.from('attendances').select('student_id, session_id, status').in('session_id', allSessionIds)
+           const { data: specialParts } = await supabase.from('special_session_participants').select('session_id, student_id').in('session_id', allSessionIds)
            
            if (allAtts) {
               activeStudents.forEach(enr => {
-                 const ekskul = ekskuls.find(e => e.id === enr.extracurricular_id)
-                 const isMandatory = ekskul?.is_mandatory || false
-                 const ekskulSessions = allSessions
-                   .filter(s => s.extracurricular_id === enr.extracurricular_id)
-                 const ekskulSessionIds = ekskulSessions.map(s => s.id)
-                 const studentAtts = allAtts.filter(a => a.student_id === enr.student_id && ekskulSessionIds.includes(a.session_id))
-                 
-                 if (studentAtts.length === 0) return
+                  const ekskul = ekskuls.find(e => e.id === enr.extracurricular_id)
+                  const isMandatory = ekskul?.is_mandatory || false
+                  const ekskulSessions = allSessions
+                    .filter(s => s.extracurricular_id === enr.extracurricular_id)
+                  
+                  // Filter only sessions that have been filled and where the student was invited
+                  const validSessions = ekskulSessions.filter(s => {
+                    const isFilled = allAtts.some(a => a.session_id === s.id)
+                    const isInvited = !s.is_special_training || (specialParts && specialParts.some(sp => sp.session_id === s.id && sp.student_id === enr.student_id))
+                    return isFilled && isInvited
+                  })
 
-                 const total = studentAtts.length
-                 const present = studentAtts.filter(a => a.status === 'hadir').length
-                 const alphaCount = studentAtts.filter(a => a.status === 'alpha').length
-                 const percentage = Math.round((present / total) * 100)
+                  const validSessionIds = validSessions.map(s => s.id)
+                  const studentAtts = allAtts.filter(a => a.student_id === enr.student_id && validSessionIds.includes(a.session_id))
+                  
+                  if (validSessions.length === 0) return
 
-                 // Hitung alpha berturut-turut
-                 const sortedSessions = ekskulSessions
-                   .slice() // jangan mutasi
-                   .sort((a, b) => new Date(b.session_date) - new Date(a.session_date))
-                 let consecutiveAlpha = 0
-                 for (const session of sortedSessions) {
-                   const att = allAtts.find(a => a.session_id === session.id && a.student_id === enr.student_id)
-                   if (!att || att.status === 'alpha') consecutiveAlpha++
-                   else break
-                 }
+                  const total = validSessions.length
+                  const present = studentAtts.filter(a => a.status === 'hadir').length
+                  const alphaCount = studentAtts.filter(a => a.status === 'alpha').length
+                  const percentage = Math.round((present / total) * 100)
+
+                  // Hitung alpha berturut-turut
+                  const sortedSessions = validSessions
+                    .slice() // jangan mutasi
+                    .sort((a, b) => new Date(b.session_date) - new Date(a.session_date))
+                  let consecutiveAlpha = 0
+                  for (const session of sortedSessions) {
+                    const att = studentAtts.find(a => a.session_id === session.id)
+                    if (att && att.status === 'alpha') consecutiveAlpha++
+                    else break
+                  }
 
                  // Threshold berbeda: wajib vs pilihan
                  const shouldWarn = isMandatory
