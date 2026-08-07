@@ -44,6 +44,8 @@ export default function AdminDashboard() {
   // Audit Logs state
   const [logs, setLogs] = useState([])
   const [searchLogQuery, setSearchLogQuery] = useState('')
+  const [revertingLogId, setRevertingLogId] = useState(null)
+  const [revertMsg, setRevertMsg] = useState({ type: '', text: '' }) // type: 'success'|'error'
 
   // Student Tracking state
   const [trackingFilter, setTrackingFilter] = useState('all') // 'all', 'no_account', 'no_ekskul', 'both_missing'
@@ -266,13 +268,42 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleRevertLog = async (log) => {
+    if (!confirm(`Apakah Anda yakin ingin membatalkan tindakan ini?\n\nAksi: ${log.action}\nDetail: ${log.details}\n\nData akan dikembalikan ke kondisi sebelumnya.`)) return
+    setRevertingLogId(log.id)
+    setRevertMsg({ type: '', text: '' })
+    try {
+      const result = await auditLogService.revertLog(log.id, user?.id)
+      if (result.success) {
+        setRevertMsg({ type: 'success', text: result.message })
+      } else {
+        setRevertMsg({ type: 'error', text: result.message })
+      }
+      await loadAuditLogs()
+    } catch (err) {
+      setRevertMsg({ type: 'error', text: err.message })
+    } finally {
+      setRevertingLogId(null)
+    }
+  }
+
   const handleCreateAnnouncement = async (e) => {
     e.preventDefault()
     if (!newTitle.trim() || !newContent.trim()) return
     setAnnLoading(true)
     try {
-      await announcementService.createAnnouncement(newTitle, newContent, user?.id)
-      await auditLogService.logEvent(user?.id, user?.email, 'CREATE_ANNOUNCEMENT', `Membuat pengumuman: ${newTitle}`)
+      const { data: newAnn, error } = await supabase
+        .from('announcements')
+        .insert([{ title: newTitle, content: newContent, created_by: user?.id }])
+        .select()
+        .single()
+      if (error) throw error
+      await auditLogService.logEvent(
+        user?.id, user?.email,
+        'CREATE_ANNOUNCEMENT',
+        `Membuat pengumuman: ${newTitle}`,
+        { targetTable: 'announcements', targetId: newAnn.id, beforeState: null, afterState: newAnn }
+      )
       setNewTitle('')
       setNewContent('')
       await loadAnnouncements()
@@ -288,10 +319,16 @@ export default function AdminDashboard() {
     try {
       await announcementService.toggleAnnouncementStatus(id, !currentStatus)
       await auditLogService.logEvent(
-        user?.id, 
-        user?.email, 
-        'TOGGLE_ANNOUNCEMENT', 
-        `Mengubah status pengumuman "${title}" menjadi ${!currentStatus ? 'Aktif' : 'Nonaktif'}`
+        user?.id,
+        user?.email,
+        'TOGGLE_ANNOUNCEMENT',
+        `Mengubah status pengumuman "${title}" menjadi ${!currentStatus ? 'Aktif' : 'Nonaktif'}`,
+        {
+          targetTable: 'announcements',
+          targetId: id,
+          beforeState: { is_active: currentStatus },
+          afterState: { is_active: !currentStatus }
+        }
       )
       await loadAnnouncements()
       await loadAuditLogs()
@@ -303,8 +340,19 @@ export default function AdminDashboard() {
   const handleDeleteAnnouncement = async (id, title) => {
     if (!confirm('Apakah Anda yakin ingin menghapus pengumuman ini?')) return
     try {
+      // Ambil data sebelum dihapus untuk before_state
+      const { data: annData } = await supabase
+        .from('announcements')
+        .select('*')
+        .eq('id', id)
+        .single()
       await announcementService.deleteAnnouncement(id)
-      await auditLogService.logEvent(user?.id, user?.email, 'DELETE_ANNOUNCEMENT', `Menghapus pengumuman: ${title}`)
+      await auditLogService.logEvent(
+        user?.id, user?.email,
+        'DELETE_ANNOUNCEMENT',
+        `Menghapus pengumuman: ${title}`,
+        { targetTable: 'announcements', targetId: id, beforeState: annData, afterState: null }
+      )
       await loadAnnouncements()
       await loadAuditLogs()
     } catch (err) {
@@ -1112,7 +1160,22 @@ export default function AdminDashboard() {
                 className="pl-9"
               />
             </div>
+
           </div>
+
+          {revertMsg.text && (
+            <div className={`p-3 rounded font-retro text-lg border-2 ${
+              revertMsg.type === 'success'
+                ? 'border-pixel-green text-pixel-green bg-pixel-green/10'
+                : 'border-pixel-red text-pixel-red bg-pixel-red/10'
+            }`}>
+              {revertMsg.text}
+              <button
+                onClick={() => setRevertMsg({ type: '', text: '' })}
+                className="ml-3 text-pixel-lavender hover:text-pixel-white"
+              >✕</button>
+            </div>
+          )}
 
           <Card>
             <div className="overflow-x-auto">
@@ -1123,18 +1186,20 @@ export default function AdminDashboard() {
                     <th className="p-4">Pengguna</th>
                     <th className="p-4">Aksi</th>
                     <th className="p-4">Detail</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Batalkan</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y-2 divide-pixel-gray/20 text-pixel-peach">
                   {filteredLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="p-8 text-center text-pixel-lavender">
+                      <td colSpan={6} className="p-8 text-center text-pixel-lavender">
                         Tidak ada log aktivitas yang cocok.
                       </td>
                     </tr>
                   ) : (
                     filteredLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-pixel-panel-light">
+                      <tr key={log.id} className={`hover:bg-pixel-panel-light ${log.is_reverted ? 'opacity-60' : ''}`}>
                         <td className="p-4 whitespace-nowrap text-base text-pixel-lavender">
                           {new Date(log.created_at).toLocaleString('id-ID')}
                         </td>
@@ -1143,7 +1208,9 @@ export default function AdminDashboard() {
                         </td>
                         <td className="p-4 whitespace-nowrap">
                           <span className={`pixel-badge ${
-                            log.action.includes('DELETE')
+                            log.action.startsWith('REVERT_')
+                              ? 'border-pixel-yellow text-pixel-yellow bg-pixel-yellow/10'
+                              : log.action.includes('DELETE')
                               ? 'border-pixel-red text-pixel-red bg-pixel-red/10'
                               : log.action.includes('CREATE')
                               ? 'border-pixel-green text-pixel-green bg-pixel-green/10'
@@ -1152,8 +1219,33 @@ export default function AdminDashboard() {
                             {log.action}
                           </span>
                         </td>
-                        <td className="p-4 text-base text-pixel-lavender max-w-[300px] truncate" title={log.details}>
+                        <td className="p-4 text-base text-pixel-lavender max-w-[250px] truncate" title={log.details}>
                           {log.details}
+                        </td>
+                        <td className="p-4 whitespace-nowrap">
+                          {log.is_reverted ? (
+                            <span className="pixel-badge border-pixel-yellow text-pixel-yellow bg-pixel-yellow/10">
+                              ✓ Dibatalkan
+                            </span>
+                          ) : (
+                            <span className="pixel-badge border-pixel-green text-pixel-green bg-pixel-green/10">
+                              Aktif
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          {!log.is_reverted && log.target_id && !log.action.startsWith('REVERT_') ? (
+                            <button
+                              onClick={() => handleRevertLog(log)}
+                              disabled={revertingLogId === log.id}
+                              className="pixel-badge border-pixel-red text-pixel-red bg-pixel-red/10 hover:bg-pixel-red/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="Batalkan tindakan ini"
+                            >
+                              {revertingLogId === log.id ? '...' : '↩ Batalkan'}
+                            </button>
+                          ) : (
+                            <span className="text-pixel-lavender text-base">—</span>
+                          )}
                         </td>
                       </tr>
                     ))
