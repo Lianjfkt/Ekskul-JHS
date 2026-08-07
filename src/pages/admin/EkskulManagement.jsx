@@ -8,8 +8,11 @@ import {
   Search, Plus, Trash2, Edit2, Activity, Calendar, User, 
   X, Check, ShieldAlert, Power, PowerOff
 } from 'lucide-react'
+import { auditLogService } from '../../utils/auditLogService'
+import { useAuthStore } from '../../stores/authStore'
 
 export default function EkskulManagement() {
+  const { user } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
@@ -130,9 +133,41 @@ export default function EkskulManagement() {
           })
           .eq('id', selectedEkskul.id)
         if (error) throw error
+
+        await auditLogService.logEvent(
+          user?.id, user?.email,
+          'UPDATE_EKSKUL',
+          `Memperbarui ekskul: ${form.name}`,
+          {
+            targetTable: 'extracurriculars',
+            targetId: selectedEkskul.id,
+            beforeState: {
+              name: selectedEkskul.name,
+              description: selectedEkskul.description,
+              schedule: selectedEkskul.schedule,
+              coach_id: selectedEkskul.coach_id,
+              coach_id_2: selectedEkskul.coach_id_2,
+              coach_id_3: selectedEkskul.coach_id_3,
+              is_active: selectedEkskul.is_active,
+              is_mandatory: selectedEkskul.is_mandatory,
+              mandatory_class: selectedEkskul.mandatory_class
+            },
+            afterState: {
+              name: form.name,
+              description: form.description,
+              schedule: form.schedule,
+              coach_id: form.coach_id || null,
+              coach_id_2: form.coach_id_2 || null,
+              coach_id_3: form.coach_id_3 || null,
+              is_active: form.is_active,
+              is_mandatory: form.is_mandatory,
+              mandatory_class: form.is_mandatory ? (form.mandatory_class || null) : null
+            }
+          }
+        )
         setSuccessMsg('Ekskul berhasil diperbarui.')
       } else {
-        const { error } = await supabase
+        const { data: newEkskul, error } = await supabase
           .from('extracurriculars')
           .insert([
             {
@@ -147,7 +182,16 @@ export default function EkskulManagement() {
               mandatory_class: form.is_mandatory ? (form.mandatory_class || null) : null
             }
           ])
+          .select()
+          .single()
         if (error) throw error
+
+        await auditLogService.logEvent(
+          user?.id, user?.email,
+          'CREATE_EKSKUL',
+          `Membuat ekskul baru: ${form.name}`,
+          { targetTable: 'extracurriculars', targetId: newEkskul.id, beforeState: null, afterState: newEkskul }
+        )
         setSuccessMsg('Ekskul baru berhasil dibuat.')
       }
       setIsModalOpen(false)
@@ -161,11 +205,25 @@ export default function EkskulManagement() {
     if (!confirm('Apakah Anda yakin ingin menghapus ekstrakurikuler ini? Data kehadiran, sesi, dan nilai terkait akan dihapus secara cascade.')) return
     setErrorMsg('')
     try {
+      // Ambil data sebelum dihapus untuk before_state
+      const { data: ekskulData } = await supabase
+        .from('extracurriculars')
+        .select('id, name, description, schedule, coach_id, coach_id_2, coach_id_3, is_active, is_mandatory, mandatory_class')
+        .eq('id', id)
+        .single()
+
       const { error } = await supabase
         .from('extracurriculars')
         .delete()
         .eq('id', id)
       if (error) throw error
+
+      await auditLogService.logEvent(
+        user?.id, user?.email,
+        'DELETE_EKSKUL',
+        `Menghapus ekskul: ${ekskulData?.name || id}`,
+        { targetTable: 'extracurriculars', targetId: id, beforeState: ekskulData, afterState: null }
+      )
       setSuccessMsg('Ekskul berhasil dihapus.')
       fetchData()
     } catch (err) {
@@ -181,6 +239,18 @@ export default function EkskulManagement() {
         .update({ is_active: !ekskul.is_active })
         .eq('id', ekskul.id)
       if (error) throw error
+
+      await auditLogService.logEvent(
+        user?.id, user?.email,
+        'TOGGLE_EKSKUL',
+        `Mengubah status ekskul "${ekskul.name}" menjadi ${!ekskul.is_active ? 'Aktif' : 'Nonaktif'}`,
+        {
+          targetTable: 'extracurriculars',
+          targetId: ekskul.id,
+          beforeState: { is_active: ekskul.is_active },
+          afterState: { is_active: !ekskul.is_active }
+        }
+      )
       setSuccessMsg(`Status ekskul ${ekskul.name} berhasil diubah.`)
       fetchData()
     } catch (err) {
