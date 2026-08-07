@@ -9,8 +9,11 @@ import {
  X, Check, ShieldAlert, Calendar, Filter, Award, Upload
 } from 'lucide-react'
 import ImportCSVModal from '../../components/import/ImportCSVModal'
+import { auditLogService } from '../../utils/auditLogService'
+import { useAuthStore } from '../../stores/authStore'
 
 export default function EnrollmentManagement() {
+ const { user } = useAuthStore()
  const [loading, setLoading] = useState(false)
  const [searchQuery, setSearchQuery] = useState('')
  const [errorMsg, setErrorMsg] = useState('')
@@ -134,10 +137,19 @@ export default function EnrollmentManagement() {
  throw new Error('Gagal: Siswa ini sudah mencapai batas maksimal pendaftaran (3 Ekstrakurikuler).')
  }
 
- const { error } = await supabase
+ const { data: newEnrollment, error } = await supabase
  .from('enrollments')
  .insert([form])
+ .select(`*, student:student_id (full_name, nis, class), extracurricular:extracurricular_id (name)`)
+ .single()
  if (error) throw error
+
+ await auditLogService.logEvent(
+ user?.id, user?.email,
+ 'CREATE_ENROLLMENT',
+ `Mendaftarkan ${newEnrollment.student?.full_name} ke ${newEnrollment.extracurricular?.name}`,
+ { targetTable: 'enrollments', targetId: newEnrollment.id, beforeState: null, afterState: form }
+ )
 
  setSuccessMsg('Siswa berhasil didaftarkan ke ekstrakurikuler.')
  setIsModalOpen(false)
@@ -151,11 +163,37 @@ export default function EnrollmentManagement() {
  if (!confirm('Apakah Anda yakin ingin menghapus/menolak data pendaftaran ini?')) return
  setErrorMsg('')
  try {
+ // Ambil data sebelum dihapus untuk before_state
+ const { data: enrollData } = await supabase
+ .from('enrollments')
+ .select(`*, student:student_id (full_name, nis), extracurricular:extracurricular_id (name)`)
+ .eq('id', id)
+ .single()
+
  const { error } = await supabase
  .from('enrollments')
  .delete()
  .eq('id', id)
  if (error) throw error
+
+ await auditLogService.logEvent(
+ user?.id, user?.email,
+ 'DELETE_ENROLLMENT',
+ `Menghapus pendaftaran ${enrollData?.student?.full_name} dari ${enrollData?.extracurricular?.name}`,
+ {
+ targetTable: 'enrollments',
+ targetId: id,
+ beforeState: {
+ id: enrollData.id,
+ student_id: enrollData.student_id,
+ extracurricular_id: enrollData.extracurricular_id,
+ semester: enrollData.semester,
+ academic_year: enrollData.academic_year,
+ status: enrollData.status
+ },
+ afterState: null
+ }
+ )
  setSuccessMsg('Pendaftaran berhasil dihapus/ditolak.')
  fetchData()
  } catch (err) {
@@ -166,11 +204,30 @@ export default function EnrollmentManagement() {
  const handleStatusChange = async (id, newStatus) => {
  setErrorMsg('')
  try {
+ // Ambil status lama untuk before_state
+ const { data: currentData } = await supabase
+ .from('enrollments')
+ .select('status, student:student_id (full_name), extracurricular:extracurricular_id (name)')
+ .eq('id', id)
+ .single()
+
  const { error } = await supabase
  .from('enrollments')
  .update({ status: newStatus })
  .eq('id', id)
  if (error) throw error
+
+ await auditLogService.logEvent(
+ user?.id, user?.email,
+ 'TOGGLE_ENROLLMENT',
+ `Mengubah status pendaftaran ${currentData?.student?.full_name} ke ${currentData?.extracurricular?.name} menjadi ${newStatus}`,
+ {
+ targetTable: 'enrollments',
+ targetId: id,
+ beforeState: { status: currentData?.status },
+ afterState: { status: newStatus }
+ }
+ )
  setSuccessMsg(newStatus === 'active' ? 'Pendaftaran berhasil disetujui!' : 'Status pendaftaran berhasil diubah.')
  fetchData()
  } catch (err) {
