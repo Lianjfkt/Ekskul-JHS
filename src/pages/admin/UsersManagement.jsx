@@ -10,10 +10,13 @@ import {
  UserCheck, Check, X, FileSpreadsheet
 } from 'lucide-react'
 import ImportCSVModal from '../../components/import/ImportCSVModal'
+import { auditLogService } from '../../utils/auditLogService'
+import { useAuthStore } from '../../stores/authStore'
 
 
 
 export default function UsersManagement() {
+ const { user } = useAuthStore()
  const [activeTab, setActiveTab] = useState('siswa')
  const [searchQuery, setSearchQuery] = useState('')
  const [loading, setLoading] = useState(false)
@@ -175,7 +178,6 @@ export default function UsersManagement() {
 
  const associatedUser = selectedStudent.users?.[0]
  if (associatedUser) {
- // Update credentials if email changed or password was typed
  if (associatedUser.email !== cleanEmail || (studentForm.password && studentForm.password.length >= 6)) {
  const { error: uErr } = await supabase.rpc('admin_update_user', {
  p_user_id: associatedUser.id,
@@ -187,7 +189,6 @@ export default function UsersManagement() {
  if (uErr) throw uErr
  }
  } else if (cleanEmail) {
- // Create login account if email was provided for the first time
  if (!studentForm.password || studentForm.password.length < 6) {
  throw new Error('Password minimal 6 karakter diperlukan untuk membuat akun baru.')
  }
@@ -201,6 +202,29 @@ export default function UsersManagement() {
  if (uErr) throw uErr
  }
 
+ await auditLogService.logEvent(
+ user?.id, user?.email,
+ 'UPDATE_STUDENT',
+ `Memperbarui data siswa: ${cleanName}`,
+ {
+   targetTable: 'students',
+   targetId: selectedStudent.id,
+   beforeState: {
+     nis: selectedStudent.nis,
+     full_name: selectedStudent.full_name,
+     class: selectedStudent.class,
+     gender: selectedStudent.gender,
+     phone: selectedStudent.phone
+   },
+   afterState: {
+     nis: studentForm.nis.trim(),
+     full_name: cleanName,
+     class: studentForm.class.trim(),
+     gender: studentForm.gender,
+     phone: studentForm.phone.trim()
+   }
+ }
+ )
  setSuccessMsg('Berhasil memperbarui data siswa.')
  } else {
  // Insert Mode
@@ -231,6 +255,12 @@ export default function UsersManagement() {
  if (uErr) throw uErr
  }
 
+ await auditLogService.logEvent(
+ user?.id, user?.email,
+ 'CREATE_STUDENT',
+ `Menambah siswa baru: ${cleanName}`,
+ { targetTable: 'students', targetId: newStudent.id, beforeState: null, afterState: newStudent }
+ )
  setSuccessMsg('Berhasil menambahkan siswa baru.')
  }
  setIsStudentModalOpen(false)
@@ -259,6 +289,25 @@ export default function UsersManagement() {
  .eq('id', student.id)
  if (sErr) throw sErr
 
+ // Log dengan target_id null karena tidak bisa di-revert otomatis (auth sudah terhapus)
+ await auditLogService.logEvent(
+ user?.id, user?.email,
+ 'DELETE_STUDENT',
+ `Menghapus siswa: ${student.full_name} (${student.nis})`,
+ {
+   targetTable: 'students',
+   targetId: null,
+   beforeState: {
+     id: student.id,
+     nis: student.nis,
+     full_name: student.full_name,
+     class: student.class,
+     gender: student.gender,
+     phone: student.phone
+   },
+   afterState: null
+ }
+ )
  setSuccessMsg('Berhasil menghapus data siswa dan akun login terkait.')
  fetchData()
  } catch (err) {
@@ -316,10 +365,22 @@ export default function UsersManagement() {
          })
          .eq('nis', selectedMaster.nis)
        if (error) throw error
+
+       await auditLogService.logEvent(
+         user?.id, user?.email,
+         'UPDATE_STUDENT_MASTER',
+         `Memperbarui data acuan siswa: ${cleanName}`,
+         {
+           targetTable: 'student_master',
+           targetId: selectedMaster.id,
+           beforeState: { nis: selectedMaster.nis, full_name: selectedMaster.full_name, class: selectedMaster.class, gender: selectedMaster.gender, phone: selectedMaster.phone },
+           afterState: { nis: masterForm.nis.trim(), full_name: cleanName, class: masterForm.class.trim(), gender: masterForm.gender, phone: masterForm.phone.trim() }
+         }
+       )
        setSuccessMsg('Berhasil memperbarui data acuan siswa.')
      } else {
        // Insert Mode
-       const { error } = await supabase
+       const { data: newMaster, error } = await supabase
          .from('student_master')
          .insert([{
            nis: masterForm.nis.trim(),
@@ -328,7 +389,16 @@ export default function UsersManagement() {
            gender: masterForm.gender,
            phone: masterForm.phone.trim()
          }])
+         .select()
+         .single()
        if (error) throw error
+
+       await auditLogService.logEvent(
+         user?.id, user?.email,
+         'CREATE_STUDENT_MASTER',
+         `Menambah data acuan siswa: ${cleanName}`,
+         { targetTable: 'student_master', targetId: newMaster.id, beforeState: null, afterState: newMaster }
+       )
        setSuccessMsg('Berhasil menambahkan data acuan siswa.')
      }
      setIsMasterModalOpen(false)
@@ -342,11 +412,24 @@ export default function UsersManagement() {
    if (!confirm(`Apakah Anda yakin ingin menghapus siswa master "${m.full_name}" dari data acuan? Ini tidak menghapus akun siswa yang sudah terdaftar.`)) return
    setErrorMsg('')
    try {
+     const { data: masterData } = await supabase
+       .from('student_master')
+       .select('*')
+       .eq('nis', m.nis)
+       .single()
+
      const { error } = await supabase
        .from('student_master')
        .delete()
        .eq('nis', m.nis)
      if (error) throw error
+
+     await auditLogService.logEvent(
+       user?.id, user?.email,
+       'DELETE_STUDENT_MASTER',
+       `Menghapus data acuan siswa: ${m.full_name}`,
+       { targetTable: 'student_master', targetId: masterData?.id || null, beforeState: masterData, afterState: null }
+     )
      setSuccessMsg('Berhasil menghapus data acuan siswa.')
      fetchData()
    } catch (err) {
@@ -423,6 +506,25 @@ export default function UsersManagement() {
           }
         }
 
+        await auditLogService.logEvent(
+          user?.id, user?.email,
+          'UPDATE_USER',
+          `Memperbarui akun ${userForm.role}: ${userForm.full_name}`,
+          {
+            targetTable: 'users',
+            targetId: selectedUser.id,
+            beforeState: {
+              email: selectedUser.email,
+              full_name: selectedUser.full_name,
+              role: selectedUser.role
+            },
+            afterState: {
+              email: userForm.email.toLowerCase().trim(),
+              full_name: userForm.full_name.trim(),
+              role: userForm.role
+            }
+          }
+        )
         setSuccessMsg(`Berhasil memperbarui data akun ${userForm.role}.`)
       } else {
         // Mode Create User
@@ -448,6 +550,21 @@ export default function UsersManagement() {
           if (pErr) console.warn('Gagal sinkron ke tabel parents:', pErr.message)
         }
 
+        await auditLogService.logEvent(
+          user?.id, user?.email,
+          'CREATE_USER',
+          `Membuat akun ${userForm.role}: ${userForm.full_name}`,
+          {
+            targetTable: 'users',
+            targetId: data, // UUID dikembalikan dari admin_create_user RPC
+            beforeState: null,
+            afterState: {
+              email: userForm.email.toLowerCase().trim(),
+              full_name: userForm.full_name.trim(),
+              role: userForm.role
+            }
+          }
+        )
         setSuccessMsg(`Berhasil membuat akun ${userForm.role} baru dengan ID: ${data}`)
       }
       setIsUserModalOpen(false)
@@ -469,6 +586,19 @@ export default function UsersManagement() {
  p_user_id: id
  })
  if (error) throw error
+
+ // Log dengan target_id null karena tidak bisa di-revert otomatis (auth Supabase terhapus)
+ await auditLogService.logEvent(
+ user?.id, user?.email,
+ 'DELETE_USER',
+ `Menghapus akun pengguna: ${email}`,
+ {
+   targetTable: 'users',
+   targetId: null,
+   beforeState: { id, email },
+   afterState: null
+ }
+ )
  setSuccessMsg('Berhasil menghapus akun pengguna.')
  fetchData()
  } catch (err) {
