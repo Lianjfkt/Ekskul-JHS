@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { 
  ClipboardCheck, Calendar, ShieldAlert, Check, 
- Users, AlertCircle, Save, Info, Trophy
+ Users, AlertCircle, Save, Info, Trophy, Search, X
 } from 'lucide-react'
 
 export default function CoachAttendances() {
@@ -28,6 +28,7 @@ export default function CoachAttendances() {
 
  // Attendance state: { [studentId]: { status: 'hadir'|'izin'|'alpha', notes: '' } }
  const [attendanceSheet, setAttendanceSheet] = useState({})
+ const [searchTerm, setSearchTerm] = useState('')
 
  useEffect(() => {
  if (user) {
@@ -88,10 +89,12 @@ export default function CoachAttendances() {
  // Load students and their existing attendance when session changes
  useEffect(() => {
  if (selectedEkskul && selectedSession) {
+ setSearchTerm('')
  loadAttendanceData(selectedEkskul, selectedSession)
  } else {
  setStudents([])
  setAttendanceSheet({})
+ setSearchTerm('')
  }
  }, [selectedEkskul, selectedSession])
 
@@ -224,6 +227,11 @@ export default function CoachAttendances() {
  return acc
  }, { hadir: 0, izin: 0, alpha: 0 })
 
+ const filteredStudents = students.filter(student => 
+    student.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.class?.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
  return (
  <div className="space-y-6">
  {/* Alert Status */}
@@ -320,6 +328,29 @@ export default function CoachAttendances() {
  </div>
  ) : (
  <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+      <div className="p-4 border-b border-pixel-gray/30 bg-pixel-navy/20 flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-pixel-lavender" />
+          <Input
+            type="text"
+            placeholder="Cari nama atau kelas siswa..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 pr-8 h-9 text-xs w-full bg-pixel-panel border-pixel-gray/30"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-2.5 text-pixel-lavender hover:text-pixel-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className="text-xs text-pixel-lavender">
+          Menampilkan {filteredStudents.length} dari {students.length} siswa
+        </div>
+      </div>
  <CardContent className="p-0">
  <div className="overflow-x-auto">
  <table className="w-full text-left border-collapse">
@@ -333,7 +364,14 @@ export default function CoachAttendances() {
  </tr>
  </thead>
  <tbody className="divide-y-2 divide-pixel-gray/30 text-sm text-pixel-peach">
- {students.map(student => {
+ {filteredStudents.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8 text-center text-pixel-lavender">
+                  Tidak ada siswa yang cocok dengan pencarian "{searchTerm}"
+                </td>
+              </tr>
+            ) : (
+              filteredStudents.map(student => {
  const studentAtt = attendanceSheet[student.id] || { status: 'hadir', notes: '' }
  return (
  <tr key={student.id} className="hover:bg-pixel-navy/30">
@@ -372,7 +410,8 @@ export default function CoachAttendances() {
  </td>
  </tr>
  )
- })}
+ })
+ )}
  </tbody>
  </table>
  </div>
