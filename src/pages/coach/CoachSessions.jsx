@@ -291,7 +291,7 @@ export default function CoachSessions() {
  <div className="space-y-6">
  {/* Alert Status */}
  {errorMsg && (
- <div className="p-4 bg-pixel-red/10 border-3 border-pixel-red rounded-none text-pixel-red text-sm flex items-start gap-3">
+ <div className="p-4 bg-pixel-red/10 border-3 border-pixel-red rounded-none text-pixel-red text-sm flex items-start gap-3 animate-pixel-shake">
  <ShieldAlert className="w-5 h-5 flex-shrink-0 mt-0.5" />
  <div>{errorMsg}</div>
  </div>
@@ -394,7 +394,7 @@ export default function CoachSessions() {
  {/* --- MODAL TAMBAH/EDIT SESI --- */}
  {isModalOpen && (
  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
- <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-lg max-h-[90vh] overflow-y-auto pixel-slide-in">
+ <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-pixel-pop">
  <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy sticky top-0 z-10">
  <h3 className="font-bold text-pixel-white text-lg flex items-center gap-2">
  <FileText className="w-5 h-5 text-primary" />
