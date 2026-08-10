@@ -86,6 +86,10 @@ export default {
       animation: {
         'pixel-blink': 'pixel-blink 1s steps(2) infinite',
         'pixel-bounce': 'pixel-bounce 0.6s steps(4) infinite',
+        'pixel-shake': 'pixel-shake 0.3s steps(4) 1',
+        'pixel-pop': 'pixel-pop 0.2s steps(3) forwards',
+        'pixel-xp-float': 'pixel-xp-float 1s steps(6) forwards',
+        'pixel-spin-stepped': 'pixel-spin-stepped 1s steps(8) infinite',
       },
     },
   },
