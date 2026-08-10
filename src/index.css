@@ -320,6 +320,10 @@
     animation: pixel-spin-stepped 1s steps(8) infinite;
   }
 
+  .animate-spin {
+    animation: pixel-spin-stepped 1s steps(8) infinite !important;
+  }
+
   /* Interactive card hover styles */
   .pixel-card-interactive {
     cursor: pointer;
