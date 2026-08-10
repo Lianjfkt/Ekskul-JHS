@@ -9,6 +9,7 @@ import { GraduationCap, Filter, Loader2, TrendingUp, Download } from 'lucide-rea
 import { Button } from '@/components/ui/button'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { addKopSuratToPDF } from '../../utils/pdfHelper'
 
 export default function ParentGrades() {
  const { selectedChild, loading: childrenLoading } = useParentChildren()
@@ -53,16 +54,18 @@ export default function ParentGrades() {
 
  const colors = ['#8b5cf6', '#06b6d4', '#f59e0b', '#10b981', '#f43f5e']
 
- const exportPDF = () => {
+ const exportPDF = async () => {
  if (!selectedChild || displayGrades.length === 0) return
  const doc = new jsPDF()
 
+ const startY = await addKopSuratToPDF(doc, 'portrait')
+
  doc.setFontSize(16)
- doc.text('Laporan Nilai Ekstrakurikuler', 14, 20)
+ doc.text('Laporan Nilai Ekstrakurikuler', 14, startY + 6)
  doc.setFontSize(12)
- doc.text(`Nama Anak: ${selectedChild.full_name}`, 14, 30)
+ doc.text(`Nama Anak: ${selectedChild.full_name}`, 14, startY + 14)
  if (selectedSemester) {
- doc.text(`Semester: ${selectedSemester}`, 14, 38)
+ doc.text(`Semester: ${selectedSemester}`, 14, startY + 22)
  }
 
  const tableData = displayGrades.map(g => [
@@ -76,7 +79,7 @@ export default function ParentGrades() {
  ])
 
  autoTable(doc, {
- startY: selectedSemester ? 45 : 38,
+ startY: startY + (selectedSemester ? 28 : 20),
  head: [['Ekstrakurikuler', 'Smstr', 'Sikap', 'Keterampilan', 'Keaktifan', 'Rata-rata', 'Predikat']],
  body: tableData,
  theme: 'grid',

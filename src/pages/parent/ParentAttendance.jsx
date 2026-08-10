@@ -15,6 +15,7 @@ import { ClipboardCheck, Loader2, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { addKopSuratToPDF } from '../../utils/pdfHelper'
 
 import '../../pages/student/calendar-overrides.css'
 
@@ -92,18 +93,20 @@ export default function ParentAttendance() {
  return null
  }
 
- const exportPDF = () => {
+ const exportPDF = async () => {
  if (!selectedChild || attendances.length === 0) return
  const doc = new jsPDF()
 
  const ekskulName = enrollments.find(e => e.id === selectedEkskul)?.name || 'Ekskul'
 
+ const startY = await addKopSuratToPDF(doc, 'portrait')
+
  doc.setFontSize(16)
- doc.text(`Laporan Kehadiran Ekstrakurikuler`, 14, 20)
+ doc.text(`Laporan Kehadiran Ekstrakurikuler`, 14, startY + 6)
  doc.setFontSize(12)
- doc.text(`Nama Anak: ${selectedChild.full_name}`, 14, 30)
- doc.text(`Ekskul: ${ekskulName}`, 14, 38)
- doc.text(`Persentase Kehadiran: ${summary.percentage}%`, 14, 46)
+ doc.text(`Nama Anak: ${selectedChild.full_name}`, 14, startY + 14)
+ doc.text(`Ekskul: ${ekskulName}`, 14, startY + 22)
+ doc.text(`Persentase Kehadiran: ${summary.percentage}%`, 14, startY + 30)
 
  const tableData = attendances.map(att => [
  att.session?.session_date ? new Date(att.session.session_date).toLocaleDateString('id-ID') : '-',
@@ -113,7 +116,7 @@ export default function ParentAttendance() {
  ])
 
  autoTable(doc, {
- startY: 55,
+ startY: startY + 36,
  head: [['Tanggal', 'Topik', 'Status', 'Catatan']],
  body: tableData,
  theme: 'grid',

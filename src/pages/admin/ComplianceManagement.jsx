@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import 'jspdf-autotable'
+import { addKopSuratToPDF } from '../../utils/pdfHelper'
 import * as XLSX from 'xlsx'
 
 export default function ComplianceManagement() {
@@ -463,7 +464,7 @@ export default function ComplianceManagement() {
     XLSX.writeFile(wb, `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     const doc = new jsPDF()
     let title = ''
     let headers = []
@@ -507,13 +508,15 @@ export default function ComplianceManagement() {
       ])
     }
 
+    const startY = await addKopSuratToPDF(doc, 'portrait')
+
     doc.setFontSize(14)
-    doc.text(title, 14, 15)
+    doc.text(title, 14, startY + 6)
     doc.setFontSize(9)
-    doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, 22)
+    doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, startY + 13)
 
     doc.autoTable({
-      startY: 28,
+      startY: startY + 18,
       head: headers,
       body: body,
       theme: 'grid',

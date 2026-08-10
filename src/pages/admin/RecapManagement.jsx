@@ -30,6 +30,7 @@ import {
  Minus
 } from 'lucide-react'
 import { saveAs } from 'file-saver'
+import { addKopSuratToPDF } from '../../utils/pdfHelper'
 import {
  ResponsiveContainer,
  BarChart,
@@ -127,15 +128,17 @@ async function exportWarningsToPDF(rows) {
  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
  const now = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
 
+ const startY = await addKopSuratToPDF(doc, 'landscape')
+
  doc.setFontSize(14)
  doc.setFont('helvetica', 'bold')
- doc.text('LAPORAN SISWA BERMASALAH — KEHADIRAN EKSTRAKURIKULER', 14, 18)
+ doc.text('LAPORAN SISWA BERMASALAH — KEHADIRAN EKSTRAKURIKULER', 14, startY + 6)
  doc.setFontSize(10)
  doc.setFont('helvetica', 'normal')
- doc.text(`SMP Global Madani  |  Dicetak: ${now}`, 14, 26)
+ doc.text(`SMP Global Madani  |  Dicetak: ${now}`, 14, startY + 14)
 
  autoTable(doc, {
-  startY: 32,
+  startY: startY + 20,
   head: [['No','NIS','Nama Siswa','Kelas','Ekstrakurikuler','Jenis','Hadir','Alpha','% Kehadiran','Status']],
   body: rows.map((r,i) => [
    i + 1, r.nis, r.studentName, r.class, r.ekskulName,
@@ -732,9 +735,28 @@ export default function RecapManagement() {
  const exportToExcel = async (rows, headers, sheetName, filename) => {
   const XLSX = await import('xlsx')
   const wb = XLSX.utils.book_new()
-  const data = [headers, ...rows]
+  const data = [
+   ['YAYASAN PENDIDIKAN GLOBAL MADANI'],
+   ['SMP GLOBAL MADANI'],
+   ['Jl. Kavling Raya, Pramuka Kel. Rajabasa Kec. Rajabasa Kota Bandar Lampung Provinsi Lampung 35144'],
+   ['Telf. 0721-8011325/Faks. 0721-8011329 | www.globalmadani.sch.id | e-mail: ypgm.smp@globalmadani.sch.id'],
+   [],
+   [sheetName.toUpperCase()],
+   [],
+   headers,
+   ...rows
+  ]
   const ws = XLSX.utils.aoa_to_sheet(data)
   const maxCols = headers.length
+
+  ws['!merges'] = [
+   { s: { r: 0, c: 0 }, e: { r: 0, c: Math.max(maxCols - 1, 1) } },
+   { s: { r: 1, c: 0 }, e: { r: 1, c: Math.max(maxCols - 1, 1) } },
+   { s: { r: 2, c: 0 }, e: { r: 2, c: Math.max(maxCols - 1, 1) } },
+   { s: { r: 3, c: 0 }, e: { r: 3, c: Math.max(maxCols - 1, 1) } },
+   { s: { r: 5, c: 0 }, e: { r: 5, c: Math.max(maxCols - 1, 1) } }
+  ]
+
   ws['!cols'] = Array(maxCols).fill({ wch: 18 })
   XLSX.utils.book_append_sheet(wb, ws, sheetName)
   const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
@@ -867,14 +889,18 @@ export default function RecapManagement() {
   const periodeLabel = formatPeriodIndo(periodKey)
 
   const data = [
-   ['DAFTAR HADIR PEMBIMBING EKSTRAKURIKULER'],
+   ['YAYASAN PENDIDIKAN GLOBAL MADANI'],
    ['SMP GLOBAL MADANI'],
+   ['Jl. Kavling Raya, Pramuka Kel. Rajabasa Kec. Rajabasa Kota Bandar Lampung Provinsi Lampung 35144'],
+   ['Telf. 0721-8011325/Faks. 0721-8011329 | www.globalmadani.sch.id | e-mail: ypgm.smp@globalmadani.sch.id'],
+   [],
+   ['DAFTAR HADIR PEMBIMBING EKSTRAKURIKULER'],
    [`SEMESTER ${semester.toUpperCase()} - TAHUN AKADEMIK ${academicYear}`],
    [],
    [`Periode: ${periodeLabel}`],
    [],
    [`Pembimbing : ${coachName}`, '', '', '', `Jenis Ekskul : ${ekskulName}`],
-   ['Kelas : -', '', '', '', `Jumlah Peserta : ${totalPeserta} Siswa`],
+   ['Kelas : 7, 8, 9', '', '', '', `Jumlah Peserta : ${totalPeserta} Siswa`],
    [],
    ['No', 'Hari/Tanggal', 'Waktu', '', 'Materi', 'Tanda Tangan', 'Siswa Tidak Hadir'],
    ['', '', 'Mulai', 'Selesai', '', '', '']
@@ -888,21 +914,37 @@ export default function RecapManagement() {
     .filter(a => a.session_id === s.id && a.status !== 'hadir')
     .map(a => a.student?.full_name || '').filter(Boolean).join(', ')
    data.push([
-    index + 1, `${dayName}, ${dateStr}`, '14.00', '15.30',
+    index + 1, `${dayName}, ${dateStr}`, '15.15', '16.30',
     s.is_special_training ? `[KHUSUS: ${s.event_name}] ${s.topic || '-'}` : (s.topic || '-'),
     '', absentList || 'Nihil'
    ])
   })
 
+  // Add signatures to Excel
+  data.push([])
+  data.push([])
+  const now = new Date()
+  const yearStr = now.getFullYear()
+  const monthName = monthsIndo[now.getMonth()]
+  data.push(['Mengetahui,', '', '', '', `Bandar Lampung,  ${monthName} ${yearStr}`])
+  data.push(['Kepala SMP Global Madani', '', '', '', 'Koordinator Ekstrakurikuler'])
+  data.push([])
+  data.push([])
+  data.push([])
+  data.push(['Fathul Anwariyah, M.Pd., Gr.', '', '', '', 'Jalian Pebriandy, S.Kom'])
+  data.push(['NPGM. 311030987 2 014', '', '', '', 'NPGM. 124090194 1 294'])
+
   const ws = XLSX.utils.aoa_to_sheet(data)
   ws['!merges'] = [
    { s: { r:0,c:0 }, e: { r:0,c:6 } }, { s: { r:1,c:0 }, e: { r:1,c:6 } },
-   { s: { r:2,c:0 }, e: { r:2,c:6 } }, { s: { r:4,c:0 }, e: { r:4,c:6 } },
-   { s: { r:6,c:0 }, e: { r:6,c:3 } }, { s: { r:6,c:4 }, e: { r:6,c:6 } },
-   { s: { r:7,c:0 }, e: { r:7,c:3 } }, { s: { r:7,c:4 }, e: { r:7,c:6 } },
-   { s: { r:9,c:0 }, e: { r:10,c:0 } }, { s: { r:9,c:1 }, e: { r:10,c:1 } },
-   { s: { r:9,c:2 }, e: { r:9,c:3 } }, { s: { r:9,c:4 }, e: { r:10,c:4 } },
-   { s: { r:9,c:5 }, e: { r:10,c:5 } }, { s: { r:9,c:6 }, e: { r:10,c:6 } }
+   { s: { r:2,c:0 }, e: { r:2,c:6 } }, { s: { r:3,c:0 }, e: { r:3,c:6 } },
+   { s: { r:5,c:0 }, e: { r:5,c:6 } }, { s: { r:6,c:0 }, e: { r:6,c:6 } },
+   { s: { r:8,c:0 }, e: { r:8,c:6 } },
+   { s: { r:10,c:0 }, e: { r:10,c:3 } }, { s: { r:10,c:4 }, e: { r:10,c:6 } },
+   { s: { r:11,c:0 }, e: { r:11,c:3 } }, { s: { r:11,c:4 }, e: { r:11,c:6 } },
+   { s: { r:13,c:0 }, e: { r:14,c:0 } }, { s: { r:13,c:1 }, e: { r:14,c:1 } },
+   { s: { r:13,c:2 }, e: { r:13,c:3 } }, { s: { r:13,c:4 }, e: { r:14,c:4 } },
+   { s: { r:13,c:5 }, e: { r:14,c:5 } }, { s: { r:13,c:6 }, e: { r:14,c:6 } }
   ]
   ws['!cols'] = [{ wch:6 },{ wch:22 },{ wch:10 },{ wch:10 },{ wch:32 },{ wch:15 },{ wch:30 }]
 
@@ -912,6 +954,129 @@ export default function RecapManagement() {
   const sanitize = s => s.replace(/[^a-z0-9]/gi, '_').toLowerCase()
   saveAs(new Blob([wbout], { type: 'application/octet-stream' }),
    `daftar_hadir_${sanitize(coachName)}_${sanitize(ekskulName)}_${sanitize(periodKey)}.xlsx`)
+ }
+
+ const exportCoachSessionsDetailToPDF = async (rowGroup) => {
+  const { default: jsPDF } = await import('jspdf')
+  const { default: autoTable } = await import('jspdf-autotable')
+  const { coachName, ekskulName, periodKey, sessionsList, ekskulId } = rowGroup
+
+  const totalPeserta = enrollments.filter(en => en.extracurricular_id === ekskulId).length
+  const sampleEnroll = enrollments.find(en => en.extracurricular_id === ekskulId)
+  const academicYear = sampleEnroll?.academic_year || '2026/2027'
+  const semester = sampleEnroll?.semester || 'Genap'
+  const periodeLabel = formatPeriodIndo(periodKey)
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  // Add Kop Surat
+  const startY = await addKopSuratToPDF(doc, 'portrait')
+
+  // Title
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.text('DAFTAR HADIR PEMBIMBING EKSTRAKURIKULER SMP GLOBAL MADANI', 105, startY + 6, { align: 'center' })
+  doc.text(`SEMESTER ${semester.toUpperCase()} TAHUN AKADEMIK ${academicYear}`, 105, startY + 11, { align: 'center' })
+  doc.text(`Periode: ${periodeLabel}`, 105, startY + 18, { align: 'center' })
+
+  // Metadata Box Table
+  const metadataRows = [
+   [`Tutor : ${coachName}`, `Jenis Ekskul : ${ekskulName}`],
+   [`Kelas : 7, 8, 9`, `Jumlah Peserta : ${totalPeserta}`]
+  ]
+
+  autoTable(doc, {
+   startY: startY + 23,
+   body: metadataRows,
+   theme: 'grid',
+   styles: { fontSize: 9, cellPadding: 2.5, textColor: [0, 0, 0], fontStyle: 'bold' },
+   columnStyles: {
+    0: { width: 95 },
+    1: { width: 95 }
+   },
+   tableLineColor: [0, 0, 0],
+   tableLineWidth: 0.3,
+   margin: { left: 10, right: 10 }
+  })
+
+  // Main Sessions Table
+  const tableData = sessionsList.map((s, index) => {
+   const dateObj = new Date(s.session_date)
+   const dayName = dateObj.toLocaleDateString('id-ID', { weekday: 'long' })
+   const dateStr = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })
+   const absentList = attendances
+    .filter(a => a.session_id === s.id && a.status !== 'hadir')
+    .map(a => a.student?.full_name || '').filter(Boolean).join(', ')
+   return [
+    index + 1,
+    `${dayName}, ${dateStr}`,
+    '7, 8, 9',
+    '15.15',
+    '16.30',
+    s.is_special_training ? `[KHUSUS: ${s.event_name}] ${s.topic || '-'}` : (s.topic || '-'),
+    '',
+    absentList || 'Nihil'
+   ]
+  })
+
+  autoTable(doc, {
+   startY: doc.lastAutoTable.finalY + 4,
+   head: [
+    [
+     { content: 'No', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+     { content: 'Tanggal', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+     { content: 'Kelas', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+     { content: 'Waktu', colSpan: 2, styles: { halign: 'center' } },
+     { content: 'Materi', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+     { content: 'Tanda Tangan', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+     { content: 'Siswa Tidak Hadir', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }
+    ],
+    ['Mulai', 'Selesai']
+   ],
+   body: tableData,
+   theme: 'grid',
+   styles: { fontSize: 8.5, textColor: [0, 0, 0], cellPadding: 2 },
+   headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.3, lineColor: [0, 0, 0] },
+   columnStyles: {
+    0: { width: 8, halign: 'center' },
+    1: { width: 25, halign: 'center' },
+    2: { width: 12, halign: 'center' },
+    3: { width: 13, halign: 'center' },
+    4: { width: 13, halign: 'center' },
+    5: { width: 62 },
+    6: { width: 22 },
+    7: { width: 35 }
+   },
+   tableLineColor: [0, 0, 0],
+   tableLineWidth: 0.3,
+   margin: { left: 10, right: 10 }
+  })
+
+  // Signatures
+  const finalY = doc.lastAutoTable.finalY + 12
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+
+  const now = new Date()
+  const yearStr = now.getFullYear()
+  const monthName = monthsIndo[now.getMonth()]
+
+  doc.text('Mengetahui,', 25, finalY)
+  doc.text('Kepala SMP Global Madani', 25, finalY + 4)
+
+  doc.text(`Bandar Lampung,  ${monthName} ${yearStr}`, 130, finalY)
+  doc.text('Koordinator Ekstrakurikuler', 130, finalY + 4)
+
+  doc.setFont('helvetica', 'bold')
+  doc.text('Fathul Anwariyah, M.Pd., Gr.', 25, finalY + 28)
+  doc.text('Jalian Pebriandy, S.Kom', 130, finalY + 28)
+
+  doc.setFont('helvetica', 'normal')
+  doc.text('NPGM. 311030987 2 014', 25, finalY + 32)
+  doc.text('NPGM. 124090194 1 294', 130, finalY + 32)
+
+  const sanitize = s => s.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+  doc.save(`laporan_absensi_pelatih_${sanitize(coachName)}_${sanitize(ekskulName)}_${sanitize(periodKey)}.pdf`)
  }
 
  // ─── Loading State ─────────────────────────────────────────────────────────
@@ -1655,7 +1820,12 @@ export default function RecapManagement() {
             <Button variant="outline" size="sm" onClick={() => exportCoachSessionsDetailToExcel(r)}
              className="text-pixel-green hover:text-pixel-green hover:bg-pixel-green/10 border-emerald-200 hover:border-emerald-300 font-semibold text-xs gap-1">
              <Download className="w-3.5 h-3.5" />
-             Unduh Form
+             Excel
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => exportCoachSessionsDetailToPDF(r)}
+             className="text-pixel-peach hover:text-pixel-peach hover:bg-pixel-peach/10 border-orange-200 hover:border-orange-300 font-semibold text-xs gap-1">
+             <Download className="w-3.5 h-3.5" />
+             PDF
             </Button>
            </td>
           </tr>
@@ -1784,6 +1954,11 @@ export default function RecapManagement() {
         className="bg-emerald-600 hover:bg-emerald-700 text-pixel-white shadow-pixel-sm flex items-center gap-1.5">
         <Download className="w-4 h-4" />
         Unduh Form Excel
+       </Button>
+       <Button onClick={() => exportCoachSessionsDetailToPDF(selectedSessionGroup)}
+        className="bg-orange-600 hover:bg-orange-700 text-pixel-white shadow-pixel-sm flex items-center gap-1.5">
+        <Download className="w-4 h-4" />
+        Unduh Form PDF
        </Button>
        <Button onClick={() => setSelectedSessionGroup(null)} variant="outline">Tutup</Button>
       </div>

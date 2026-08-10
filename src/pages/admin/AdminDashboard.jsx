@@ -20,6 +20,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { jsPDF } from 'jspdf'
 import 'jspdf-autotable'
+import { addKopSuratToPDF } from '../../utils/pdfHelper'
 import * as XLSX from 'xlsx'
 
 
@@ -110,14 +111,16 @@ export default function AdminDashboard() {
   const class8Count = trackingStudents.filter(s => s.class?.trim().startsWith('8')).length;
   const class9Count = trackingStudents.filter(s => s.class?.trim().startsWith('9')).length;
 
-  const exportViolationsToPDF = (filteredData) => {
+   const exportViolationsToPDF = async (filteredData) => {
     const doc = new jsPDF()
     
+    const startY = await addKopSuratToPDF(doc, 'portrait')
+
     // Header
     doc.setFontSize(16)
-    doc.text('Laporan Siswa Belum Mengambil Ekskul Wajib', 14, 20)
+    doc.text('Laporan Siswa Belum Mengambil Ekskul Wajib', 14, startY + 6)
     doc.setFontSize(10)
-    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 28)
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, startY + 13)
 
     const tableData = filteredData.map((v, index) => [
       index + 1,
@@ -129,7 +132,7 @@ export default function AdminDashboard() {
     ])
 
     doc.autoTable({
-      startY: 35,
+      startY: startY + 18,
       head: [['No', 'NIS', 'Nama Siswa', 'Kelas', 'Pelanggaran', 'Ekskul Saat Ini']],
       body: tableData,
       theme: 'grid',
