@@ -92,7 +92,7 @@ export default function Sidebar({ isOpen }) {
           {[...Array(5)].map((_, i) => (
             <div 
               key={i} 
-              className="w-2 h-2 bg-pixel-lavender/30"
+              className="w-2 h-2 bg-pixel-lavender/30 animate-pixel-bounce"
               style={{ animationDelay: `${i * 200}ms` }}
             />
           ))}
