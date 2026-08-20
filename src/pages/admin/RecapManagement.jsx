@@ -1079,6 +1079,145 @@ export default function RecapManagement() {
   doc.save(`laporan_absensi_pelatih_${sanitize(coachName)}_${sanitize(ekskulName)}_${sanitize(periodKey)}.pdf`)
  }
 
+ const exportCoachSessionsFrequencyToPDF = async () => {
+  const { default: jsPDF } = await import('jspdf')
+  const { default: autoTable } = await import('jspdf-autotable')
+
+  const targetPeriod = selectedMonth || availablePeriods[0]
+  if (!targetPeriod) {
+   alert("Tidak ada periode absensi pelatih yang tersedia.")
+   return
+  }
+
+  const parts = targetPeriod.split('_')
+  let periodTitle = ''
+  if (parts.length === 2) {
+   const [s, e] = parts
+   const [sy, sm] = s.split('-')
+   const [ey, em] = e.split('-')
+   const startM = monthsIndo[parseInt(sm, 10) - 1].toUpperCase()
+   const endM = monthsIndo[parseInt(em, 10) - 1].toUpperCase()
+   if (startM === endM) {
+    periodTitle = `BULAN ${startM} TAHUN ${ey}`
+   } else {
+    periodTitle = `BULAN ${startM} – ${endM} TAHUN ${ey}`
+   }
+  } else {
+   const [year, month] = targetPeriod.split('-')
+   const mName = monthsIndo[parseInt(month, 10) - 1].toUpperCase()
+   periodTitle = `BULAN ${mName} TAHUN ${year}`
+  }
+
+  // Grouping and filtering sessions for targetPeriod
+  const groups = {}
+  sessions.forEach(s => {
+   if (!s.session_date) return
+   const periodKey = getSessionPeriodKey(s.session_date)
+   if (periodKey !== targetPeriod) return
+
+   const coaches = getSessionCoaches(s)
+   const ekskul = s.extracurricular || { id: 'unknown', name: 'Ekskul Tidak Diketahui' }
+   coaches.forEach(coach => {
+    const key = `${coach.id}_${ekskul.id}`
+    if (!groups[key]) {
+     groups[key] = {
+      coachName: coach.full_name,
+      ekskulName: ekskul.name,
+      sessionsCount: 0
+     }
+    }
+    groups[key].sessionsCount++
+   })
+  })
+
+  const reportRows = Object.values(groups).sort((a, b) => a.coachName.localeCompare(b.coachName))
+  if (reportRows.length === 0) {
+   alert("Tidak ada data kehadiran pelatih pada periode ini.")
+   return
+  }
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  // Add Kop Surat
+  const startY = await addKopSuratToPDF(doc, 'portrait')
+
+  // Titles
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.text('REKAP KEHADIRAN PELATIH EKSTRAKURIKULER', 105, startY + 6, { align: 'center' })
+  doc.text('SMP GLOBAL MADANI', 105, startY + 11, { align: 'center' })
+  doc.text(periodTitle, 105, startY + 16, { align: 'center' })
+
+  // Prepare table data
+  let totalSessions = 0
+  const tableData = reportRows.map((row, index) => {
+   totalSessions += row.sessionsCount
+   return [
+    index + 1,
+    row.coachName,
+    row.ekskulName,
+    row.sessionsCount
+   ]
+  })
+
+  // Add TOTAL row at the bottom
+  tableData.push([
+   { content: 'TOTAL', colSpan: 3, styles: { halign: 'center', fontStyle: 'bold' } },
+   { content: totalSessions, styles: { halign: 'center', fontStyle: 'bold' } }
+  ])
+
+  autoTable(doc, {
+   startY: startY + 22,
+   head: [
+    [
+     { content: 'No.', styles: { halign: 'center', valign: 'middle' } },
+     { content: 'PEMBINA', styles: { halign: 'center', valign: 'middle' } },
+     { content: 'EKSTRAKURIKULER', styles: { halign: 'center', valign: 'middle' } },
+     { content: 'FREKUENSI', styles: { halign: 'center', valign: 'middle' } }
+    ]
+   ],
+   body: tableData,
+   theme: 'grid',
+   styles: { fontSize: 9.5, textColor: [0, 0, 0], cellPadding: 3 },
+   headStyles: { fillColor: [181, 172, 137], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.3, lineColor: [0, 0, 0] },
+   columnStyles: {
+    0: { width: 12, halign: 'center' },
+    1: { width: 90 },
+    2: { width: 63 },
+    3: { width: 25, halign: 'center' }
+   },
+   tableLineColor: [0, 0, 0],
+   tableLineWidth: 0.3,
+   margin: { left: 10, right: 10 }
+  })
+
+  // Signatures
+  const finalY = doc.lastAutoTable.finalY + 12
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+
+  const now = new Date()
+  const yearStr = now.getFullYear()
+  const monthName = monthsIndo[now.getMonth()]
+
+  doc.text('Mengetahui,', 25, finalY)
+  doc.text('Kepala SMP Global Madani', 25, finalY + 5)
+
+  doc.text(`Bandar Lampung, ${now.getDate()} ${monthName} ${yearStr}`, 125, finalY)
+  doc.text('Koordinator Ekstrakurikuler', 125, finalY + 5)
+
+  doc.setFont('helvetica', 'bold')
+  doc.text('Fathul Anwariyah, M.Pd., Gr.', 25, finalY + 30)
+  doc.text('Jalian Pebriandy, S.Kom', 125, finalY + 30)
+
+  doc.setFont('helvetica', 'normal')
+  doc.text('NPGM. 311030987 2 014', 25, finalY + 34)
+  doc.text('NPGM. 124090194 1 294', 125, finalY + 34)
+
+  const sanitize = s => s.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+  doc.save(`rekap_frekuensi_kehadiran_pelatih_${sanitize(targetPeriod)}.pdf`)
+ }
+
  // ─── Loading State ─────────────────────────────────────────────────────────
 
  if (loading) {
@@ -1371,6 +1510,17 @@ export default function RecapManagement() {
        >
         <Download className="w-4 h-4" />
         PDF
+       </Button>
+      )}
+      {activeTab === 'coachSessions' && (
+       <Button
+        onClick={exportCoachSessionsFrequencyToPDF}
+        disabled={coachSessionReportRows.length === 0}
+        variant="outline"
+        className="border-orange-300 text-pixel-peach hover:bg-pixel-peach/10 flex items-center gap-2"
+       >
+        <Download className="w-4 h-4" />
+        PDF Frekuensi
        </Button>
       )}
       <Button
