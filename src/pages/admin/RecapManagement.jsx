@@ -82,7 +82,7 @@ function getSessionPeriodKey(sessionDate) {
  const day = date.getDate()
  const month = date.getMonth()
  const year = date.getFullYear()
- if (day >= 25) {
+ if (day >= 20) {
   const endMonth = (month + 1) % 12
   const endYear = month === 11 ? year + 1 : year
   return `${year}-${String(month+1).padStart(2,'0')}_${endYear}-${String(endMonth+1).padStart(2,'0')}`
@@ -100,7 +100,7 @@ function formatPeriodIndo(periodKey) {
  const [s, e] = parts
  const [sy, sm] = s.split('-')
  const [ey, em] = e.split('-')
- return `25 ${monthsIndo[parseInt(sm,10)-1]} ${sy} – 24 ${monthsIndo[parseInt(em,10)-1]} ${ey}`
+ return `20 ${monthsIndo[parseInt(sm,10)-1]} ${sy} – 19 ${monthsIndo[parseInt(em,10)-1]} ${ey}`
 }
 
 function formatPeriodShortIndo(periodKey) {
