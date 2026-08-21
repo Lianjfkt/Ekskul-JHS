@@ -368,19 +368,26 @@ export default function RecapManagement() {
  // ─── Tab: Fill Tracking ───────────────────────────────────────────────────
 
  const fillTrackingRows = useMemo(() => {
+  // Normalisasi tanggal — amankan jika session_date dari DB bertipe timestamptz
+  // (format "2026-08-19T00:00:00+07:00" vs string "2026-08-19")
+  const normalizeDate = (d) => (d ? String(d).split('T')[0] : d)
+
   return extracurriculars
    .filter(e => e.is_active)
    .map(e => {
-    const ekskulSessions = sessions.filter(s => 
-     s.extracurricular_id === e.id && 
-     s.session_date >= trackingStartDate && 
-     s.session_date <= trackingEndDate
+    const ekskulSessions = sessions.filter(s =>
+     s.extracurricular_id === e.id &&
+     normalizeDate(s.session_date) >= trackingStartDate &&
+     normalizeDate(s.session_date) <= trackingEndDate
     )
-    
+
     let hasUnfilledAttendance = false
     const sessionDetails = ekskulSessions.map(s => {
      const sessionAttendancesCount = attendances.filter(a => a.session_id === s.id).length
-     const isFilled = sessionAttendancesCount > 0
+     // Fix: cek flag attendance_submitted terlebih dulu.
+     // Menangani kasus ekskul tanpa siswa enrolled — pelatih tetap bisa
+     // menyimpan absensi dan flag ini di-set true, tapi tabel attendances kosong.
+     const isFilled = s.attendance_submitted === true || sessionAttendancesCount > 0
      if (!isFilled) {
       hasUnfilledAttendance = true
      }
@@ -391,16 +398,16 @@ export default function RecapManagement() {
       isFilled
      }
     })
-    
+
     let status = 'completed' // 'no_session' | 'unfilled_attendance' | 'completed'
     if (ekskulSessions.length === 0) {
      status = 'no_session'
     } else if (hasUnfilledAttendance) {
      status = 'unfilled_attendance'
     }
-    
+
     const coachNames = [e.coach?.full_name, e.coach2?.full_name, e.coach3?.full_name].filter(Boolean).join(', ') || 'Belum ditunjuk'
-    
+
     return {
      id: e.id,
      name: e.name,

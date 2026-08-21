@@ -211,6 +211,17 @@ export default function CoachAttendances() {
   if (upsertError) throw upsertError
   }
 
+  // Fix bug tracking pengisian: selalu tandai sesi sebagai sudah diisi absensi,
+  // terlepas dari jumlah siswa (fix untuk ekskul tanpa enrollment aktif).
+  const { error: flagError } = await supabase
+   .from('sessions')
+   .update({
+    attendance_submitted: true,
+    attendance_submitted_at: new Date().toISOString()
+   })
+   .eq('id', selectedSession)
+  if (flagError) throw flagError
+
   setSuccessMsg('Absensi berhasil disimpan.')
  } catch (err) {
  console.error(err)
