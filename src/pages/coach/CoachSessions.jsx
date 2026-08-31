@@ -34,7 +34,8 @@ export default function CoachSessions() {
  coaches_present: [],
  is_special_training: false,
  event_name: '',
- selected_students: []
+ selected_students: [],
+ target_class: 'all'
  })
 
  useEffect(() => {
@@ -129,7 +130,8 @@ export default function CoachSessions() {
   coaches_present: presentCoaches.length > 0 ? presentCoaches : [user.id],
   is_special_training: session.is_special_training || false,
   event_name: session.event_name || '',
-  selected_students: preSelectedStudents
+  selected_students: preSelectedStudents,
+  target_class: session.target_class || 'all'
   })
   } else {
   setSelectedSession(null)
@@ -141,7 +143,8 @@ export default function CoachSessions() {
   coaches_present: [user.id],
   is_special_training: false,
   event_name: '',
-  selected_students: []
+  selected_students: [],
+  target_class: 'all'
   })
   }
   setIsModalOpen(true)
@@ -196,7 +199,8 @@ export default function CoachSessions() {
   topic: form.topic,
   notes: form.notes,
   is_special_training: form.is_special_training,
-  event_name: form.is_special_training ? form.event_name : null
+  event_name: form.is_special_training ? form.event_name : null,
+  target_class: form.target_class
   })
   .eq('id', selectedSession.id)
   if (error) throw error
@@ -218,7 +222,8 @@ export default function CoachSessions() {
   notes: form.notes,
   created_by: user.id,
   is_special_training: form.is_special_training,
-  event_name: form.is_special_training ? form.event_name : null
+  event_name: form.is_special_training ? form.event_name : null,
+  target_class: form.target_class
   }
   ])
   .select()
@@ -282,7 +287,8 @@ export default function CoachSessions() {
    const isDirty = form.topic.trim() !== '' ||
      form.notes.trim() !== '' ||
      form.event_name.trim() !== '' ||
-     form.selected_students.length > 0
+     form.selected_students.length > 0 ||
+     form.target_class !== 'all'
    if (isDirty && !confirm('Data yang sudah diisi akan hilang. Yakin ingin menutup?')) return
    setIsModalOpen(false)
  }
@@ -364,7 +370,12 @@ export default function CoachSessions() {
     )}
   </div>
   </td>
-  <td className="px-6 py-4 font-bold text-pixel-white">{session.extracurricular?.name}</td>
+  <td className="px-6 py-4 font-bold text-pixel-white">
+    {session.extracurricular?.name}
+    <div className="text-xs text-pixel-lavender font-mono font-normal mt-1">
+      Target: {session.target_class === 'all' || !session.target_class ? 'Semua Kelas' : `Kelas ${session.target_class}`}
+    </div>
+  </td>
   <td className="px-6 py-4 text-pixel-yellow font-semibold">{session.session_coaches && session.session_coaches.length > 0 ? session.session_coaches.map(sc => sc.coach?.full_name).filter(Boolean).join(', ') : 'Tidak diketahui'}</td>
   <td className="px-6 py-4 font-semibold text-pixel-white">
     {session.topic || 'Sesi Umum'}
@@ -545,6 +556,23 @@ export default function CoachSessions() {
  value={form.session_date}
  onChange={e => setForm({...form, session_date: e.target.value})}
  />
+ </div>
+
+ {/* Target Tingkat Kelas */}
+ <div className="space-y-1.5">
+ <Label htmlFor="s_target_class">Target Tingkat Kelas</Label>
+ <select
+ id="s_target_class"
+ required
+ className="flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring text-pixel-white"
+ value={form.target_class || 'all'}
+ onChange={e => setForm({...form, target_class: e.target.value})}
+ >
+ <option value="all" className="bg-pixel-panel text-pixel-white">Semua Kelas</option>
+ <option value="7" className="bg-pixel-panel text-pixel-white">Kelas 7</option>
+ <option value="8" className="bg-pixel-panel text-pixel-white">Kelas 8</option>
+ <option value="9" className="bg-pixel-panel text-pixel-white">Kelas 9</option>
+ </select>
  </div>
 
  {/* Topik Latihan */}

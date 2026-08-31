@@ -69,7 +69,7 @@ export default function CoachAttendances() {
  try {
  const { data, error } = await supabase
  .from('sessions')
- .select('id, session_date, topic, is_special_training, event_name')
+ .select('id, session_date, topic, is_special_training, event_name, target_class')
  .eq('extracurricular_id', ekskulId)
  .order('session_date', { ascending: false })
  if (error) throw error
@@ -130,6 +130,13 @@ export default function CoachAttendances() {
    .eq('status', 'active')
    if (enErr) throw enErr
    studentList = enrollments ? enrollments.map(e => e.student) : []
+
+   // Filter students by target_class if specified
+   if (sessionObj && sessionObj.target_class && sessionObj.target_class !== 'all') {
+     studentList = studentList.filter(student => 
+       student && student.class && student.class.trim().startsWith(sessionObj.target_class)
+     )
+   }
  }
  
  setStudents(studentList)
@@ -300,11 +307,14 @@ export default function CoachAttendances() {
  {sessions.length === 0 ? (
  <option value="">-- Tidak ada sesi ditemukan --</option>
  ) : (
- sessions.map(s => (
- <option key={s.id} value={s.id}>
- {new Date(s.session_date).toLocaleDateString('id-ID')} - {s.is_special_training ? `[KHUSUS] ${s.event_name}` : s.topic || 'Sesi Umum'}
- </option>
- ))
+ sessions.map(s => {
+    const targetLabel = s.target_class && s.target_class !== 'all' ? `[Kelas ${s.target_class}]` : '[Semua Kelas]';
+    return (
+      <option key={s.id} value={s.id}>
+        {new Date(s.session_date).toLocaleDateString('id-ID')} - {targetLabel} {s.is_special_training ? `[KHUSUS] ${s.event_name}` : s.topic || 'Sesi Umum'}
+      </option>
+    )
+  })
  )}
  </select>
  </div>
