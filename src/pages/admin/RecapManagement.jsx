@@ -401,7 +401,7 @@ export default function RecapManagement() {
 
     let status = 'completed' // 'no_session' | 'unfilled_attendance' | 'completed'
     if (ekskulSessions.length === 0) {
-     status = 'no_session'
+status = 'no_session'
     } else if (hasUnfilledAttendance) {
      status = 'unfilled_attendance'
     }
@@ -454,10 +454,22 @@ export default function RecapManagement() {
    }
   })
 
+  // Build fast session lookup map
+  const sessionMap = Object.fromEntries(sessions.map(s => [s.id, s]))
+
+  // Count directly from actual attendance records with proper validation
   attendances.forEach(a => {
    const student = a.student
-   const session = sessions.find(s => s.id === a.session_id)
+   const session = sessionMap[a.session_id]
    if (!student || !session) return
+
+   // Validation: special training invite check
+   const isInvited = !session.is_special_training || specialParticipants.some(sp => sp.session_id === session.id && sp.student_id === student.id)
+   // Validation: target class check (trim to handle "8.1, 8.2" with spaces)
+   const isTargetClass = !session.target_class || session.target_class === 'all' || (student.class && session.target_class.split(',').some(tc => student.class.trim().startsWith(tc.trim())))
+
+   if (!isInvited || !isTargetClass) return
+
    const key = `${student.id}_${session.extracurricular_id}`
    if (!keyMap[key]) {
     const ekskul = extracurriculars.find(e => e.id === session.extracurricular_id)
@@ -469,32 +481,11 @@ export default function RecapManagement() {
      hadir: 0, izin: 0, alpha: 0, total: 0
     }
    }
-  })
-
-  Object.values(keyMap).forEach(row => {
-   const ekskulSessions = sessions.filter(s => s.extracurricular_id === row.ekskulId)
-
-   const validSessions = ekskulSessions.filter(s => {
-    const sessionAtts = attendances.filter(a => a.session_id === s.id)
-    const isFilled = s.attendance_submitted === true || sessionAtts.length > 0
-    if (!isFilled) return false
-    const isInvited = !s.is_special_training || specialParticipants.some(sp => sp.session_id === s.id && sp.student_id === row.studentId)
-    const isTargetClass = !s.target_class || s.target_class === 'all' || (row.class && s.target_class.split(',').some(tc => row.class.trim().startsWith(tc)))
-    return isInvited && isTargetClass
-   })
-
-   row.total = validSessions.length
-
-   validSessions.forEach(s => {
-    const att = attendances.find(a => a.session_id === s.id && a.student_id === row.studentId)
-    if (att) {
-     if (att.status === 'hadir') row.hadir++
-     else if (att.status === 'izin') row.izin++
-     else row.alpha++
-    } else {
-     row.alpha++
-    }
-   })
+   const row = keyMap[key]
+   row.total++
+   if (a.status === 'hadir') row.hadir++
+   else if (a.status === 'izin') row.izin++
+   else row.alpha++
   })
 
   return Object.values(keyMap).map(row => {
@@ -540,7 +531,7 @@ export default function RecapManagement() {
  }, [grades, selectedEkskul, selectedSemester, selectedAcademicYear, searchQuery])
 
  // ─── Tab 5: Warning Siswa Bermasalah ──────────────────────────────────────
- // Helper: deteksi alpha berturut-turut
+ // Helper: deteksi alpha berturut-turut hanya dari record yang benar-benar ada
  const getConsecutiveAlpha = (studentId, ekskulId, studentClass) => {
   const ekskulSessions = sessions
    .filter(s => s.extracurricular_id === ekskulId)
@@ -551,11 +542,13 @@ export default function RecapManagement() {
    const sessionAtts = attendances.filter(a => a.session_id === session.id)
    const isFilled = session.attendance_submitted === true || sessionAtts.length > 0
    const isInvited = !session.is_special_training || specialParticipants.some(sp => sp.session_id === session.id && sp.student_id === studentId)
-   const isTargetClass = !session.target_class || session.target_class === 'all' || (studentClass && session.target_class.split(',').some(tc => studentClass.trim().startsWith(tc)))
-   
+   const isTargetClass = !session.target_class || session.target_class === 'all' || (studentClass && session.target_class.split(',').some(tc => studentClass.trim().startsWith(tc.trim())))
+
    if (isFilled && isInvited && isTargetClass) {
     const att = sessionAtts.find(a => a.student_id === studentId)
-    if (!att || att.status === 'alpha') {
+    // Hanya hitung consecutive alpha jika record BENAR-BENAR ada dan statusnya alpha
+    // Jika tidak ada record, jangan anggap alpha (hentikan chain)
+    if (att && att.status === 'alpha') {
      consecutive++
     } else {
      break
@@ -629,7 +622,7 @@ export default function RecapManagement() {
    if (a.warningLevel !== b.warningLevel) return a.warningLevel === 'TEGURAN' ? -1 : 1
    return a.percentage - b.percentage
   })
- }, [enrollments, extracurriculars, attendances, sessions, specialParticipants, selectedEkskul, searchQuery, warningTypeFilter, warningLevelFilter])
+ }, [attendanceReportRows, sessions, attendances, specialParticipants, selectedEkskul, searchQuery, warningTypeFilter, warningLevelFilter])
 
  const warningCount = useMemo(() => warningRows.length, [warningRows])
  const teguranCount = useMemo(() => warningRows.filter(r => r.warningLevel === 'TEGURAN').length, [warningRows])

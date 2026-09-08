@@ -59,42 +59,28 @@ export function useAttendanceSummary(studentId, extracurricularId) {
 
       const specialSessionIds = new Set((spRes.data || []).map(sp => sp.session_id))
       const attMap = Object.fromEntries((attRes.data || []).map(a => [a.session_id, a]))
-      const studentAttSessionIds = new Set(Object.keys(attMap))
 
-      // Filter valid sessions (filled by coach and targeting this student)
-      const validSessions = (sessions || []).filter(s => {
-        const isFilled = s.attendance_submitted === true || studentAttSessionIds.has(s.id)
-        if (!isFilled) return false
+      // Only use sessions where the student actually HAS an attendance record,
+      // with proper validation (special training invite, target_class)
+      const enriched = (attRes.data || []).filter(a => {
+        const s = sessionMap[a.session_id]
+        if (!s) return false
         if (s.is_special_training && !specialSessionIds.has(s.id)) return false
         if (s.target_class && s.target_class !== 'all') {
           const targetClasses = s.target_class.split(',')
-          if (!studentClass || !targetClasses.some(tc => studentClass.trim().startsWith(tc))) return false
+          if (!studentClass || !targetClasses.some(tc => studentClass.trim().startsWith(tc.trim()))) return false
         }
         return true
-      })
-
-      // Build enriched list for all valid sessions
-      const enriched = validSessions.map(s => {
-        const a = attMap[s.id]
-        if (a) {
-          return {
-            ...a,
-            session: s
-          }
-        }
-        return {
-          id: `unrecorded-${s.id}`,
-          session_id: s.id,
-          status: 'alpha',
-          notes: 'Tidak ada catatan absensi saat absensi diisi',
-          recorded_at: null,
-          session: s
-        }
-      })
+      }).map(a => ({
+        ...a,
+        session: sessionMap[a.session_id]
+      }))
 
       // Sort by session_date descending
       enriched.sort((a, b) => new Date(b.session?.session_date) - new Date(a.session?.session_date))
 
+      // Build attMap of validated records for easy lookup by session
+      // (attMap is already built above but filtered here via enriched)
       setAttendances(enriched)
 
       const hadir = enriched.filter(a => a.status === 'hadir').length
