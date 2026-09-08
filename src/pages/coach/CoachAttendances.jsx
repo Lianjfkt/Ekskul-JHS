@@ -116,6 +116,7 @@ export default function CoachAttendances() {
        student:student_id (id, nis, full_name, class)
      `)
      .eq('session_id', sessionId)
+     .range(0, 9999)
    if (spErr) throw spErr
    studentList = specialParticipants ? specialParticipants.map(sp => sp.student) : []
  } else {
@@ -128,6 +129,7 @@ export default function CoachAttendances() {
    `)
    .eq('extracurricular_id', ekskulId)
    .eq('status', 'active')
+   .range(0, 9999)
    if (enErr) throw enErr
    studentList = enrollments ? enrollments.map(e => e.student) : []
 
@@ -147,6 +149,7 @@ export default function CoachAttendances() {
  .from('attendances')
  .select('*')
  .eq('session_id', sessionId)
+ .range(0, 9999)
  if (attErr) throw attErr
 
  // Map existing records to the sheet, default other students to 'hadir'
