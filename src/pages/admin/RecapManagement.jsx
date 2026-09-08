@@ -208,12 +208,12 @@ export default function RecapManagement() {
     { data: spData, error: spErr }
    ] = await Promise.all([
     supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email), coach3:coach_id_3 (id, full_name, email)').order('name', { ascending: true }),
-    supabase.from('enrollments').select('*, student:student_id (id, nis, full_name, class)').eq('status', 'active'),
-    supabase.from('grades').select('*, student:student_id (id, nis, full_name, class), extracurricular:extracurricular_id (id, name)'),
-    supabase.from('sessions').select('*, creator:created_by (id, full_name, email), extracurricular:extracurricular_id (id, name, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email), coach3:coach_id_3 (id, full_name, email)), session_coaches (id, coach:coach_id (id, full_name, email))').order('session_date', { ascending: false }),
-    supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)'),
-    supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true }),
-    supabase.from('special_session_participants').select('*')
+    supabase.from('enrollments').select('*, student:student_id (id, nis, full_name, class)').eq('status', 'active').range(0, 9999),
+    supabase.from('grades').select('*, student:student_id (id, nis, full_name, class), extracurricular:extracurricular_id (id, name)').range(0, 9999),
+    supabase.from('sessions').select('*, creator:created_by (id, full_name, email), extracurricular:extracurricular_id (id, name, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email), coach3:coach_id_3 (id, full_name, email))').order('session_date', { ascending: false }).range(0, 9999),
+    supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)').range(0, 9999),
+    supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true }).range(0, 9999),
+    supabase.from('special_session_participants').select('*').range(0, 9999)
    ])
 
    if (eErr) throw eErr

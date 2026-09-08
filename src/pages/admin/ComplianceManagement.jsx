@@ -49,13 +49,13 @@ export default function ComplianceManagement() {
         { data: gradesData, error: gErr },
         { data: spData, error: spErr }
       ] = await Promise.all([
-        supabase.from('students').select('*').order('full_name', { ascending: true }),
+        supabase.from('students').select('*').order('full_name', { ascending: true }).range(0, 9999),
         supabase.from('extracurriculars').select('*'),
-        supabase.from('enrollments').select('*, extracurricular:extracurricular_id(*)').eq('status', 'active'),
-        supabase.from('sessions').select('*').order('session_date', { ascending: true }),
-        supabase.from('attendances').select('*'),
-        supabase.from('grades').select('*, extracurricular:extracurricular_id(*)'),
-        supabase.from('special_session_participants').select('*')
+        supabase.from('enrollments').select('*, extracurricular:extracurricular_id(*)').eq('status', 'active').range(0, 9999),
+        supabase.from('sessions').select('*').order('session_date', { ascending: true }).range(0, 9999),
+        supabase.from('attendances').select('*').range(0, 9999),
+        supabase.from('grades').select('*, extracurricular:extracurricular_id(*)').range(0, 9999),
+        supabase.from('special_session_participants').select('*').range(0, 9999)
       ])
 
       if (sErr) throw sErr
