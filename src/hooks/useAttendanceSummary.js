@@ -25,7 +25,7 @@ export function useAttendanceSummary(studentId, extracurricularId) {
       // 2. Get all sessions for the extracurricular
       const { data: sessions, error: sErr } = await supabase
         .from('sessions')
-        .select('id, session_date, topic, is_special_training, target_class')
+        .select('id, session_date, topic, is_special_training, target_class, attendance_submitted')
         .eq('extracurricular_id', extracurricularId)
         .order('session_date', { ascending: false })
 
@@ -58,11 +58,13 @@ export function useAttendanceSummary(studentId, extracurricularId) {
       if (attRes.error) throw attRes.error
 
       const specialSessionIds = new Set((spRes.data || []).map(sp => sp.session_id))
+      const attMap = Object.fromEntries((attRes.data || []).map(a => [a.session_id, a]))
+      const studentAttSessionIds = new Set(Object.keys(attMap))
 
-      // Filter only attendances from valid sessions (invited / targeted)
-      const validAttendances = (attRes.data || []).filter(a => {
-        const s = sessionMap[a.session_id]
-        if (!s) return false
+      // Filter valid sessions (filled by coach and targeting this student)
+      const validSessions = (sessions || []).filter(s => {
+        const isFilled = s.attendance_submitted === true || studentAttSessionIds.has(s.id)
+        if (!isFilled) return false
         if (s.is_special_training && !specialSessionIds.has(s.id)) return false
         if (s.target_class && s.target_class !== 'all') {
           const targetClasses = s.target_class.split(',')
@@ -71,11 +73,24 @@ export function useAttendanceSummary(studentId, extracurricularId) {
         return true
       })
 
-      // Merge session info into attendance records
-      const enriched = validAttendances.map(a => ({
-        ...a,
-        session: sessionMap[a.session_id]
-      }))
+      // Build enriched list for all valid sessions
+      const enriched = validSessions.map(s => {
+        const a = attMap[s.id]
+        if (a) {
+          return {
+            ...a,
+            session: s
+          }
+        }
+        return {
+          id: `unrecorded-${s.id}`,
+          session_id: s.id,
+          status: 'alpha',
+          notes: 'Tidak ada catatan absensi saat absensi diisi',
+          recorded_at: null,
+          session: s
+        }
+      })
 
       // Sort by session_date descending
       enriched.sort((a, b) => new Date(b.session?.session_date) - new Date(a.session?.session_date))

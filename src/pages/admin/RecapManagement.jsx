@@ -445,40 +445,58 @@ export default function RecapManagement() {
    if (student && ekskul) {
     const key = `${student.id}_${ekskul.id}`
     keyMap[key] = {
-     studentId: student.id, nis: student.nis, studentName: student.full_name,
-     class: student.class, ekskulId: ekskul.id, ekskulName: ekskul.name,
+     studentId: student.id, nis: student.nis || '-', studentName: student.full_name,
+     class: student.class || '-', ekskulId: ekskul.id, ekskulName: ekskul.name,
      semester: en.semester, academicYear: en.academic_year,
+     isMandatory: ekskul.is_mandatory || false, mandatoryClass: ekskul.mandatory_class || null,
      hadir: 0, izin: 0, alpha: 0, total: 0
     }
    }
   })
+
   attendances.forEach(a => {
    const student = a.student
    const session = sessions.find(s => s.id === a.session_id)
    if (!student || !session) return
-
-   // Validation checks
-   const isInvited = !session.is_special_training || specialParticipants.some(sp => sp.session_id === session.id && sp.student_id === student.id)
-   const isTargetClass = !session.target_class || session.target_class === 'all' || (student.class && session.target_class.split(',').some(tc => student.class.trim().startsWith(tc)))
-
-   if (!isInvited || !isTargetClass) return
-
    const key = `${student.id}_${session.extracurricular_id}`
    if (!keyMap[key]) {
     const ekskul = extracurriculars.find(e => e.id === session.extracurricular_id)
     keyMap[key] = {
-     studentId: student.id, nis: student.nis, studentName: student.full_name,
-     class: student.class, ekskulId: session.extracurricular_id,
+     studentId: student.id, nis: student.nis || '-', studentName: student.full_name,
+     class: student.class || '-', ekskulId: session.extracurricular_id,
      ekskulName: ekskul?.name || 'Ekskul Lama', semester: '-', academicYear: '-',
+     isMandatory: ekskul?.is_mandatory || false, mandatoryClass: ekskul?.mandatory_class || null,
      hadir: 0, izin: 0, alpha: 0, total: 0
     }
    }
-   const row = keyMap[key]
-   row.total++
-   if (a.status === 'hadir') row.hadir++
-   else if (a.status === 'izin') row.izin++
-   else if (a.status === 'alpha') row.alpha++
   })
+
+  Object.values(keyMap).forEach(row => {
+   const ekskulSessions = sessions.filter(s => s.extracurricular_id === row.ekskulId)
+
+   const validSessions = ekskulSessions.filter(s => {
+    const sessionAtts = attendances.filter(a => a.session_id === s.id)
+    const isFilled = s.attendance_submitted === true || sessionAtts.length > 0
+    if (!isFilled) return false
+    const isInvited = !s.is_special_training || specialParticipants.some(sp => sp.session_id === s.id && sp.student_id === row.studentId)
+    const isTargetClass = !s.target_class || s.target_class === 'all' || (row.class && s.target_class.split(',').some(tc => row.class.trim().startsWith(tc)))
+    return isInvited && isTargetClass
+   })
+
+   row.total = validSessions.length
+
+   validSessions.forEach(s => {
+    const att = attendances.find(a => a.session_id === s.id && a.student_id === row.studentId)
+    if (att) {
+     if (att.status === 'hadir') row.hadir++
+     else if (att.status === 'izin') row.izin++
+     else row.alpha++
+    } else {
+     row.alpha++
+    }
+   })
+  })
+
   return Object.values(keyMap).map(row => {
    const percentage = row.total > 0 ? Math.round((row.hadir / row.total) * 100) : 0
    return { ...row, percentage }
@@ -491,7 +509,7 @@ export default function RecapManagement() {
     : true
    return matchEkskul && matchSemester && matchYear && matchSearch
   })
- }, [enrollments, extracurriculars, attendances, sessions, selectedEkskul, selectedSemester, selectedAcademicYear, searchQuery])
+ }, [enrollments, extracurriculars, attendances, sessions, specialParticipants, selectedEkskul, selectedSemester, selectedAcademicYear, searchQuery])
 
  // ─── Tab 3: Grade Report ───────────────────────────────────────────────────
 
@@ -531,13 +549,13 @@ export default function RecapManagement() {
   let consecutive = 0
   for (const session of ekskulSessions) {
    const sessionAtts = attendances.filter(a => a.session_id === session.id)
-   const isFilled = sessionAtts.length > 0
+   const isFilled = session.attendance_submitted === true || sessionAtts.length > 0
    const isInvited = !session.is_special_training || specialParticipants.some(sp => sp.session_id === session.id && sp.student_id === studentId)
    const isTargetClass = !session.target_class || session.target_class === 'all' || (studentClass && session.target_class.split(',').some(tc => studentClass.trim().startsWith(tc)))
    
    if (isFilled && isInvited && isTargetClass) {
     const att = sessionAtts.find(a => a.student_id === studentId)
-    if (att && att.status === 'alpha') {
+    if (!att || att.status === 'alpha') {
      consecutive++
     } else {
      break
@@ -548,56 +566,12 @@ export default function RecapManagement() {
  }
 
  const warningRows = useMemo(() => {
-  const keyMap = {}
-
-  // Build base data from enrollments
-  enrollments.forEach(en => {
-   const student = en.student
-   const ekskul = extracurriculars.find(e => e.id === en.extracurricular_id)
-   if (!student || !ekskul) return
-   const key = `${student.id}_${ekskul.id}`
-   keyMap[key] = {
-    studentId: student.id,
-    nis: student.nis || '-',
-    studentName: student.full_name,
-    class: student.class,
-    ekskulId: ekskul.id,
-    ekskulName: ekskul.name,
-    isMandatory: ekskul.is_mandatory || false,
-    mandatoryClass: ekskul.mandatory_class || null,
-    semester: en.semester,
-    academicYear: en.academic_year,
-    hadir: 0, izin: 0, alpha: 0, total: 0
-   }
-  })
-
-  // Sum attendance
-  attendances.forEach(a => {
-   const student = a.student
-   const session = sessions.find(s => s.id === a.session_id)
-   if (!student || !session) return
-
-   // Validation checks
-   const isInvited = !session.is_special_training || specialParticipants.some(sp => sp.session_id === session.id && sp.student_id === student.id)
-   const isTargetClass = !session.target_class || session.target_class === 'all' || (student.class && session.target_class.split(',').some(tc => student.class.trim().startsWith(tc)))
-
-   if (!isInvited || !isTargetClass) return
-
-   const key = `${student.id}_${session.extracurricular_id}`
-   if (!keyMap[key]) return
-   const row = keyMap[key]
-   row.total++
-   if (a.status === 'hadir') row.hadir++
-   else if (a.status === 'izin') row.izin++
-   else if (a.status === 'alpha') row.alpha++
-  })
-
-  // Apply warning logic
   const result = []
-  Object.values(keyMap).forEach(row => {
+
+  attendanceReportRows.forEach(row => {
    if (row.total === 0) return
 
-   const percentage = Math.round((row.hadir / row.total) * 100)
+   const percentage = row.percentage
    const consecutiveAlpha = getConsecutiveAlpha(row.studentId, row.ekskulId, row.class)
 
    let warningLevel = null
@@ -605,7 +579,6 @@ export default function RecapManagement() {
    let warningReasons = []
 
    if (row.isMandatory) {
-    // Ekskul WAJIB: setiap alpha = warning
     if (row.alpha >= 1 && percentage < 80) {
      warningReasons.push(`Kehadiran ${percentage}% (min. 80%)`)
     }
@@ -620,7 +593,6 @@ export default function RecapManagement() {
      warningLabel = 'PERINGATAN'
     }
    } else {
-    // Ekskul PILIHAN: alpha 3x berturut-turut, atau kehadiran < 70%
     if (consecutiveAlpha >= 3) warningReasons.push(`${consecutiveAlpha}x Alpha Berturut-turut`)
     if (percentage < 70) warningReasons.push(`Kehadiran ${percentage}% (min. 70%)`)
     if (consecutiveAlpha >= 5 || percentage < 55) {
