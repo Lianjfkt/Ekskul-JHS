@@ -60,27 +60,34 @@ export function useAttendanceSummary(studentId, extracurricularId) {
       const specialSessionIds = new Set((spRes.data || []).map(sp => sp.session_id))
       const attMap = Object.fromEntries((attRes.data || []).map(a => [a.session_id, a]))
 
-      // Only use sessions where the student actually HAS an attendance record,
-      // with proper validation (special training invite, target_class)
-      const enriched = (attRes.data || []).filter(a => {
-        const s = sessionMap[a.session_id]
-        if (!s) return false
+      // Sesi yang valid untuk siswa ini
+      const validSessions = sessions.filter(s => {
+        const hasAtt = attMap[s.id] !== undefined
+        if (!s.attendance_submitted && !hasAtt) return false
         if (s.is_special_training && !specialSessionIds.has(s.id)) return false
         if (s.target_class && s.target_class !== 'all') {
           const targetClasses = s.target_class.split(',')
           if (!studentClass || !targetClasses.some(tc => studentClass.trim().startsWith(tc.trim()))) return false
         }
         return true
-      }).map(a => ({
-        ...a,
-        session: sessionMap[a.session_id]
-      }))
+      })
+
+      const enriched = validSessions.map(s => {
+        const att = attMap[s.id]
+        return {
+          id: att?.id || `virtual-${s.id}`,
+          session_id: s.id,
+          student_id: studentId,
+          status: att ? att.status : 'alpha',
+          notes: att?.notes || '',
+          recorded_at: att?.recorded_at || null,
+          session: s
+        }
+      })
 
       // Sort by session_date descending
       enriched.sort((a, b) => new Date(b.session?.session_date) - new Date(a.session?.session_date))
 
-      // Build attMap of validated records for easy lookup by session
-      // (attMap is already built above but filtered here via enriched)
       setAttendances(enriched)
 
       const hadir = enriched.filter(a => a.status === 'hadir').length

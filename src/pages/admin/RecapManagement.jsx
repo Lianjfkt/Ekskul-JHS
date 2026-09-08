@@ -401,7 +401,7 @@ export default function RecapManagement() {
 
     let status = 'completed' // 'no_session' | 'unfilled_attendance' | 'completed'
     if (ekskulSessions.length === 0) {
-status = 'no_session'
+     status = 'no_session'
     } else if (hasUnfilledAttendance) {
      status = 'unfilled_attendance'
     }
@@ -438,60 +438,63 @@ status = 'no_session'
  // ─── Tab 2: Attendance Report ──────────────────────────────────────────────
 
  const attendanceReportRows = useMemo(() => {
-  const keyMap = {}
-  enrollments.forEach(en => {
+  return enrollments.map(en => {
    const student = en.student
    const ekskul = extracurriculars.find(e => e.id === en.extracurricular_id)
-   if (student && ekskul) {
-    const key = `${student.id}_${ekskul.id}`
-    keyMap[key] = {
-     studentId: student.id, nis: student.nis || '-', studentName: student.full_name,
-     class: student.class || '-', ekskulId: ekskul.id, ekskulName: ekskul.name,
-     semester: en.semester, academicYear: en.academic_year,
-     isMandatory: ekskul.is_mandatory || false, mandatoryClass: ekskul.mandatory_class || null,
-     hadir: 0, izin: 0, alpha: 0, total: 0
+   if (!student || !ekskul) return null
+
+   // Sesi-sesi ekskul ini yang valid untuk siswa ini
+   const validSessions = sessions.filter(s => {
+    if (s.extracurricular_id !== ekskul.id) return false
+    // Hanya hitung sesi yang sudah disimpan/disubmit absensinya atau memiliki record absensi
+    const hasAtt = attendances.some(a => a.session_id === s.id)
+    if (!s.attendance_submitted && !hasAtt) return false
+
+    // Cek undangan latihan khusus jika sesi khusus
+    const isInvited = !s.is_special_training || specialParticipants.some(sp => sp.session_id === s.id && sp.student_id === student.id)
+    // Cek target kelas jika diset
+    const isTargetClass = !s.target_class || s.target_class === 'all' || (student.class && s.target_class.split(',').some(tc => student.class.trim().startsWith(tc.trim())))
+
+    return isInvited && isTargetClass
+   })
+
+   let hadir = 0
+   let izin = 0
+   let alpha = 0
+
+   validSessions.forEach(s => {
+    const att = attendances.find(a => a.session_id === s.id && a.student_id === student.id)
+    if (att) {
+     if (att.status === 'hadir') hadir++
+     else if (att.status === 'izin') izin++
+     else alpha++
+    } else {
+     // Pelatih sudah submit sesi tapi siswa tidak memiliki record hadir/izin -> terhitung Alpha
+     alpha++
     }
+   })
+
+   const total = validSessions.length
+   const percentage = total > 0 ? Math.round((hadir / total) * 100) : 0
+
+   return {
+    studentId: student.id,
+    nis: student.nis || '-',
+    studentName: student.full_name,
+    class: student.class || '-',
+    ekskulId: ekskul.id,
+    ekskulName: ekskul.name,
+    semester: en.semester,
+    academicYear: en.academic_year,
+    isMandatory: ekskul.is_mandatory || false,
+    mandatoryClass: ekskul.mandatory_class || null,
+    hadir,
+    izin,
+    alpha,
+    total,
+    percentage
    }
-  })
-
-  // Build fast session lookup map
-  const sessionMap = Object.fromEntries(sessions.map(s => [s.id, s]))
-
-  // Count directly from actual attendance records with proper validation
-  attendances.forEach(a => {
-   const student = a.student
-   const session = sessionMap[a.session_id]
-   if (!student || !session) return
-
-   // Validation: special training invite check
-   const isInvited = !session.is_special_training || specialParticipants.some(sp => sp.session_id === session.id && sp.student_id === student.id)
-   // Validation: target class check (trim to handle "8.1, 8.2" with spaces)
-   const isTargetClass = !session.target_class || session.target_class === 'all' || (student.class && session.target_class.split(',').some(tc => student.class.trim().startsWith(tc.trim())))
-
-   if (!isInvited || !isTargetClass) return
-
-   const key = `${student.id}_${session.extracurricular_id}`
-   if (!keyMap[key]) {
-    const ekskul = extracurriculars.find(e => e.id === session.extracurricular_id)
-    keyMap[key] = {
-     studentId: student.id, nis: student.nis || '-', studentName: student.full_name,
-     class: student.class || '-', ekskulId: session.extracurricular_id,
-     ekskulName: ekskul?.name || 'Ekskul Lama', semester: '-', academicYear: '-',
-     isMandatory: ekskul?.is_mandatory || false, mandatoryClass: ekskul?.mandatory_class || null,
-     hadir: 0, izin: 0, alpha: 0, total: 0
-    }
-   }
-   const row = keyMap[key]
-   row.total++
-   if (a.status === 'hadir') row.hadir++
-   else if (a.status === 'izin') row.izin++
-   else row.alpha++
-  })
-
-  return Object.values(keyMap).map(row => {
-   const percentage = row.total > 0 ? Math.round((row.hadir / row.total) * 100) : 0
-   return { ...row, percentage }
-  }).filter(row => {
+  }).filter(Boolean).filter(row => {
    const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
    const matchSemester = selectedSemester ? row.semester === selectedSemester : true
    const matchYear = selectedAcademicYear ? row.academicYear === selectedAcademicYear : true
@@ -531,7 +534,6 @@ status = 'no_session'
  }, [grades, selectedEkskul, selectedSemester, selectedAcademicYear, searchQuery])
 
  // ─── Tab 5: Warning Siswa Bermasalah ──────────────────────────────────────
- // Helper: deteksi alpha berturut-turut hanya dari record yang benar-benar ada
  const getConsecutiveAlpha = (studentId, ekskulId, studentClass) => {
   const ekskulSessions = sessions
    .filter(s => s.extracurricular_id === ekskulId)
@@ -546,12 +548,14 @@ status = 'no_session'
 
    if (isFilled && isInvited && isTargetClass) {
     const att = sessionAtts.find(a => a.student_id === studentId)
-    // Hanya hitung consecutive alpha jika record BENAR-BENAR ada dan statusnya alpha
-    // Jika tidak ada record, jangan anggap alpha (hentikan chain)
-    if (att && att.status === 'alpha') {
-     consecutive++
+    if (att) {
+     if (att.status === 'alpha') {
+      consecutive++
+     } else {
+      break
+     }
     } else {
-     break
+     consecutive++
     }
    }
   }
