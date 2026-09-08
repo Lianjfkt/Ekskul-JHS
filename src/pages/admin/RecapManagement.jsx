@@ -455,23 +455,29 @@ export default function RecapManagement() {
   attendances.forEach(a => {
    const student = a.student
    const session = sessions.find(s => s.id === a.session_id)
-   if (student && session) {
-    const key = `${student.id}_${session.extracurricular_id}`
-    if (!keyMap[key]) {
-     const ekskul = extracurriculars.find(e => e.id === session.extracurricular_id)
-     keyMap[key] = {
-      studentId: student.id, nis: student.nis, studentName: student.full_name,
-      class: student.class, ekskulId: session.extracurricular_id,
-      ekskulName: ekskul?.name || 'Ekskul Lama', semester: '-', academicYear: '-',
-      hadir: 0, izin: 0, alpha: 0, total: 0
-     }
+   if (!student || !session) return
+
+   // Validation checks
+   const isInvited = !session.is_special_training || specialParticipants.some(sp => sp.session_id === session.id && sp.student_id === student.id)
+   const isTargetClass = !session.target_class || session.target_class === 'all' || (student.class && session.target_class.split(',').some(tc => student.class.trim().startsWith(tc)))
+
+   if (!isInvited || !isTargetClass) return
+
+   const key = `${student.id}_${session.extracurricular_id}`
+   if (!keyMap[key]) {
+    const ekskul = extracurriculars.find(e => e.id === session.extracurricular_id)
+    keyMap[key] = {
+     studentId: student.id, nis: student.nis, studentName: student.full_name,
+     class: student.class, ekskulId: session.extracurricular_id,
+     ekskulName: ekskul?.name || 'Ekskul Lama', semester: '-', academicYear: '-',
+     hadir: 0, izin: 0, alpha: 0, total: 0
     }
-    const row = keyMap[key]
-    row.total++
-    if (a.status === 'hadir') row.hadir++
-    else if (a.status === 'izin') row.izin++
-    else if (a.status === 'alpha') row.alpha++
    }
+   const row = keyMap[key]
+   row.total++
+   if (a.status === 'hadir') row.hadir++
+   else if (a.status === 'izin') row.izin++
+   else if (a.status === 'alpha') row.alpha++
   })
   return Object.values(keyMap).map(row => {
    const percentage = row.total > 0 ? Math.round((row.hadir / row.total) * 100) : 0
@@ -570,6 +576,13 @@ export default function RecapManagement() {
    const student = a.student
    const session = sessions.find(s => s.id === a.session_id)
    if (!student || !session) return
+
+   // Validation checks
+   const isInvited = !session.is_special_training || specialParticipants.some(sp => sp.session_id === session.id && sp.student_id === student.id)
+   const isTargetClass = !session.target_class || session.target_class === 'all' || (student.class && session.target_class.split(',').some(tc => student.class.trim().startsWith(tc)))
+
+   if (!isInvited || !isTargetClass) return
+
    const key = `${student.id}_${session.extracurricular_id}`
    if (!keyMap[key]) return
    const row = keyMap[key]
