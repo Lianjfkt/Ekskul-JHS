@@ -196,11 +196,12 @@ export default function ComplianceManagement() {
         return isFilled && isInvited
       })
 
-      const totalSessions = validSessions.length
-      if (totalSessions === 0) return
-
       const sessionIds = validSessions.map(s => s.id)
       const studentAtts = attendances.filter(a => a.student_id === student.id && sessionIds.includes(a.session_id))
+      // Total hanya dihitung dari sesi yang BENAR-BENAR memiliki record absensi untuk siswa ini
+      const totalSessions = studentAtts.length
+      if (totalSessions === 0) return
+
       const attendedCount = studentAtts.filter(a => a.status === 'hadir').length
       const percentage = Math.round((attendedCount / totalSessions) * 100)
 
@@ -222,16 +223,19 @@ export default function ComplianceManagement() {
         })
       }
 
-      // Check consecutive absences (3x Alpha)
-      const sortedAtts = validSessions.map(session => {
-        const att = studentAtts.find(a => a.session_id === session.id)
-        return {
-          session_date: session.session_date,
-          topic: session.topic,
-          status: att ? att.status : 'alpha', // fallback just in case
-          notes: att ? att.notes : 'Tidak ada keterangan'
-        }
-      })
+      // Hanya gunakan sesi yang memiliki record absensi ASLI untuk siswa ini
+      const sortedAtts = validSessions
+        .map(session => {
+          const att = studentAtts.find(a => a.session_id === session.id)
+          if (!att) return null // skip sesi tanpa record
+          return {
+            session_date: session.session_date,
+            topic: session.topic,
+            status: att.status,
+            notes: att.notes || 'Tidak ada keterangan'
+          }
+        })
+        .filter(Boolean)
 
       let maxConsecutiveAlpha = 0
       let currentConsecutiveAlpha = 0
@@ -343,16 +347,19 @@ export default function ComplianceManagement() {
     const sessionIds = ekskulSessions.map(s => s.id)
     const studentAtts = attendances.filter(a => a.student_id === studentId && sessionIds.includes(a.session_id))
     
-    // Construct all logs
-    const logs = ekskulSessions.map(session => {
-      const att = studentAtts.find(a => a.session_id === session.id)
-      return {
-        date: session.session_date,
-        topic: session.topic || 'Tanpa topik',
-        status: att ? att.status : 'alpha', // Default alpha if no record is created yet
-        notes: att?.notes || '-'
-      }
-    })
+    // Construct logs — hanya sesi yang memiliki record absensi
+    const logs = ekskulSessions
+      .map(session => {
+        const att = studentAtts.find(a => a.session_id === session.id)
+        if (!att) return null // skip sesi tanpa record
+        return {
+          date: session.session_date,
+          topic: session.topic || 'Tanpa topik',
+          status: att.status,
+          notes: att.notes || '-'
+        }
+      })
+      .filter(Boolean)
 
     setSelectedAbsenceDetail({
       studentName,

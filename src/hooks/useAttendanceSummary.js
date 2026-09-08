@@ -72,18 +72,23 @@ export function useAttendanceSummary(studentId, extracurricularId) {
         return true
       })
 
-      const enriched = validSessions.map(s => {
-        const att = attMap[s.id]
-        return {
-          id: att?.id || `virtual-${s.id}`,
-          session_id: s.id,
-          student_id: studentId,
-          status: att ? att.status : 'alpha',
-          notes: att?.notes || '',
-          recorded_at: att?.recorded_at || null,
-          session: s
-        }
-      })
+      // HANYA sertakan sesi yang memiliki record absensi ASLI di database.
+      // Jangan buat virtual alpha untuk sesi tanpa record — ini menyebabkan
+      // siswa yang tidak pernah alpa terdeteksi alpa secara palsu.
+      const enriched = validSessions
+        .filter(s => attMap[s.id] !== undefined)
+        .map(s => {
+          const att = attMap[s.id]
+          return {
+            id: att.id,
+            session_id: s.id,
+            student_id: studentId,
+            status: att.status,
+            notes: att.notes || '',
+            recorded_at: att.recorded_at || null,
+            session: s
+          }
+        })
 
       // Sort by session_date descending
       enriched.sort((a, b) => new Date(b.session?.session_date) - new Date(a.session?.session_date))

@@ -462,19 +462,21 @@ export default function RecapManagement() {
    let izin = 0
    let alpha = 0
 
+   // HANYA hitung dari record absensi yang BENAR-BENAR ada di database.
+   // Jika tidak ada record untuk siswa ini di sesi tertentu, JANGAN hitung sebagai alpha.
+   // Ini mencegah false-alpha pada siswa yang enroll setelah sesi berlangsung
+   // atau jika pelatih belum merekam absensi untuk siswa tersebut.
    validSessions.forEach(s => {
     const att = attendances.find(a => a.session_id === s.id && a.student_id === student.id)
     if (att) {
      if (att.status === 'hadir') hadir++
      else if (att.status === 'izin') izin++
      else alpha++
-    } else {
-     // Pelatih sudah submit sesi tapi siswa tidak memiliki record hadir/izin -> terhitung Alpha
-     alpha++
     }
+    // Tidak ada record → tidak dihitung (bukan alpha)
    })
 
-   const total = validSessions.length
+   const total = hadir + izin + alpha
    const percentage = total > 0 ? Math.round((hadir / total) * 100) : 0
 
    return {
@@ -549,14 +551,14 @@ export default function RecapManagement() {
    if (isFilled && isInvited && isTargetClass) {
     const att = sessionAtts.find(a => a.student_id === studentId)
     if (att) {
+     // Record ada di database → cek statusnya
      if (att.status === 'alpha') {
       consecutive++
      } else {
-      break
+      break // hadir/izin → putus chain
      }
-    } else {
-     consecutive++
     }
+    // Tidak ada record → SKIP sesi ini (jangan hitung sebagai alpha)
    }
   }
   return consecutive

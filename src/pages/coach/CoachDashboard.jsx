@@ -131,21 +131,23 @@ export default function CoachDashboard() {
                   const validSessionIds = validSessions.map(s => s.id)
                   const studentAtts = allAtts.filter(a => a.student_id === enr.student_id && validSessionIds.includes(a.session_id))
                   
-                  if (validSessions.length === 0) return
+                  // Total hanya dari sesi yang BENAR-BENAR memiliki record absensi
+                  if (studentAtts.length === 0) return
 
-                  const total = validSessions.length
+                  const total = studentAtts.length
                   const present = studentAtts.filter(a => a.status === 'hadir').length
                   const alphaCount = studentAtts.filter(a => a.status === 'alpha').length
                   const percentage = Math.round((present / total) * 100)
 
-                  // Hitung alpha berturut-turut
+                  // Hitung alpha berturut-turut (hanya dari record yang ada)
                   const sortedSessions = validSessions
                     .slice() // jangan mutasi
                     .sort((a, b) => new Date(b.session_date) - new Date(a.session_date))
                   let consecutiveAlpha = 0
                   for (const session of sortedSessions) {
                     const att = studentAtts.find(a => a.session_id === session.id)
-                    if (att && att.status === 'alpha') consecutiveAlpha++
+                    if (!att) continue // skip sesi tanpa record
+                    if (att.status === 'alpha') consecutiveAlpha++
                     else break
                   }
 
