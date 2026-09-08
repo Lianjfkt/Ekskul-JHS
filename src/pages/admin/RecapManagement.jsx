@@ -1471,6 +1471,14 @@ status = 'no_session'
          <option value="">Semua Ekskul</option>
          {extracurriculars.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
+        <select value={selectedSemester} onChange={e => setSelectedSemester(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300">
+         <option value="">Semua Semester</option>
+         {semesters.map(s => <option key={s} value={s}>Semester {s}</option>)}
+        </select>
+        <select value={selectedAcademicYear} onChange={e => setSelectedAcademicYear(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300">
+         <option value="">Semua Tahun Ajaran</option>
+         {academicYears.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
         <select value={warningTypeFilter} onChange={e => setWarningTypeFilter(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300">
          <option value="">Wajib & Pilihan</option>
          <option value="wajib">Ekskul Wajib</option>
