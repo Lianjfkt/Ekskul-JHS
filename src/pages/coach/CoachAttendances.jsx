@@ -135,7 +135,7 @@ export default function CoachAttendances() {
    if (sessionObj && sessionObj.target_class && sessionObj.target_class !== 'all') {
      const targetClasses = sessionObj.target_class.split(',');
      studentList = studentList.filter(student => 
-       student && student.class && targetClasses.some(tc => student.class.trim().startsWith(tc))
+       student && student.class && targetClasses.some(tc => student.class.trim().startsWith(tc.trim()))
      )
    }
  }
