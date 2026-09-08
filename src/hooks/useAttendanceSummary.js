@@ -13,10 +13,19 @@ export function useAttendanceSummary(studentId, extracurricularId) {
     }
     setLoading(true)
     try {
-      // 1. Get all sessions for the extracurricular
+      // 1. Get student's class to check target_class
+      const { data: studentData } = await supabase
+        .from('students')
+        .select('class')
+        .eq('id', studentId)
+        .single()
+
+      const studentClass = studentData?.class || ''
+
+      // 2. Get all sessions for the extracurricular
       const { data: sessions, error: sErr } = await supabase
         .from('sessions')
-        .select('id, session_date, topic')
+        .select('id, session_date, topic, is_special_training, target_class')
         .eq('extracurricular_id', extracurricularId)
         .order('session_date', { ascending: false })
 
@@ -32,17 +41,38 @@ export function useAttendanceSummary(studentId, extracurricularId) {
       const sessionIds = sessions.map(s => s.id)
       const sessionMap = Object.fromEntries(sessions.map(s => [s.id, s]))
 
-      // 2. Get attendances for those sessions for this student
-      const { data: attData, error: aErr } = await supabase
-        .from('attendances')
-        .select('id, session_id, status, notes, recorded_at')
-        .eq('student_id', studentId)
-        .in('session_id', sessionIds)
+      // 3. Get attendances and special participants for those sessions
+      const [attRes, spRes] = await Promise.all([
+        supabase
+          .from('attendances')
+          .select('id, session_id, status, notes, recorded_at')
+          .eq('student_id', studentId)
+          .in('session_id', sessionIds),
+        supabase
+          .from('special_session_participants')
+          .select('session_id')
+          .eq('student_id', studentId)
+          .in('session_id', sessionIds)
+      ])
 
-      if (aErr) throw aErr
+      if (attRes.error) throw attRes.error
+
+      const specialSessionIds = new Set((spRes.data || []).map(sp => sp.session_id))
+
+      // Filter only attendances from valid sessions (invited / targeted)
+      const validAttendances = (attRes.data || []).filter(a => {
+        const s = sessionMap[a.session_id]
+        if (!s) return false
+        if (s.is_special_training && !specialSessionIds.has(s.id)) return false
+        if (s.target_class && s.target_class !== 'all') {
+          const targetClasses = s.target_class.split(',')
+          if (!studentClass || !targetClasses.some(tc => studentClass.trim().startsWith(tc))) return false
+        }
+        return true
+      })
 
       // Merge session info into attendance records
-      const enriched = (attData || []).map(a => ({
+      const enriched = validAttendances.map(a => ({
         ...a,
         session: sessionMap[a.session_id]
       }))

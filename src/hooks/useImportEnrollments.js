@@ -38,7 +38,7 @@ export function useImportEnrollments() {
     const failed = []
 
     // Resolve student IDs from NIS map and build insert payload
-    const rows = valid.map(({ _index, _rowNum, nis, extracurricular_id, semester, academic_year, status }) => ({
+    const rows = valid.map(({ _rowNum, nis, extracurricular_id, semester, academic_year, status }) => ({
       student_id: nisToStudentId[nis] || null,
       extracurricular_id,
       semester,
@@ -66,7 +66,12 @@ export function useImportEnrollments() {
         label: `Mengimport ${Math.min(current + BATCH_SIZE, total)} dari ${total} data...`,
       })
 
-      const payload = batch.map(({ _rowNum, nis, ...rest }) => rest)
+      const payload = batch.map((item) => {
+        const copy = { ...item }
+        delete copy._rowNum
+        delete copy.nis
+        return copy
+      })
 
       const { error } = await supabase
         .from('enrollments')

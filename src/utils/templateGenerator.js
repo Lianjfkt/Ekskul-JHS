@@ -3,7 +3,7 @@ import { saveAs } from 'file-saver'
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-function applyHeaderStyle(ws, headerRow, cols) {
+function applyHeaderStyle(ws, headerRow) {
   headerRow.forEach((_, colIdx) => {
     const cellAddr = XLSX.utils.encode_cell({ r: 0, c: colIdx })
     if (!ws[cellAddr]) return

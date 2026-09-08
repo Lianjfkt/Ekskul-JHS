@@ -2,11 +2,6 @@ import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 
 const MAX_FILE_SIZE_MB = 5
-const ACCEPTED_TYPES = [
-  'text/csv',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-excel',
-]
 
 /**
  * Validate file type and size before parsing.

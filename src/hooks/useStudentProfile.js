@@ -3,7 +3,7 @@ import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabaseClient'
 
 export function useStudentProfile() {
-  const { studentId, user } = useAuthStore()
+  const { studentId } = useAuthStore()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

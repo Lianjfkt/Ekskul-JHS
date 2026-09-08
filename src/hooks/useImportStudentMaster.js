@@ -50,7 +50,12 @@ export function useImportStudentMaster() {
       })
 
       // Strip internal tracking keys before upserting
-      const cleaned = batch.map(({ _index, _rowNum, ...rest }) => rest)
+      const cleaned = batch.map((item) => {
+        const copy = { ...item }
+        delete copy._index
+        delete copy._rowNum
+        return copy
+      })
 
       const { error } = await supabase
         .from('student_master')

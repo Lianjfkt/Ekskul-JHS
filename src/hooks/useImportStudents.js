@@ -57,9 +57,14 @@ export function useImportStudents() {
       })
 
       // Strip internal tracking keys before upserting
-      const cleaned = batch.map(({ _index, _rowNum, ...rest }) => rest)
+      const cleaned = batch.map((item) => {
+        const copy = { ...item }
+        delete copy._index
+        delete copy._rowNum
+        return copy
+      })
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('students')
         .upsert(cleaned, { onConflict: 'nis', returning: 'representation' })
 

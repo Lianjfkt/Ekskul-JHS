@@ -92,18 +92,20 @@ export default function EnrollmentManagement() {
  }
  }
 
- const handleOpenModal = () => {
- setForm({
- student_id: '',
- extracurricular_id: extracurriculars[0]?.id || '',
- semester: 'Ganjil',
- academic_year: '2026/2027',
- status: 'active'
- })
- setFormStudentSearch('')
- setShowStudentDropdown(false)
- setIsModalOpen(true)
- }
+  const handleOpenModal = () => {
+    const currentYear = new Date().getFullYear()
+    const defaultAcademicYear = `${currentYear}/${currentYear + 1}`
+    setForm({
+      student_id: '',
+      extracurricular_id: extracurriculars.length > 0 ? extracurriculars[0].id : '',
+      semester: 'Ganjil',
+      academic_year: defaultAcademicYear,
+      status: 'active'
+    })
+    setFormStudentSearch('')
+    setShowStudentDropdown(false)
+    setIsModalOpen(true)
+  }
 
  const handleSubmit = async (e) => {
  e.preventDefault()

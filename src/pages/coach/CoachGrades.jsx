@@ -90,17 +90,19 @@ export default function CoachGrades() {
  // Only count sessions that have been filled (isFilled = at least one attendance record)
  const { data: sessionsData } = await supabase
  .from('sessions')
- .select('id')
+ .select('id, is_special_training, target_class')
  .eq('extracurricular_id', ekskulId)
 
  const sessionIds = (sessionsData || []).map(s => s.id)
  let attendancesData = []
+ let specialParts = []
  if (sessionIds.length > 0) {
- const { data: atts } = await supabase
- .from('attendances')
- .select('student_id, status, session_id')
- .in('session_id', sessionIds)
- attendancesData = atts || []
+ const [attsRes, spRes] = await Promise.all([
+   supabase.from('attendances').select('student_id, status, session_id').in('session_id', sessionIds),
+   supabase.from('special_session_participants').select('session_id, student_id').in('session_id', sessionIds)
+ ])
+ attendancesData = attsRes.data || []
+ specialParts = spRes.data || []
  }
 
  // Sesi yang sudah terisi (ada minimal 1 attendance record)
@@ -110,10 +112,22 @@ export default function CoachGrades() {
 
  // Map dynamic attendance to each student object
  const enrichedStudents = studentList.map(student => {
+ // Hanya hitung sesi yang valid untuk siswa ini:
+ const studentValidSessions = (sessionsData || []).filter(s => {
+   if (!filledSessionIds.has(s.id)) return false
+   if (s.is_special_training && !specialParts.some(sp => sp.session_id === s.id && sp.student_id === student.id)) return false
+   if (s.target_class && s.target_class !== 'all') {
+     const targetClasses = s.target_class.split(',')
+     if (!student.class || !targetClasses.some(tc => student.class.trim().startsWith(tc))) return false
+   }
+   return true
+ })
+
+ const validSessionIds = new Set(studentValidSessions.map(s => s.id))
  const studentAtts = attendancesData.filter(
- a => a.student_id === student.id && filledSessionIds.has(a.session_id)
+ a => a.student_id === student.id && validSessionIds.has(a.session_id)
  )
- const total = filledSessionIds.size // Total sesi yang sudah diisi
+ const total = studentValidSessions.length
  const hadir = studentAtts.filter(a => a.status === 'hadir').length
  const attendancePercentage = total > 0 ? Math.round((hadir / total) * 100) : 0
  return {

@@ -517,7 +517,7 @@ export default function RecapManagement() {
 
  // ─── Tab 5: Warning Siswa Bermasalah ──────────────────────────────────────
  // Helper: deteksi alpha berturut-turut
- const getConsecutiveAlpha = (studentId, ekskulId) => {
+ const getConsecutiveAlpha = (studentId, ekskulId, studentClass) => {
   const ekskulSessions = sessions
    .filter(s => s.extracurricular_id === ekskulId)
    .sort((a, b) => new Date(b.session_date) - new Date(a.session_date)) // terbaru dulu
@@ -527,8 +527,9 @@ export default function RecapManagement() {
    const sessionAtts = attendances.filter(a => a.session_id === session.id)
    const isFilled = sessionAtts.length > 0
    const isInvited = !session.is_special_training || specialParticipants.some(sp => sp.session_id === session.id && sp.student_id === studentId)
+   const isTargetClass = !session.target_class || session.target_class === 'all' || (studentClass && session.target_class.split(',').some(tc => studentClass.trim().startsWith(tc)))
    
-   if (isFilled && isInvited) {
+   if (isFilled && isInvited && isTargetClass) {
     const att = sessionAtts.find(a => a.student_id === studentId)
     if (att && att.status === 'alpha') {
      consecutive++
@@ -584,7 +585,7 @@ export default function RecapManagement() {
    if (row.total === 0) return
 
    const percentage = Math.round((row.hadir / row.total) * 100)
-   const consecutiveAlpha = getConsecutiveAlpha(row.studentId, row.ekskulId)
+   const consecutiveAlpha = getConsecutiveAlpha(row.studentId, row.ekskulId, row.class)
 
    let warningLevel = null
    let warningLabel = ''

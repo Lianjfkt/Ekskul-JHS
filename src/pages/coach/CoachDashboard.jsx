@@ -107,7 +107,7 @@ export default function CoachDashboard() {
         
       const warnings = []
       if (activeStudents && activeStudents.length > 0) {
-        const { data: allSessions } = await supabase.from('sessions').select('id, session_date, extracurricular_id, is_special_training').in('extracurricular_id', ekskulIds)
+        const { data: allSessions } = await supabase.from('sessions').select('id, session_date, extracurricular_id, is_special_training, target_class').in('extracurricular_id', ekskulIds)
         if (allSessions && allSessions.length > 0) {
            const allSessionIds = allSessions.map(s => s.id)
            const { data: allAtts } = await supabase.from('attendances').select('student_id, session_id, status').in('session_id', allSessionIds)
@@ -120,11 +120,12 @@ export default function CoachDashboard() {
                   const ekskulSessions = allSessions
                     .filter(s => s.extracurricular_id === enr.extracurricular_id)
                   
-                  // Filter only sessions that have been filled and where the student was invited
+                  // Filter only sessions that have been filled and where the student was invited / targeted
                   const validSessions = ekskulSessions.filter(s => {
                     const isFilled = allAtts.some(a => a.session_id === s.id)
                     const isInvited = !s.is_special_training || (specialParts && specialParts.some(sp => sp.session_id === s.id && sp.student_id === enr.student_id))
-                    return isFilled && isInvited
+                    const isTargetClass = !s.target_class || s.target_class === 'all' || (enr.students?.class && s.target_class.split(',').some(tc => enr.students.class.trim().startsWith(tc)))
+                    return isFilled && isInvited && isTargetClass
                   })
 
                   const validSessionIds = validSessions.map(s => s.id)
