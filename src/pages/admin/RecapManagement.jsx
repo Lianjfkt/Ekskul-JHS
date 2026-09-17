@@ -340,57 +340,79 @@ export default function RecapManagement() {
   fetchData()
  }, [])
 
- const fetchData = async () => {
-  setLoading(true)
-  setErrorMsg('')
-  try {
-   const [
-    { data: ekskulData, error: eErr },
-    { data: enrollmentsData, error: enErr },
-    { data: gradesData, error: gErr },
-    { data: sessionsData, error: sErr },
-    { data: attendancesData, error: aErr },
-    { data: coachesData, error: cErr },
-    { data: spData, error: spErr }
-   ] = await Promise.all([
-    supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email), coach3:coach_id_3 (id, full_name, email)').order('name', { ascending: true }),
-    supabase.from('enrollments').select('*, student:student_id (id, nis, full_name, class)').eq('status', 'active').range(0, 9999),
-    supabase.from('grades').select('*, student:student_id (id, nis, full_name, class), extracurricular:extracurricular_id (id, name)').range(0, 9999),
-    supabase.from('sessions').select(`
-      *,
-      creator:created_by (id, full_name, email),
-      extracurricular:extracurricular_id (
-        id,
-        name,
-        coach:coach_id (id, full_name, email),
-        coach2:coach_id_2 (id, full_name, email),
-        coach3:coach_id_3 (id, full_name, email)
-      ),
-      session_coaches (
-        id,
-        coach:coach_id (id, full_name, email)
-      )
-    `).order('session_date', { ascending: false }).range(0, 9999),
-    supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)').range(0, 9999),
-    supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true }).range(0, 9999),
-    supabase.from('special_session_participants').select('*').range(0, 9999)
-   ])
+  // Helper pagination untuk menarik SEMUA data tanpa terpotong batas 1000 baris Supabase
+  const fetchAllPaginated = async (queryFn) => {
+   let allData = []
+   let from = 0
+   const pageSize = 1000
+   while (true) {
+    const { data, error } = await queryFn(from, from + pageSize - 1)
+    if (error) throw error
+    if (!data || data.length === 0) break
+    allData = allData.concat(data)
+    if (data.length < pageSize) break
+    from += pageSize
+   }
+   return allData
+  }
 
-   if (eErr) throw eErr
-   if (enErr) throw enErr
-   if (gErr) throw gErr
-   if (sErr) throw sErr
-   if (aErr) throw aErr
-   if (cErr) throw cErr
-   if (spErr) throw spErr
+  const fetchData = async () => {
+   setLoading(true)
+   setErrorMsg('')
+   try {
+    const [
+     ekskulData,
+     enrollmentsData,
+     gradesData,
+     sessionsData,
+     attendancesData,
+     coachesData,
+     spData
+    ] = await Promise.all([
+     fetchAllPaginated((from, to) =>
+      supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email), coach3:coach_id_3 (id, full_name, email)').order('name', { ascending: true }).range(from, to)
+     ),
+     fetchAllPaginated((from, to) =>
+      supabase.from('enrollments').select('*, student:student_id (id, nis, full_name, class)').eq('status', 'active').range(from, to)
+     ),
+     fetchAllPaginated((from, to) =>
+      supabase.from('grades').select('*, student:student_id (id, nis, full_name, class), extracurricular:extracurricular_id (id, name)').range(from, to)
+     ),
+     fetchAllPaginated((from, to) =>
+      supabase.from('sessions').select(`
+        *,
+        creator:created_by (id, full_name, email),
+        extracurricular:extracurricular_id (
+          id,
+          name,
+          coach:coach_id (id, full_name, email),
+          coach2:coach_id_2 (id, full_name, email),
+          coach3:coach_id_3 (id, full_name, email)
+        ),
+        session_coaches (
+          id,
+          coach:coach_id (id, full_name, email)
+        )
+      `).order('session_date', { ascending: false }).range(from, to)
+     ),
+     fetchAllPaginated((from, to) =>
+      supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)').range(from, to)
+     ),
+     fetchAllPaginated((from, to) =>
+      supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true }).range(from, to)
+     ),
+     fetchAllPaginated((from, to) =>
+      supabase.from('special_session_participants').select('*').range(from, to)
+     )
+    ])
 
-   setExtracurriculars(ekskulData || [])
-   setEnrollments(enrollmentsData || [])
-   setGrades(gradesData || [])
-   setSessions(sessionsData || [])
-   setAttendances(attendancesData || [])
-   setCoaches(coachesData || [])
-   setSpecialParticipants(spData || [])
+    setExtracurriculars(ekskulData || [])
+    setEnrollments(enrollmentsData || [])
+    setGrades(gradesData || [])
+    setSessions(sessionsData || [])
+    setAttendances(attendancesData || [])
+    setCoaches(coachesData || [])
+    setSpecialParticipants(spData || [])
   } catch (err) {
    console.error('Error fetching recap data:', err.message)
    setErrorMsg('Gagal memuat data laporan: ' + err.message)
