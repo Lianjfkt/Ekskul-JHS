@@ -11,6 +11,8 @@ import { jsPDF } from 'jspdf'
 import 'jspdf-autotable'
 import { addKopSuratToPDF } from '../../utils/pdfHelper'
 import { isSessionApplicableToStudent, evaluateAttendanceRisk } from '../../utils/attendanceRiskEngine'
+import { matchesClass } from '../../utils/classHelper'
+import { fetchAllPaginated } from '../../utils/supabaseHelper'
 import * as XLSX from 'xlsx'
 
 export default function ComplianceManagement() {
@@ -42,30 +44,36 @@ export default function ComplianceManagement() {
     setErrorMsg('')
     try {
       const [
-        { data: studentsData, error: sErr },
-        { data: ekskulData, error: eErr },
-        { data: enrollmentsData, error: enErr },
-        { data: sessionsData, error: sesErr },
-        { data: attendancesData, error: aErr },
-        { data: gradesData, error: gErr },
-        { data: spData, error: spErr }
+        studentsData,
+        ekskulData,
+        enrollmentsData,
+        sessionsData,
+        attendancesData,
+        gradesData,
+        spData
       ] = await Promise.all([
-        supabase.from('students').select('*').order('full_name', { ascending: true }).range(0, 9999),
-        supabase.from('extracurriculars').select('*'),
-        supabase.from('enrollments').select('*, extracurricular:extracurricular_id(*)').eq('status', 'active').range(0, 9999),
-        supabase.from('sessions').select('*').order('session_date', { ascending: true }).range(0, 9999),
-        supabase.from('attendances').select('*').range(0, 9999),
-        supabase.from('grades').select('*, extracurricular:extracurricular_id(*)').range(0, 9999),
-        supabase.from('special_session_participants').select('*').range(0, 9999)
+        fetchAllPaginated((from, to) =>
+          supabase.from('students').select('*').order('full_name', { ascending: true }).range(from, to)
+        ),
+        fetchAllPaginated((from, to) =>
+          supabase.from('extracurriculars').select('*').range(from, to)
+        ),
+        fetchAllPaginated((from, to) =>
+          supabase.from('enrollments').select('*, extracurricular:extracurricular_id(*)').eq('status', 'active').range(from, to)
+        ),
+        fetchAllPaginated((from, to) =>
+          supabase.from('sessions').select('*').order('session_date', { ascending: true }).range(from, to)
+        ),
+        fetchAllPaginated((from, to) =>
+          supabase.from('attendances').select('*').range(from, to)
+        ),
+        fetchAllPaginated((from, to) =>
+          supabase.from('grades').select('*, extracurricular:extracurricular_id(*)').range(from, to)
+        ),
+        fetchAllPaginated((from, to) =>
+          supabase.from('special_session_participants').select('*').range(from, to)
+        )
       ])
-
-      if (sErr) throw sErr
-      if (eErr) throw eErr
-      if (enErr) throw enErr
-      if (sesErr) throw sesErr
-      if (aErr) throw aErr
-      if (gErr) throw gErr
-      if (spErr) throw spErr
 
       setStudents(studentsData || [])
       setExtracurriculars(ekskulData || [])

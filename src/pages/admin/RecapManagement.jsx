@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { matchesClass } from '../../utils/classHelper'
+import { fetchAllPaginated } from '../../utils/supabaseHelper'
 import { supabase } from '../../lib/supabaseClient'
 import { 
  Card, 
@@ -340,21 +341,8 @@ export default function RecapManagement() {
   fetchData()
  }, [])
 
-  // Helper pagination untuk menarik SEMUA data tanpa terpotong batas 1000 baris Supabase
-  const fetchAllPaginated = async (queryFn) => {
-   let allData = []
-   let from = 0
-   const pageSize = 1000
-   while (true) {
-    const { data, error } = await queryFn(from, from + pageSize - 1)
-    if (error) throw error
-    if (!data || data.length === 0) break
-    allData = allData.concat(data)
-    if (data.length < pageSize) break
-    from += pageSize
-   }
-   return allData
-  }
+
+
 
   const fetchData = async () => {
    setLoading(true)

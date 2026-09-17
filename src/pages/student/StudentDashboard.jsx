@@ -5,133 +5,160 @@ import { useStudentProfile } from '../../hooks/useStudentProfile'
 import { supabase } from '../../lib/supabaseClient'
 import { Progress } from '@/components/ui/progress'
 import AnnouncementBanner from '../../components/shared/AnnouncementBanner'
+import { evaluateAttendanceRisk, isSessionApplicableToStudent } from '../../utils/attendanceRiskEngine'
 import { 
- Waves, CalendarDays, Clock, ChevronRight, 
- TrendingUp, AlertCircle, CheckCircle2, Loader2
+  Waves, CalendarDays, Clock, ChevronRight, 
+  TrendingUp, AlertCircle, CheckCircle2, Loader2
 } from 'lucide-react'
 
 function SkeletonCard() {
- return (
- <div className="bg-pixel-panel rounded-none p-5 shadow-pixel-sm border border-violet-50 animate-pulse">
- <div className="h-4 bg-slate-200 rounded w-2/3 mb-3"></div>
- <div className="h-3 bg-slate-100 rounded w-1/2 mb-4"></div>
- <div className="h-2 bg-slate-100 rounded w-full mb-2"></div>
- <div className="h-3 bg-slate-200 rounded w-1/4"></div>
- </div>
- )
+  return (
+    <div className="bg-pixel-panel rounded-none p-5 shadow-pixel-sm border border-violet-50 animate-pulse">
+      <div className="h-4 bg-slate-200 rounded w-2/3 mb-3"></div>
+      <div className="h-3 bg-slate-100 rounded w-1/2 mb-4"></div>
+      <div className="h-2 bg-slate-100 rounded w-full mb-2"></div>
+      <div className="h-3 bg-slate-200 rounded w-1/4"></div>
+    </div>
+  )
 }
 
 function AttendanceBadge({ pct }) {
- if (pct >= 75) return <span className="font-retro text-base text-pixel-green">{pct}%</span>
- if (pct >= 50) return <span className="font-retro text-base text-pixel-orange">{pct}%</span>
- return <span className="font-retro text-base text-pixel-red">{pct}%</span>
+  if (pct >= 75) return <span className="font-retro text-base text-pixel-green">{pct}%</span>
+  if (pct >= 50) return <span className="font-retro text-base text-pixel-orange">{pct}%</span>
+  return <span className="font-retro text-base text-pixel-red">{pct}%</span>
 }
 
 function progressColor(pct) {
- if (pct >= 75) return 'bg-pixel-green/100'
- if (pct >= 50) return 'bg-amber-500'
- return 'bg-pixel-red/100'
+  if (pct >= 75) return 'bg-pixel-green/100'
+  if (pct >= 50) return 'bg-amber-500'
+  return 'bg-pixel-red/100'
 }
 
 export default function StudentDashboard() {
- const { studentId } = useAuthStore()
- const { profile, loading: profileLoading } = useStudentProfile()
- const [enrollments, setEnrollments] = useState([])
- const [upcomingSessions, setUpcomingSessions] = useState([])
- const [loading, setLoading] = useState(true)
- const [showAll, setShowAll] = useState(false)
+  const { studentId } = useAuthStore()
+  const { profile, loading: profileLoading } = useStudentProfile()
+  const [enrollments, setEnrollments] = useState([])
+  const [upcomingSessions, setUpcomingSessions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showAll, setShowAll] = useState(false)
 
- useEffect(() => {
- if (studentId) {
- fetchDashboardData()
+  useEffect(() => {
+    if (studentId) {
+      fetchDashboardData()
 
- const channel = supabase
- .channel(`student-dash-${studentId}`)
- .on('postgres_changes', {
- event: '*',
- schema: 'public',
- table: 'attendances',
- filter: `student_id=eq.${studentId}`
- }, () => fetchDashboardData())
- .on('postgres_changes', {
- event: '*',
- schema: 'public',
- table: 'grades',
- filter: `student_id=eq.${studentId}`
- }, () => fetchDashboardData())
- .subscribe()
+      const channel = supabase
+        .channel(`student-dash-${studentId}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'attendances',
+          filter: `student_id=eq.${studentId}`
+        }, () => fetchDashboardData())
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'grades',
+          filter: `student_id=eq.${studentId}`
+        }, () => fetchDashboardData())
+        .subscribe()
 
- return () => {
- supabase.removeChannel(channel)
- }
- } else {
- setLoading(false)
- }
- }, [studentId])
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    } else {
+      setLoading(false)
+    }
+  }, [studentId, profile])
 
- const fetchDashboardData = async () => {
- setLoading(true)
- try {
- // Fetch enrollments + extracurricular info
- const { data: enrollData, error: eErr } = await supabase
- .from('enrollments')
- .select(`
- id, semester, academic_year, status,
- extracurriculars(id, name, schedule, description, coach_id,
- coach:coach_id(full_name), coach2:coach_id_2(full_name), coach3:coach_id_3(full_name)
- )
- `)
- .eq('student_id', studentId)
- .eq('status', 'active')
+  const fetchDashboardData = async () => {
+    setLoading(true)
+    try {
+      // Fetch enrollments + extracurricular info
+      const { data: enrollData, error: eErr } = await supabase
+        .from('enrollments')
+        .select(`
+          id, semester, academic_year, status,
+          extracurriculars(id, name, schedule, description, coach_id, is_mandatory, mandatory_class,
+            coach:coach_id(full_name), coach2:coach_id_2(full_name), coach3:coach_id_3(full_name)
+          )
+        `)
+        .eq('student_id', studentId)
+        .eq('status', 'active')
 
- if (eErr) throw eErr
+      if (eErr) throw eErr
 
- // For each enrollment, fetch attendance %
- const enriched = await Promise.all((enrollData || []).map(async enr => {
- const ekskulId = enr.extracurriculars?.id
- if (!ekskulId) return { ...enr, pct: 0, lastGrade: null }
+      const student = profile || { id: studentId }
 
- // Get sessions
- const { data: sessions } = await supabase
- .from('sessions')
- .select('id')
- .eq('extracurricular_id', ekskulId)
+      // For each enrollment, fetch attendance % using attendance risk engine
+      const enriched = await Promise.all((enrollData || []).map(async enr => {
+        const ekskul = enr.extracurriculars
+        const ekskulId = ekskul?.id
+        if (!ekskulId) return { ...enr, pct: 0, lastGrade: null }
 
- const sessionIds = (sessions || []).map(s => s.id)
- let pct = 0
+        // Get sessions
+        const { data: sessions } = await supabase
+          .from('sessions')
+          .select('id, session_date, topic, is_special_training, target_class, attendance_submitted')
+          .eq('extracurricular_id', ekskulId)
+          .order('session_date', { ascending: false })
 
- if (sessionIds.length > 0) {
- const { data: atts } = await supabase
- .from('attendances')
- .select('status')
- .eq('student_id', studentId)
- .in('session_id', sessionIds)
+        let pct = 0
 
- const hadir = (atts || []).filter(a => a.status === 'hadir').length
- pct = atts?.length > 0 ? Math.round((hadir / atts.length) * 100) : 0
- }
+        if (sessions && sessions.length > 0) {
+          const sessionIds = sessions.map(s => s.id)
+          const [attRes, spRes] = await Promise.all([
+            supabase
+              .from('attendances')
+              .select('id, session_id, status, notes')
+              .eq('student_id', studentId)
+              .in('session_id', sessionIds),
+            supabase
+              .from('special_session_participants')
+              .select('session_id, student_id')
+              .eq('student_id', studentId)
+              .in('session_id', sessionIds)
+          ])
 
- // Get last grade
- const { data: gradeData } = await supabase
- .from('grades')
- .select('attitude_score, skill_score, activity_score, semester')
- .eq('student_id', studentId)
- .eq('extracurricular_id', ekskulId)
- .order('graded_at', { ascending: false })
- .limit(1)
- .maybeSingle()
+          const rawAtts = attRes.data || []
+          const specialParts = spRes.data || []
 
- let lastGrade = null
- if (gradeData) {
- const avg = Math.round(
- ((gradeData.attitude_score || 0) + (gradeData.skill_score || 0) + (gradeData.activity_score || 0)) / 3
- )
- const predikat = avg >= 90 ? 'A' : avg >= 75 ? 'B' : avg >= 60 ? 'C' : 'D'
- lastGrade = { avg, predikat, semester: gradeData.semester }
- }
+          const validSessions = sessions.filter(s =>
+            isSessionApplicableToStudent(s, student, specialParts, rawAtts)
+          )
+          const validSessionIds = new Set(validSessions.map(s => s.id))
+          const studentAtts = rawAtts.filter(a => validSessionIds.has(a.session_id))
 
- return { ...enr, pct, lastGrade }
- }))
+          const risk = evaluateAttendanceRisk({
+            student,
+            ekskul,
+            studentAtts,
+            validSessions
+          })
+
+          pct = risk.percentage
+        }
+
+        // Get last grade
+        const { data: gradeData } = await supabase
+          .from('grades')
+          .select('attitude_score, skill_score, activity_score, semester')
+          .eq('student_id', studentId)
+          .eq('extracurricular_id', ekskulId)
+          .order('graded_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        let lastGrade = null
+        if (gradeData) {
+          const avg = Math.round(
+            ((gradeData.attitude_score || 0) + (gradeData.skill_score || 0) + (gradeData.activity_score || 0)) / 3
+          )
+          const predikat = avg >= 90 ? 'A' : avg >= 75 ? 'B' : avg >= 60 ? 'C' : 'D'
+          lastGrade = { avg, predikat, semester: gradeData.semester }
+        }
+
+        return { ...enr, pct, lastGrade }
+      }))
 
  setEnrollments(enriched)
 
