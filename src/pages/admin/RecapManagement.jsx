@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { matchesClass } from '../../utils/classHelper'
 import { supabase } from '../../lib/supabaseClient'
 import { 
  Card, 
@@ -666,7 +667,7 @@ export default function RecapManagement() {
    const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
    const matchSemester = selectedSemester ? row.semester === selectedSemester : true
    const matchYear = selectedAcademicYear ? row.academicYear === selectedAcademicYear : true
-   const matchClass = selectedClass ? (selectedClass.length <= 2 ? row.class?.startsWith(selectedClass) : row.class === selectedClass) : true
+   const matchClass = selectedClass ? matchesClass(row.class, selectedClass) : true
    const matchSearch = searchQuery
     ? row.studentName.toLowerCase().includes(searchQuery.toLowerCase()) || row.nis.includes(searchQuery)
     : true
@@ -706,7 +707,7 @@ export default function RecapManagement() {
    const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
    const matchSemester = selectedSemester ? row.semester === selectedSemester : true
    const matchYear = selectedAcademicYear ? row.academicYear === selectedAcademicYear : true
-   const matchClass = selectedClass ? (selectedClass.length <= 2 ? row.class?.startsWith(selectedClass) : row.class === selectedClass) : true
+   const matchClass = selectedClass ? matchesClass(row.class, selectedClass) : true
    const matchSearch = searchQuery
     ? row.studentName.toLowerCase().includes(searchQuery.toLowerCase()) || row.nis.includes(searchQuery)
     : true

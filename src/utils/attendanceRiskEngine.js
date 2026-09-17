@@ -1,3 +1,5 @@
+import { matchesClass } from './classHelper'
+
 /**
  * Attendance Risk Engine
  * Engine terpusat untuk mendeteksi siswa yang berisiko / jarang hadir / sering alpa
@@ -32,13 +34,12 @@ export function isSessionApplicableToStudent(session, student, specialParticipan
     if (!isInvited) return false
   }
 
-  // 3. Cek target kelas
-  if (session.target_class && session.target_class !== 'all') {
+  // 3. Cek target kelas menggunakan matching cerdas (Arab & Romawi)
+  if (session.target_class && !['all', '', 'semua'].includes(String(session.target_class).trim().toLowerCase())) {
     if (!studentClass) return false
-    const targetClasses = session.target_class.split(',').map(tc => tc.trim().toLowerCase())
-    const normalizedStudentClass = studentClass.trim().toLowerCase()
-    const isTarget = targetClasses.some(tc => normalizedStudentClass.startsWith(tc))
-    if (!isTarget) return false
+    if (!matchesClass(studentClass, session.target_class)) {
+      return false
+    }
   }
 
   return true

@@ -315,7 +315,7 @@ export default function ComplianceManagement() {
     return data.filter(item => {
       const q = searchQuery.toLowerCase().trim()
       const matchSearch = !q || item.full_name?.toLowerCase().includes(q) || item.nis?.includes(q)
-      const matchClass = classFilter === 'all' || item.class?.trim().startsWith(classFilter)
+      const matchClass = classFilter === 'all' || matchesClass(item.class, classFilter)
       return matchSearch && matchClass
     })
   }

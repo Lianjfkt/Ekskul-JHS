@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuthStore } from '../../stores/authStore'
+import { matchesClass } from '../../utils/classHelper'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -116,9 +117,8 @@ export default function CoachGrades() {
  const studentValidSessions = (sessionsData || []).filter(s => {
    if (!filledSessionIds.has(s.id)) return false
    if (s.is_special_training && !specialParts.some(sp => sp.session_id === s.id && sp.student_id === student.id)) return false
-   if (s.target_class && s.target_class !== 'all') {
-     const targetClasses = s.target_class.split(',')
-     if (!student.class || !targetClasses.some(tc => student.class.trim().startsWith(tc))) return false
+    if (s.target_class && s.target_class !== 'all') {
+      if (!student.class || !matchesClass(student.class, s.target_class)) return false
    }
    return true
  })

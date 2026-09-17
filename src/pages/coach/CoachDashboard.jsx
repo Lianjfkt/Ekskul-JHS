@@ -131,7 +131,7 @@ export default function CoachDashboard() {
                   const validSessionIds = new Set(validSessions.map(s => s.id))
                   const studentAtts = allAtts.filter(a => a.student_id === enr.student_id && validSessionIds.has(a.session_id))
                   
-                  if (studentAtts.length === 0) return
+                  if (validSessions.length === 0 && studentAtts.length === 0) return
 
                   const risk = evaluateAttendanceRisk({
                     student,

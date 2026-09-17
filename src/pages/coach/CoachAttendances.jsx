@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuthStore } from '../../stores/authStore'
+import { matchesClass } from '../../utils/classHelper'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -135,9 +136,8 @@ export default function CoachAttendances() {
 
    // Filter students by target_class if specified
    if (sessionObj && sessionObj.target_class && sessionObj.target_class !== 'all') {
-     const targetClasses = sessionObj.target_class.split(',');
      studentList = studentList.filter(student => 
-       student && student.class && targetClasses.some(tc => student.class.trim().startsWith(tc.trim()))
+       student && student.class && matchesClass(student.class, sessionObj.target_class)
      )
    }
  }

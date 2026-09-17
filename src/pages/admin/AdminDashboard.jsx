@@ -107,9 +107,9 @@ export default function AdminDashboard() {
   })
 
   // 4. Hitung jumlah siswa per kelas (startsWith agar cocok dengan '7A', '7B', '8C', dll.)
-  const class7Count = trackingStudents.filter(s => s.class?.trim().startsWith('7')).length;
-  const class8Count = trackingStudents.filter(s => s.class?.trim().startsWith('8')).length;
-  const class9Count = trackingStudents.filter(s => s.class?.trim().startsWith('9')).length;
+  const class7Count = trackingStudents.filter(s => getGradeFromClass(s.class) === '7').length;
+  const class8Count = trackingStudents.filter(s => getGradeFromClass(s.class) === '8').length;
+  const class9Count = trackingStudents.filter(s => getGradeFromClass(s.class) === '9').length;
 
    const exportViolationsToPDF = async (filteredData) => {
     const doc = new jsPDF()
@@ -953,7 +953,7 @@ export default function AdminDashboard() {
                   let filtered = mandatoryViolations.filter(v => {
                     const q = violationSearch.toLowerCase().trim()
                     const matchSearch = !q || v.full_name?.toLowerCase().includes(q) || v.nis?.includes(q)
-                    const matchClass = violationClassFilter === 'all' || v.class?.trim().startsWith(violationClassFilter)
+                    const matchClass = violationClassFilter === 'all' || matchesClass(v.class, violationClassFilter)
                     return matchSearch && matchClass
                   })
                   filtered = [...filtered].sort((a, b) => {
