@@ -55,7 +55,6 @@ export function calculateTrailingConsecutiveAlpha(studentAtts) {
     return 0
   }
 
-  // Pastikan terurut dari terbaru ke terlama
   const sortedDesc = [...studentAtts].sort((a, b) => {
     const dateA = a.session?.session_date || a.recorded_at || ''
     const dateB = b.session?.session_date || b.recorded_at || ''
@@ -133,6 +132,8 @@ export function evaluateAttendanceRisk({
 
   // Persentase kehadiran riil
   const percentage = total > 0 ? Math.round((hadir / total) * 100) : 0
+  const totalActive = hadir + izin
+  const activePercentage = total > 0 ? Math.round((totalActive / total) * 100) : 0
   const consecutiveAlpha = calculateTrailingConsecutiveAlpha(studentAtts)
   const maxConsecutiveAlpha = calculateMaxHistoricalConsecutiveAlpha(studentAtts)
 
@@ -161,6 +162,7 @@ export function evaluateAttendanceRisk({
       unrecordedAlpha: 0,
       total: 0,
       percentage: 0,
+      activePercentage: 0,
       consecutiveAlpha: 0,
       maxConsecutiveAlpha: 0,
       isMandatory
@@ -169,6 +171,7 @@ export function evaluateAttendanceRisk({
 
   // ──────────────────────────────────────────────────────────────────────────
   // ATURAN EVALUASI RISIKO (Wajib vs Pilihan)
+  // Sanksi BK / SP HANYA diberikan jika ada ALPA atau ketidakhadiran tanpa izin
   // ──────────────────────────────────────────────────────────────────────────
 
   if (isMandatory) {
@@ -176,11 +179,11 @@ export function evaluateAttendanceRisk({
 
     const isCriticalStreak = consecutiveAlpha >= 2
     const isCriticalTotalAlpha = alpha >= 3
-    const isCriticalPercentage = percentage < 70
-    const isPassiveStudent = total >= 4 && hadir <= 1
+    const isCriticalPercentage = alpha > 0 && percentage < 70
+    const isPassiveStudent = total >= 4 && hadir <= 1 && alpha >= 2
 
     const isWarningTotalAlpha = alpha >= 1 && alpha < 3
-    const isWarningPercentage = percentage >= 70 && percentage < 80
+    const isWarningPercentage = alpha > 0 && percentage >= 70 && percentage < 80
 
     if (isCriticalStreak || isCriticalTotalAlpha || isCriticalPercentage || isPassiveStudent) {
       warningLevel = 'TEGURAN'
@@ -222,12 +225,12 @@ export function evaluateAttendanceRisk({
 
     const isCriticalStreak = consecutiveAlpha >= 4
     const isCriticalTotalAlpha = alpha >= 5
-    const isCriticalPercentage = percentage < 55
-    const isPassiveStudent = total >= 5 && hadir <= 1
+    const isCriticalPercentage = alpha > 0 && percentage < 55
+    const isPassiveStudent = total >= 5 && hadir <= 1 && alpha >= 2
 
     const isWarningStreak = consecutiveAlpha >= 2 && consecutiveAlpha < 4
     const isWarningTotalAlpha = alpha >= 3 && alpha < 5
-    const isWarningPercentage = percentage >= 55 && percentage < 70
+    const isWarningPercentage = alpha > 0 && percentage >= 55 && percentage < 70
 
     if (isCriticalStreak || isCriticalTotalAlpha || isCriticalPercentage || isPassiveStudent) {
       warningLevel = 'TEGURAN'
@@ -292,6 +295,7 @@ export function evaluateAttendanceRisk({
     unrecordedAlpha: 0,
     total,
     percentage,
+    activePercentage,
     consecutiveAlpha,
     maxConsecutiveAlpha,
     isMandatory
@@ -361,6 +365,7 @@ export function processBatchAttendanceReport({
       alpha: risk.alpha,
       total: risk.total,
       percentage: risk.percentage,
+      activePercentage: risk.activePercentage,
       consecutiveAlpha: risk.consecutiveAlpha,
       maxConsecutiveAlpha: risk.maxConsecutiveAlpha,
       warningLevel: risk.warningLevel,

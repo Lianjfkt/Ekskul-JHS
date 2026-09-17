@@ -1641,6 +1641,16 @@ export default function RecapManagement() {
 
      {/* Export Buttons */}
      <div className="flex gap-2 shrink-0 flex-wrap">
+      <Button
+       onClick={fetchData}
+       disabled={loading}
+       variant="outline"
+       className="border-pixel-gray text-pixel-lavender hover:bg-pixel-navy/50 flex items-center gap-2"
+       title="Segarkan data terbaru dari database"
+      >
+       <RefreshCw className={loading ? 'w-4 h-4 animate-spin' : 'w-4 h-4'} />
+       <span className="hidden sm:inline">Segarkan</span>
+      </Button>
       {activeTab === 'attendance' && (
        <Button
         onClick={() => exportAttendanceToPDF(attendanceReportRows, {
