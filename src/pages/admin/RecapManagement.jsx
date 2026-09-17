@@ -77,6 +77,24 @@ function formatMonthYearIndo(yyyymm) {
  return `${monthsIndo[parseInt(month, 10) - 1]} ${year}`
 }
 
+function getSessionSemester(dateStr) {
+ if (!dateStr) return ''
+ const m = new Date(dateStr).getMonth() + 1
+ return m >= 7 ? 'Ganjil' : 'Genap'
+}
+
+function getSessionAcademicYear(dateStr) {
+ if (!dateStr) return ''
+ const d = new Date(dateStr)
+ const y = d.getFullYear()
+ const m = d.getMonth() + 1
+ if (m >= 7) {
+  return `${y}/${y + 1}`
+ } else {
+  return `${y - 1}/${y}`
+ }
+}
+
 function getSessionPeriodKey(sessionDate) {
  if (!sessionDate) return 'unknown'
  const date = new Date(sessionDate)
@@ -120,44 +138,168 @@ function getSessionMonthKey(sessionDate) {
  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
 }
 
-// ─── PDF Export Helper ───────────────────────────────────────────────────────
+// ─── PDF Export Helpers (Standar Laporan Sekolah) ────────────────────────────
 
-async function exportWarningsToPDF(rows) {
+async function exportAttendanceToPDF(rows, filters = {}) {
  const { default: jsPDF } = await import('jspdf')
  const { default: autoTable } = await import('jspdf-autotable')
 
  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
  const now = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
-
  const startY = await addKopSuratToPDF(doc, 'landscape')
 
- doc.setFontSize(14)
+ doc.setFontSize(13)
  doc.setFont('helvetica', 'bold')
- doc.text('LAPORAN SISWA BERMASALAH — KEHADIRAN EKSTRAKURIKULER', 14, startY + 6)
- doc.setFontSize(10)
+ doc.text('REKAPITULASI LAPORAN KEHADIRAN SISWA EKSTRAKURIKULER', 14, startY + 6)
+ doc.setFontSize(9)
  doc.setFont('helvetica', 'normal')
- doc.text(`SMP Global Madani  |  Dicetak: ${now}`, 14, startY + 14)
+ const filterInfo = [
+  filters.ekskul ? `Ekskul: ${filters.ekskul}` : 'Semua Ekskul',
+  filters.semester ? `Semester: ${filters.semester}` : '',
+  filters.year ? `T.A: ${filters.year}` : ''
+ ].filter(Boolean).join(' | ')
+ doc.text(`SMP Global Madani  |  ${filterInfo}  |  Dicetak: ${now}`, 14, startY + 12)
 
  autoTable(doc, {
-  startY: startY + 20,
-  head: [['No','NIS','Nama Siswa','Kelas','Ekstrakurikuler','Jenis','Hadir','Alpha','% Kehadiran','Status']],
-  body: rows.map((r,i) => [
-   i + 1, r.nis, r.studentName, r.class, r.ekskulName,
-   r.isMandatory ? 'Wajib' : 'Pilihan',
-   r.hadir, r.alpha, `${r.percentage}%`, r.warningLabel
-  ]),
-  headStyles: { fillColor: [79,70,229], fontSize: 9 },
+  startY: startY + 16,
+  head: [['No','NIS','Nama Siswa','Kelas','Ekstrakurikuler','Jenis','Sesi','Hadir','Izin','Alpa','% Hadir','Status Keaktifan']],
+  body: rows.map((r, i) => {
+   let statusLabel = 'Sangat Baik'
+   if (r.percentage < 60) statusLabel = 'Kritis'
+   else if (r.percentage < 75) statusLabel = 'Perlu Perhatian'
+   else if (r.percentage < 85) statusLabel = 'Baik'
+   return [
+    i + 1, r.nis, r.studentName, r.class, r.ekskulName,
+    r.isMandatory ? 'Wajib' : 'Pilihan',
+    r.total, r.hadir, r.izin, r.alpha, `${r.percentage}%`, statusLabel
+   ]
+  }),
+  headStyles: { fillColor: [41, 128, 185], fontSize: 8.5, halign: 'center' },
   bodyStyles: { fontSize: 8 },
-  alternateRowStyles: { fillColor: [245,245,255] },
+  columnStyles: {
+   0: { halign: 'center', cellWidth: 10 },
+   1: { halign: 'center', cellWidth: 20 },
+   2: { cellWidth: 48 },
+   3: { halign: 'center', cellWidth: 15 },
+   4: { cellWidth: 42 },
+   5: { halign: 'center', cellWidth: 18 },
+   6: { halign: 'center', cellWidth: 14 },
+   7: { halign: 'center', cellWidth: 14 },
+   8: { halign: 'center', cellWidth: 14 },
+   9: { halign: 'center', cellWidth: 14 },
+   10: { halign: 'center', cellWidth: 18 },
+   11: { halign: 'center', cellWidth: 32 }
+  },
+  alternateRowStyles: { fillColor: [248, 249, 250] },
   didParseCell: (data) => {
    if (data.section === 'body') {
-    const status = data.row.raw[9]
-    if (status === 'TEGURAN') data.cell.styles.textColor = [185,28,28]
-    else if (status === 'PERINGATAN') data.cell.styles.textColor = [180,83,9]
+    const pct = parseInt(data.row.raw[10], 10)
+    if (pct < 60) {
+      data.cell.styles.textColor = [192, 57, 43]
+      data.cell.styles.fontStyle = 'bold'
+    } else if (pct < 75) {
+      data.cell.styles.textColor = [211, 84, 0]
+    }
    }
   },
   margin: { left: 14, right: 14 }
  })
+
+ const finalY = doc.lastAutoTable.finalY || 160
+ if (finalY < 165) {
+  const sigY = finalY + 12
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.text('Mengetahui,', 25, sigY)
+  doc.text('Kepala SMP Global Madani', 25, sigY + 5)
+  doc.text('( _________________________ )', 25, sigY + 24)
+
+  doc.text('Bandar Lampung, ' + now, 205, sigY)
+  doc.text('Koordinator Kesiswaan / Pembina', 205, sigY + 5)
+  doc.text('( _________________________ )', 205, sigY + 24)
+ }
+
+ doc.save(`laporan_kehadiran_siswa_${now.replace(/ /g,'_')}.pdf`)
+}
+
+async function exportWarningsToPDF(rows, filters = {}) {
+ const { default: jsPDF } = await import('jspdf')
+ const { default: autoTable } = await import('jspdf-autotable')
+
+ const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+ const now = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
+ const startY = await addKopSuratToPDF(doc, 'landscape')
+
+ doc.setFontSize(13)
+ doc.setFont('helvetica', 'bold')
+ doc.text('LAPORAN SISWA BERMASALAH & PERINGATAN KETIDAKHADIRAN', 14, startY + 6)
+ doc.setFontSize(9)
+ doc.setFont('helvetica', 'normal')
+ doc.text(`SMP Global Madani  |  Laporan Resmi untuk Wali Kelas, Guru BK, Kesiswaan & Kepala Sekolah  |  Dicetak: ${now}`, 14, startY + 12)
+
+ autoTable(doc, {
+  startY: startY + 16,
+  head: [['No','NIS','Nama Siswa','Kelas','Ekstrakurikuler','Jenis','Sesi','H/I/A','Streak','% Hadir','Status Sanksi','Alasan Masalah','Rekomendasi Tindak Lanjut']],
+  body: rows.map((r, i) => [
+   i + 1,
+   r.nis,
+   r.studentName,
+   r.class,
+   r.ekskulName,
+   r.isMandatory ? 'Wajib' : 'Pilihan',
+   r.total,
+   `${r.hadir}/${r.izin}/${r.alpha}`,
+   `${r.consecutiveAlpha || 0}x`,
+   `${r.percentage}%`,
+   r.warningLabel,
+   (r.warningReasons || []).join('; '),
+   r.actionRecommendation || (r.warningLevel === 'TEGURAN' ? 'Panggilan BK & Ortu' : 'Pembinaan Wali Kelas')
+  ]),
+  headStyles: { fillColor: [185, 28, 28], fontSize: 8, halign: 'center' },
+  bodyStyles: { fontSize: 7.5 },
+  columnStyles: {
+   0: { halign: 'center', cellWidth: 8 },
+   1: { halign: 'center', cellWidth: 16 },
+   2: { cellWidth: 32 },
+   3: { halign: 'center', cellWidth: 12 },
+   4: { cellWidth: 26 },
+   5: { halign: 'center', cellWidth: 14 },
+   6: { halign: 'center', cellWidth: 12 },
+   7: { halign: 'center', cellWidth: 16 },
+   8: { halign: 'center', cellWidth: 14 },
+   9: { halign: 'center', cellWidth: 16 },
+   10: { halign: 'center', cellWidth: 22 },
+   11: { cellWidth: 42 },
+   12: { cellWidth: 40 }
+  },
+  alternateRowStyles: { fillColor: [254, 242, 242] },
+  didParseCell: (data) => {
+   if (data.section === 'body') {
+    const status = data.row.raw[10]
+    if (status === 'TEGURAN') {
+     data.cell.styles.textColor = [185, 28, 28]
+     data.cell.styles.fontStyle = 'bold'
+    } else if (status === 'PERINGATAN') {
+     data.cell.styles.textColor = [180, 83, 9]
+    }
+   }
+  },
+  margin: { left: 14, right: 14 }
+ })
+
+ const finalY = doc.lastAutoTable.finalY || 160
+ if (finalY < 165) {
+  const sigY = finalY + 12
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.text('Mengetahui,', 25, sigY)
+  doc.text('Kepala SMP Global Madani', 25, sigY + 5)
+  doc.text('( _________________________ )', 25, sigY + 24)
+
+  doc.text('Koordinator BK & Kesiswaan,', 205, sigY)
+  doc.text('Guru BK / Tim Kesiswaan', 205, sigY + 5)
+  doc.text('( _________________________ )', 205, sigY + 24)
+ }
 
  doc.save(`laporan_siswa_bermasalah_${now.replace(/ /g,'_')}.pdf`)
 }
@@ -183,6 +325,7 @@ export default function RecapManagement() {
  const [selectedEkskul, setSelectedEkskul] = useState('')
  const [selectedSemester, setSelectedSemester] = useState('')
  const [selectedAcademicYear, setSelectedAcademicYear] = useState('')
+ const [selectedClass, setSelectedClass] = useState('')
  const [selectedCoach, setSelectedCoach] = useState('')
  const [selectedMonth, setSelectedMonth] = useState('')
  const [searchQuery, setSearchQuery] = useState('')
@@ -265,6 +408,11 @@ export default function RecapManagement() {
   const sem = new Set([...enrollments.map(e => e.semester), ...grades.map(g => g.semester)])
   return Array.from(sem).filter(Boolean).sort()
  }, [enrollments, grades])
+
+ const classList = useMemo(() => {
+  const cls = new Set(enrollments.map(e => e.student?.class).filter(Boolean))
+  return Array.from(cls).sort()
+ }, [enrollments])
 
  const availablePeriods = useMemo(() => {
   const periods = new Set()
@@ -461,6 +609,19 @@ export default function RecapManagement() {
    // Sesi-sesi ekskul ini yang valid untuk siswa ini
    const validSessions = sessions.filter(s => {
     if (s.extracurricular_id !== ekskul.id) return false
+
+    // Filter sesi berdasarkan semester jika dipilih
+    if (selectedSemester) {
+     const sem = s.semester || getSessionSemester(s.session_date)
+     if (sem && sem !== selectedSemester) return false
+    }
+
+    // Filter sesi berdasarkan tahun ajaran jika dipilih
+    if (selectedAcademicYear) {
+     const yr = s.academic_year || getSessionAcademicYear(s.session_date)
+     if (yr && yr !== selectedAcademicYear) return false
+    }
+
     return isSessionApplicableToStudent(s, student, specialParticipants, attendances)
    })
 
@@ -488,6 +649,8 @@ export default function RecapManagement() {
     hadir: riskEvaluation.hadir,
     izin: riskEvaluation.izin,
     alpha: riskEvaluation.alpha,
+    recordedAlpha: riskEvaluation.recordedAlpha,
+    unrecordedAlpha: riskEvaluation.unrecordedAlpha,
     total: riskEvaluation.total,
     percentage: riskEvaluation.percentage,
     consecutiveAlpha: riskEvaluation.consecutiveAlpha,
@@ -495,6 +658,7 @@ export default function RecapManagement() {
     warningLevel: riskEvaluation.warningLevel,
     warningLabel: riskEvaluation.warningLabel,
     warningReasons: riskEvaluation.warningReasons,
+    actionRecommendation: riskEvaluation.actionRecommendation,
     riskTags: riskEvaluation.riskTags,
     isAtRisk: riskEvaluation.isAtRisk
    }
@@ -502,12 +666,24 @@ export default function RecapManagement() {
    const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
    const matchSemester = selectedSemester ? row.semester === selectedSemester : true
    const matchYear = selectedAcademicYear ? row.academicYear === selectedAcademicYear : true
+   const matchClass = selectedClass ? (selectedClass.length <= 2 ? row.class?.startsWith(selectedClass) : row.class === selectedClass) : true
    const matchSearch = searchQuery
     ? row.studentName.toLowerCase().includes(searchQuery.toLowerCase()) || row.nis.includes(searchQuery)
     : true
-   return matchEkskul && matchSemester && matchYear && matchSearch
+   return matchEkskul && matchSemester && matchYear && matchClass && matchSearch
   })
- }, [enrollments, extracurriculars, attendances, sessions, specialParticipants, selectedEkskul, selectedSemester, selectedAcademicYear, searchQuery])
+ }, [enrollments, extracurriculars, attendances, sessions, specialParticipants, selectedEkskul, selectedSemester, selectedAcademicYear, selectedClass, searchQuery])
+
+ const attendanceStats = useMemo(() => {
+  const total = attendanceReportRows.length
+  if (total === 0) return { total: 0, avgPct: 0, tertib: 0, perluPerhatian: 0, kritis: 0 }
+  const totalPct = attendanceReportRows.reduce((acc, r) => acc + r.percentage, 0)
+  const avgPct = Math.round(totalPct / total)
+  const tertib = attendanceReportRows.filter(r => r.percentage >= 80).length
+  const perluPerhatian = attendanceReportRows.filter(r => r.percentage >= 60 && r.percentage < 80).length
+  const kritis = attendanceReportRows.filter(r => r.percentage < 60).length
+  return { total, avgPct, tertib, perluPerhatian, kritis }
+ }, [attendanceReportRows])
 
  // ─── Tab 3: Grade Report ───────────────────────────────────────────────────
 
@@ -530,12 +706,13 @@ export default function RecapManagement() {
    const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
    const matchSemester = selectedSemester ? row.semester === selectedSemester : true
    const matchYear = selectedAcademicYear ? row.academicYear === selectedAcademicYear : true
+   const matchClass = selectedClass ? (selectedClass.length <= 2 ? row.class?.startsWith(selectedClass) : row.class === selectedClass) : true
    const matchSearch = searchQuery
     ? row.studentName.toLowerCase().includes(searchQuery.toLowerCase()) || row.nis.includes(searchQuery)
     : true
-   return matchEkskul && matchSemester && matchYear && matchSearch
+   return matchEkskul && matchSemester && matchYear && matchClass && matchSearch
   })
- }, [grades, selectedEkskul, selectedSemester, selectedAcademicYear, searchQuery])
+ }, [grades, selectedEkskul, selectedSemester, selectedAcademicYear, selectedClass, searchQuery])
 
  // ─── Tab 5: Warning Siswa Bermasalah ──────────────────────────────────────
  const warningRows = useMemo(() => {
@@ -553,6 +730,7 @@ export default function RecapManagement() {
 
  const warningCount = useMemo(() => warningRows.length, [warningRows])
  const teguranCount = useMemo(() => warningRows.filter(r => r.warningLevel === 'TEGURAN').length, [warningRows])
+ const peringatanCount = useMemo(() => warningRows.filter(r => r.warningLevel === 'PERINGATAN').length, [warningRows])
 
  // ─── Tab 6: Keaktifan Ekskul ───────────────────────────────────────────────
 
@@ -682,8 +860,27 @@ export default function RecapManagement() {
  }
 
  const exportAttendanceToExcel = () => {
-  const rows = attendanceReportRows.map(r => [r.nis, r.studentName, r.class, r.ekskulName, r.semester, r.academicYear, r.hadir, r.izin, r.alpha, r.total, `${r.percentage}%`])
-  exportToExcel(rows, ['NIS','Nama Siswa','Kelas','Ekstrakurikuler','Semester','Tahun Ajaran','Hadir','Izin','Alpha','Total Sesi','Persentase Kehadiran'], 'Laporan Kehadiran', 'rekap_kehadiran_siswa.xlsx')
+  const rows = attendanceReportRows.map(r => [
+   r.nis,
+   r.studentName,
+   r.class,
+   r.ekskulName,
+   r.isMandatory ? 'Wajib' : 'Pilihan',
+   r.semester,
+   r.academicYear,
+   r.total,
+   r.hadir,
+   r.izin,
+   r.alpha,
+   `${r.percentage}%`,
+   r.percentage >= 85 ? 'Sangat Baik' : r.percentage >= 75 ? 'Baik' : r.percentage >= 60 ? 'Cukup / Perlu Perhatian' : 'Kritis / Tidak Memenuhi Syarat'
+  ])
+  exportToExcel(
+   rows,
+   ['NIS','Nama Siswa','Kelas','Ekstrakurikuler','Jenis','Semester','Tahun Ajaran','Total Sesi Terlaksana','Hadir','Izin','Alpa','% Kehadiran','Status Keaktifan'],
+   'Laporan Kehadiran',
+   'rekap_kehadiran_siswa.xlsx'
+  )
  }
 
  const exportCoachSessionsToExcel = () => {
@@ -770,14 +967,26 @@ export default function RecapManagement() {
 
  const exportWarningsToExcel = () => {
   const rows = warningRows.map(r => [
-   r.nis, r.studentName, r.class, r.ekskulName,
+   r.nis,
+   r.studentName,
+   r.class,
+   r.ekskulName,
    r.isMandatory ? 'Wajib' : 'Pilihan',
-   r.hadir, r.izin, r.alpha, `${r.percentage}%`,
-   r.consecutiveAlpha, r.warningLabel, r.warningReasons.join('; ')
+   r.semester,
+   r.academicYear,
+   r.total,
+   r.hadir,
+   r.izin,
+   r.alpha,
+   `${r.consecutiveAlpha || 0}x`,
+   `${r.percentage}%`,
+   r.warningLabel,
+   (r.warningReasons || []).join('; '),
+   r.actionRecommendation || (r.warningLevel === 'TEGURAN' ? 'Panggilan BK & Ortu' : 'Pembinaan Wali Kelas')
   ])
   exportToExcel(rows,
-   ['NIS','Nama Siswa','Kelas','Ekstrakurikuler','Jenis','Hadir','Izin','Alpha','% Kehadiran','Alpha Berturut-turut','Status Warning','Alasan'],
-   'Siswa Bermasalah', 'rekap_siswa_bermasalah.xlsx'
+   ['NIS','Nama Siswa','Kelas','Ekstrakurikuler','Jenis','Semester','Tahun Ajaran','Total Sesi','Hadir','Izin','Alpa','Alpa Berturut-turut','% Kehadiran','Status Sanksi','Alasan Masalah','Rekomendasi Tindak Lanjut (BK/Wali Kelas)'],
+   'Siswa Bermasalah', 'rekap_siswa_bermasalah_bk.xlsx'
   )
  }
 
@@ -1157,6 +1366,7 @@ export default function RecapManagement() {
  const resetFilters = (tabId) => {
   setSearchQuery(''); setSelectedEkskul(''); setSelectedSemester(''); setSelectedAcademicYear('')
   setSelectedCoach(''); setSelectedMonth(''); setWarningTypeFilter(''); setWarningLevelFilter('')
+  setSelectedClass('')
   setActiveTab(tabId)
  }
 
@@ -1364,6 +1574,10 @@ export default function RecapManagement() {
          <option value="">Semua Ekskul</option>
          {extracurriculars.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
+        <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300">
+         <option value="">Semua Kelas</option>
+         {classList.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
         <select value={selectedSemester} onChange={e => setSelectedSemester(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300">
          <option value="">Semua Semester</option>
          {semesters.map(s => <option key={s} value={s}>Semester {s}</option>)}
@@ -1398,6 +1612,10 @@ export default function RecapManagement() {
          <option value="">Semua Ekskul</option>
          {extracurriculars.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
+        <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300">
+         <option value="">Semua Kelas</option>
+         {classList.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
         <select value={selectedSemester} onChange={e => setSelectedSemester(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300">
          <option value="">Semua Semester</option>
          {semesters.map(s => <option key={s} value={s}>Semester {s}</option>)}
@@ -1421,16 +1639,34 @@ export default function RecapManagement() {
      </div>
 
      {/* Export Buttons */}
-     <div className="flex gap-2 shrink-0">
+     <div className="flex gap-2 shrink-0 flex-wrap">
+      {activeTab === 'attendance' && (
+       <Button
+        onClick={() => exportAttendanceToPDF(attendanceReportRows, {
+          ekskul: selectedEkskul ? extracurriculars.find(e => e.id === selectedEkskul)?.name : '',
+          semester: selectedSemester,
+          year: selectedAcademicYear,
+        })}
+        disabled={attendanceReportRows.length === 0}
+        variant="outline"
+        className="border-cyan-300 text-cyan-400 hover:bg-cyan-500/10 flex items-center gap-2"
+       >
+        <Download className="w-4 h-4" />
+        PDF Absensi
+       </Button>
+      )}
       {activeTab === 'warnings' && (
        <Button
-        onClick={() => exportWarningsToPDF(warningRows)}
+        onClick={() => exportWarningsToPDF(warningRows, {
+          semester: selectedSemester,
+          year: selectedAcademicYear,
+        })}
         disabled={warningRows.length === 0}
         variant="outline"
         className="border-rose-300 text-pixel-red hover:bg-pixel-red/10 flex items-center gap-2"
        >
         <Download className="w-4 h-4" />
-        PDF
+        PDF Siswa Bermasalah
        </Button>
       )}
       {activeTab === 'coachSessions' && (
@@ -1661,154 +1897,298 @@ export default function RecapManagement() {
       </div>
      )}
 
-    {/* ═══ TAB: Siswa Bermasalah ════════════════════════════════════════════ */}
-    {activeTab === 'warnings' && (
-     <div className="space-y-4">
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3">
-       <div className="flex items-center gap-2 px-3 py-1.5 bg-rose-950/30 border border-rose-500/30 rounded-none text-xs text-pixel-red font-semibold">
-        <ShieldAlert className="w-3.5 h-3.5" />
-        TEGURAN = Ekskul wajib: alpha ≥3 atau kehadiran &lt;70% | Pilihan: alpha ≥5 berturut atau kehadiran &lt;55%
+    {/* ═══ TAB: Siswa Bermasalah (BK & Kesiswaan) ═══════════════════════════════ */}
+     {activeTab === 'warnings' && (
+      <div className="space-y-4">
+       {/* Summary Cards */}
+       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+         <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+           <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider">Total Kasus</p>
+           <h3 className="text-2xl font-extrabold text-pixel-white">{warningCount}</h3>
+           <p className="text-[10px] text-pixel-lavender">Siswa bermasalah terdeteksi</p>
+          </div>
+          <div className="p-2.5 bg-pixel-red/10 rounded-none text-pixel-red">
+           <ShieldAlert className="w-5 h-5" />
+          </div>
+         </CardContent>
+        </Card>
+        <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+         <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+           <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider">🔴 Teguran Keras / SP (BK)</p>
+           <h3 className="text-2xl font-extrabold text-pixel-red">{teguranCount}</h3>
+           <p className="text-[10px] text-pixel-lavender">Perlu panggilan BK & orang tua</p>
+          </div>
+          <div className="p-2.5 bg-rose-950/30 rounded-none text-rose-400">
+           <AlertCircle className="w-5 h-5" />
+          </div>
+         </CardContent>
+        </Card>
+        <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+         <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+           <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider">🟡 Peringatan (Wali Kelas)</p>
+           <h3 className="text-2xl font-extrabold text-pixel-orange">{peringatanCount}</h3>
+           <p className="text-[10px] text-pixel-lavender">Perlu pembinaan wali kelas</p>
+          </div>
+          <div className="p-2.5 bg-amber-950/20 rounded-none text-amber-400">
+           <AlertTriangle className="w-5 h-5" />
+          </div>
+         </CardContent>
+        </Card>
+        <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+         <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+           <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider">Rata-rata Kehadiran</p>
+           <h3 className="text-2xl font-extrabold text-cyan-400">{warningRows.length > 0 ? Math.round(warningRows.reduce((a, r) => a + r.percentage, 0) / warningRows.length) : 0}%</h3>
+           <p className="text-[10px] text-pixel-lavender">Dari siswa bermasalah</p>
+          </div>
+          <div className="p-2.5 bg-cyan-950/20 rounded-none text-cyan-400">
+           <Activity className="w-5 h-5" />
+          </div>
+         </CardContent>
+        </Card>
        </div>
-       <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-900/20 border border-amber-500/30 rounded-none text-xs text-pixel-orange font-semibold">
-        <AlertTriangle className="w-3.5 h-3.5" />
-        PERINGATAN = Ekskul wajib: alpha ≥1 atau kehadiran &lt;80% | Pilihan: alpha ≥3 berturut atau kehadiran &lt;70%
-       </div>
-      </div>
 
-      <div className="bg-pixel-panel border border-pixel-gray/30 rounded-none shadow-pixel-sm overflow-hidden">
-       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-sm">
-         <thead>
-          <tr className="bg-pixel-navy/75 border-b border-pixel-gray/30 text-pixel-lavender font-semibold">
-           <th className="p-4 pl-6">Nama Siswa</th>
-           <th className="p-4">NIS</th>
-           <th className="p-4 text-center">Kelas</th>
-           <th className="p-4">Ekstrakurikuler</th>
-           <th className="p-4 text-center">Jenis</th>
-           <th className="p-4 text-center">Hadir</th>
-           <th className="p-4 text-center">Alpha</th>
-           <th className="p-4 text-center">Alpha Turut</th>
-           <th className="p-4 text-center">% Hadir</th>
-           <th className="p-4 text-center pr-6">Status</th>
-          </tr>
-         </thead>
-         <tbody className="divide-y divide-pixel-gray/20">
-          {warningRows.length === 0 ? (
-           <tr>
-            <td colSpan="10" className="p-12 text-center space-y-2">
-             <CheckCircle className="w-10 h-10 text-pixel-green mx-auto" />
-             <p className="text-pixel-lavender">Tidak ada siswa bermasalah dengan filter yang dipilih. 🎉</p>
-            </td>
+       {/* Legend */}
+       <div className="flex flex-wrap gap-3">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-rose-950/30 border border-rose-500/30 rounded-none text-xs text-pixel-red font-semibold">
+         <ShieldAlert className="w-3.5 h-3.5" />
+         TEGURAN = Ekskul wajib: alpha ≥3 atau kehadiran &lt;70% | Pilihan: alpha ≥5 berturut atau kehadiran &lt;55%
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-900/20 border border-amber-500/30 rounded-none text-xs text-pixel-orange font-semibold">
+         <AlertTriangle className="w-3.5 h-3.5" />
+         PERINGATAN = Ekskul wajib: alpha ≥1 atau kehadiran &lt;80% | Pilihan: alpha ≥3 berturut atau kehadiran &lt;70%
+        </div>
+       </div>
+
+       <div className="bg-pixel-panel border border-pixel-gray/30 rounded-none shadow-pixel-sm overflow-hidden">
+        <div className="overflow-x-auto">
+         <table className="w-full text-left border-collapse text-sm">
+          <thead>
+           <tr className="bg-pixel-navy/75 border-b border-pixel-gray/30 text-pixel-lavender font-semibold">
+            <th className="p-4 pl-6">Nama Siswa & NIS</th>
+            <th className="p-4 text-center">Kelas</th>
+            <th className="p-4">Ekstrakurikuler</th>
+            <th className="p-4 text-center">Jenis</th>
+            <th className="p-4 text-center">Sesi</th>
+            <th className="p-4 text-center">H / I / A</th>
+            <th className="p-4 text-center">Streak Alpa</th>
+            <th className="p-4 text-center">% Hadir</th>
+            <th className="p-4 text-center">Level Sanksi</th>
+            <th className="p-4">Alasan Masalah</th>
+            <th className="p-4 pr-6">Rekomendasi Tindak Lanjut</th>
            </tr>
-          ) : warningRows.map((r, i) => (
-           <tr key={i} className={`hover:bg-pixel-navy/30 ${
-            r.warningLevel === 'TEGURAN' ? 'bg-rose-950/10 border-l-2 border-l-rose-500' :
-            'bg-amber-950/5 border-l-2 border-l-amber-500'
-           }`}>
-            <td className="p-4 pl-6">
-             <div>
+          </thead>
+          <tbody className="divide-y divide-pixel-gray/20">
+           {warningRows.length === 0 ? (
+            <tr>
+             <td colSpan="11" className="p-12 text-center space-y-2">
+              <CheckCircle className="w-10 h-10 text-pixel-green mx-auto" />
+              <p className="text-pixel-lavender">Tidak ada siswa bermasalah dengan filter yang dipilih. 🎉</p>
+             </td>
+            </tr>
+           ) : warningRows.map((r, i) => (
+            <tr key={i} className={`hover:bg-pixel-navy/30 ${
+             r.warningLevel === 'TEGURAN' ? 'bg-rose-950/10 border-l-2 border-l-rose-500' :
+             'bg-amber-950/5 border-l-2 border-l-amber-500'
+            }`}>
+             <td className="p-4 pl-6">
               <p className="font-semibold text-pixel-white">{r.studentName}</p>
-              {r.warningReasons.map((reason, ri) => (
-               <p key={ri} className="text-xs text-pixel-lavender mt-0.5">• {reason}</p>
-              ))}
-             </div>
-            </td>
-            <td className="p-4 font-mono text-pixel-lavender text-xs">{r.nis}</td>
-            <td className="p-4 text-center text-pixel-peach font-semibold">{r.class}</td>
-            <td className="p-4 text-pixel-peach font-medium">{r.ekskulName}</td>
-            <td className="p-4 text-center">
-             {r.isMandatory ? (
-              <span className="px-2 py-0.5 text-xs font-bold bg-indigo-900/30 text-indigo-300 border border-indigo-500/30">WAJIB</span>
-             ) : (
-              <span className="px-2 py-0.5 text-xs text-pixel-lavender border border-pixel-gray/30">Pilihan</span>
-             )}
-            </td>
-            <td className="p-4 text-center font-bold text-pixel-green">{r.hadir}</td>
-            <td className="p-4 text-center font-bold text-pixel-red">{r.alpha}</td>
-            <td className="p-4 text-center">
-             <span className={`font-mono font-bold text-sm ${r.consecutiveAlpha >= 3 ? 'text-pixel-red' : 'text-pixel-lavender'}`}>
-              {r.consecutiveAlpha}×
-             </span>
-            </td>
-            <td className="p-4 text-center">
-             <div className="flex items-center gap-2 justify-center">
-              <div className="w-12 h-2 bg-slate-700 rounded-none overflow-hidden">
-               <div className={`h-full ${r.percentage >= 70 ? 'bg-amber-500' : 'bg-pixel-red'}`}
-                style={{ width: `${r.percentage}%` }} />
-              </div>
-              <span className={`font-bold text-xs ${r.percentage < 60 ? 'text-pixel-red' : 'text-pixel-orange'}`}>
-               {r.percentage}%
+              <p className="text-xs font-mono text-pixel-lavender">{r.nis}</p>
+             </td>
+             <td className="p-4 text-center text-pixel-peach font-semibold">{r.class}</td>
+             <td className="p-4 text-pixel-peach font-medium">{r.ekskulName}</td>
+             <td className="p-4 text-center">
+              {r.isMandatory ? (
+               <span className="px-2 py-0.5 text-xs font-bold bg-indigo-900/30 text-indigo-300 border border-indigo-500/30">WAJIB</span>
+              ) : (
+               <span className="px-2 py-0.5 text-xs text-pixel-lavender border border-pixel-gray/30">Pilihan</span>
+              )}
+             </td>
+             <td className="p-4 text-center font-mono text-pixel-lavender text-xs">{r.total}</td>
+             <td className="p-4 text-center">
+              <span className="font-mono text-xs">
+               <span className="text-pixel-green font-bold">{r.hadir}</span>
+               <span className="text-pixel-lavender"> / </span>
+               <span className="text-pixel-orange">{r.izin}</span>
+               <span className="text-pixel-lavender"> / </span>
+               <span className="text-pixel-red font-bold">{r.alpha}</span>
               </span>
-             </div>
-            </td>
-            <td className="p-4 text-center pr-6">
-             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-none font-bold text-xs ${
-              r.warningLevel === 'TEGURAN'
-               ? 'bg-pixel-red/20 text-pixel-red border border-rose-500/40'
-               : 'bg-amber-900/30 text-pixel-orange border border-amber-500/40'
-             }`}>
-              {r.warningLevel === 'TEGURAN' ? <ShieldAlert className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
-              {r.warningLabel}
-             </span>
-            </td>
-           </tr>
-          ))}
-         </tbody>
-        </table>
+             </td>
+             <td className="p-4 text-center">
+              <span className={`inline-flex items-center gap-1 font-mono font-bold text-sm px-2 py-0.5 rounded-none ${
+               r.consecutiveAlpha >= 3 ? 'text-pixel-red bg-rose-950/30 border border-rose-500/30' :
+               r.consecutiveAlpha >= 1 ? 'text-pixel-orange bg-amber-950/20' : 'text-pixel-lavender'
+              }`}>
+               {r.consecutiveAlpha}× berturut
+              </span>
+             </td>
+             <td className="p-4 text-center">
+              <div className="flex items-center gap-2 justify-center">
+               <div className="w-14 h-2 bg-slate-700 rounded-none overflow-hidden">
+                <div className={`h-full ${r.percentage >= 70 ? 'bg-amber-500' : 'bg-pixel-red'}`}
+                 style={{ width: `${Math.min(r.percentage, 100)}%` }} />
+               </div>
+               <span className={`font-bold text-xs ${r.percentage < 60 ? 'text-pixel-red' : 'text-pixel-orange'}`}>
+                {r.percentage}%
+               </span>
+              </div>
+             </td>
+             <td className="p-4 text-center">
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-none font-bold text-xs ${
+               r.warningLevel === 'TEGURAN'
+                ? 'bg-pixel-red/20 text-pixel-red border border-rose-500/40'
+                : 'bg-amber-900/30 text-pixel-orange border border-amber-500/40'
+              }`}>
+               {r.warningLevel === 'TEGURAN' ? <ShieldAlert className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+               {r.warningLabel}
+              </span>
+             </td>
+             <td className="p-4 text-xs text-pixel-lavender max-w-[180px]">
+              {(r.warningReasons || []).map((reason, ri) => (
+               <p key={ri} className="mt-0.5">• {reason}</p>
+              ))}
+             </td>
+             <td className="p-4 pr-6 text-xs max-w-[200px]">
+              <p className={`font-semibold ${
+               r.warningLevel === 'TEGURAN' ? 'text-pixel-red' : 'text-pixel-orange'
+              }`}>
+               {r.actionRecommendation || (r.warningLevel === 'TEGURAN' ? 'Panggilan BK & Orang Tua' : 'Pembinaan Wali Kelas')}
+              </p>
+             </td>
+            </tr>
+           ))}
+          </tbody>
+         </table>
+        </div>
        </div>
       </div>
-     </div>
-    )}
-
+     )}
     {/* ═══ TAB: Laporan Absensi Siswa ══════════════════════════════════════ */}
-    {activeTab === 'attendance' && (
-     <div className="bg-pixel-panel border border-pixel-gray/30 rounded-none shadow-pixel-sm overflow-hidden">
-      <div className="overflow-x-auto">
-       <table className="w-full text-left border-collapse text-sm">
-        <thead>
-         <tr className="bg-pixel-navy/75 border-b border-pixel-gray/30 text-pixel-lavender font-semibold">
-          <th className="p-4 pl-6">NIS</th>
-          <th className="p-4">Nama Siswa</th>
-          <th className="p-4 text-center">Kelas</th>
-          <th className="p-4">Ekstrakurikuler</th>
-          <th className="p-4 text-center">Hadir</th>
-          <th className="p-4 text-center">Izin</th>
-          <th className="p-4 text-center">Alpha</th>
-          <th className="p-4 text-center">Total</th>
-          <th className="p-4 pr-6 min-w-[140px]">Rasio Kehadiran</th>
-         </tr>
-        </thead>
-        <tbody className="divide-y-2 divide-pixel-gray/30">
-         {attendanceReportRows.length === 0 ? (
-          <tr><td colSpan="9" className="p-8 text-center text-pixel-lavender">Tidak ada laporan kehadiran yang cocok dengan filter.</td></tr>
-         ) : attendanceReportRows.map((r, i) => (
-          <tr key={i} className="hover:bg-pixel-navy/30">
-           <td className="p-4 pl-6 font-mono text-pixel-lavender">{r.nis}</td>
-           <td className="p-4 font-semibold text-pixel-white">{r.studentName}</td>
-           <td className="p-4 text-center text-pixel-peach">{r.class}</td>
-           <td className="p-4 font-medium text-pixel-peach">{r.ekskulName}</td>
-           <td className="p-4 text-center font-bold text-pixel-green">{r.hadir}</td>
-           <td className="p-4 text-center text-pixel-orange">{r.izin}</td>
-           <td className="p-4 text-center text-pixel-red">{r.alpha}</td>
-           <td className="p-4 text-center text-pixel-lavender">{r.total}</td>
-           <td className="p-4 pr-6">
-            <div className="flex items-center gap-3">
-             <div className="flex-1 h-2 bg-slate-100 rounded-none overflow-hidden min-w-[50px]">
-              <div className={`h-full rounded-none ${r.percentage >= 80 ? 'bg-pixel-green/100' : r.percentage >= 60 ? 'bg-amber-500' : 'bg-pixel-red/100'}`}
-               style={{ width: `${r.percentage}%` }} />
-             </div>
-             <span className="font-bold text-pixel-peach shrink-0 text-xs">{r.percentage}%</span>
-            </div>
-           </td>
-          </tr>
-         ))}
-        </tbody>
-       </table>
-      </div>
-     </div>
-    )}
+     {activeTab === 'attendance' && (
+      <div className="space-y-4">
+       {/* Summary Cards */}
+       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+         <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+           <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider">Total Siswa</p>
+           <h3 className="text-2xl font-extrabold text-pixel-white">{attendanceStats.total}</h3>
+           <p className="text-[10px] text-pixel-lavender">Keikutsertaan ekskul</p>
+          </div>
+          <div className="p-2.5 bg-pixel-navy rounded-none text-pixel-blue">
+           <Users className="w-5 h-5" />
+          </div>
+         </CardContent>
+        </Card>
+        <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+         <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+           <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider">Rata-rata Kehadiran</p>
+           <h3 className={`text-2xl font-extrabold ${attendanceStats.avgPct >= 80 ? 'text-pixel-green' : attendanceStats.avgPct >= 60 ? 'text-pixel-orange' : 'text-pixel-red'}`}>{attendanceStats.avgPct}%</h3>
+           <p className="text-[10px] text-pixel-lavender">Dari seluruh siswa terdaftar</p>
+          </div>
+          <div className="p-2.5 bg-cyan-950/20 rounded-none text-cyan-400">
+           <Activity className="w-5 h-5" />
+          </div>
+         </CardContent>
+        </Card>
+        <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+         <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+           <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider">Siswa Tertib (≥80%)</p>
+           <h3 className="text-2xl font-extrabold text-pixel-green">{attendanceStats.tertib}</h3>
+           <p className="text-[10px] text-pixel-lavender">Kehadiran sangat baik</p>
+          </div>
+          <div className="p-2.5 bg-pixel-green/10 rounded-none text-pixel-green">
+           <CheckCircle className="w-5 h-5" />
+          </div>
+         </CardContent>
+        </Card>
+        <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+         <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+           <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider">Perlu Perhatian</p>
+           <h3 className="text-2xl font-extrabold text-pixel-orange">{attendanceStats.perluPerhatian + attendanceStats.kritis}</h3>
+           <p className="text-[10px] text-pixel-lavender">{attendanceStats.perluPerhatian} kurang aktif, {attendanceStats.kritis} kritis</p>
+          </div>
+          <div className="p-2.5 bg-amber-950/20 rounded-none text-pixel-orange">
+           <AlertTriangle className="w-5 h-5" />
+          </div>
+         </CardContent>
+        </Card>
+       </div>
 
+       <div className="bg-pixel-panel border border-pixel-gray/30 rounded-none shadow-pixel-sm overflow-hidden">
+        <div className="overflow-x-auto">
+         <table className="w-full text-left border-collapse text-sm">
+          <thead>
+           <tr className="bg-pixel-navy/75 border-b border-pixel-gray/30 text-pixel-lavender font-semibold">
+            <th className="p-4 pl-6">NIS</th>
+            <th className="p-4">Nama Siswa</th>
+            <th className="p-4 text-center">Kelas</th>
+            <th className="p-4">Ekstrakurikuler</th>
+            <th className="p-4 text-center">Jenis</th>
+            <th className="p-4 text-center">Sesi Terlaksana</th>
+            <th className="p-4 text-center">Hadir</th>
+            <th className="p-4 text-center">Izin</th>
+            <th className="p-4 text-center">Alpa</th>
+            <th className="p-4 min-w-[160px]">% Hadir</th>
+            <th className="p-4 text-center pr-6">Status Keaktifan</th>
+           </tr>
+          </thead>
+          <tbody className="divide-y-2 divide-pixel-gray/30">
+           {attendanceReportRows.length === 0 ? (
+            <tr><td colSpan="11" className="p-8 text-center text-pixel-lavender">Tidak ada laporan kehadiran yang cocok dengan filter.</td></tr>
+           ) : attendanceReportRows.map((r, i) => {
+            let statusLabel = 'Sangat Baik'
+            let statusColor = 'text-pixel-green bg-pixel-green/10 border-emerald-500/30'
+            if (r.percentage < 60) { statusLabel = 'Kritis'; statusColor = 'text-pixel-red bg-pixel-red/10 border-rose-500/30' }
+            else if (r.percentage < 75) { statusLabel = 'Perlu Perhatian'; statusColor = 'text-pixel-orange bg-amber-900/20 border-amber-500/30' }
+            else if (r.percentage < 85) { statusLabel = 'Baik'; statusColor = 'text-pixel-blue bg-pixel-blue/10 border-indigo-500/30' }
+            return (
+             <tr key={i} className={`hover:bg-pixel-navy/30 ${r.percentage < 60 ? 'bg-rose-950/5' : ''}`}>
+              <td className="p-4 pl-6 font-mono text-pixel-lavender text-xs">{r.nis}</td>
+              <td className="p-4 font-semibold text-pixel-white">{r.studentName}</td>
+              <td className="p-4 text-center text-pixel-peach font-semibold">{r.class}</td>
+              <td className="p-4 font-medium text-pixel-peach">{r.ekskulName}</td>
+              <td className="p-4 text-center">
+               {r.isMandatory ? (
+                <span className="px-2 py-0.5 text-xs font-bold bg-indigo-900/30 text-indigo-300 border border-indigo-500/30">WAJIB</span>
+               ) : (
+                <span className="px-2 py-0.5 text-xs text-pixel-lavender border border-pixel-gray/30">Pilihan</span>
+               )}
+              </td>
+              <td className="p-4 text-center font-mono text-pixel-lavender">{r.total}</td>
+              <td className="p-4 text-center font-bold text-pixel-green">{r.hadir}</td>
+              <td className="p-4 text-center text-pixel-orange">{r.izin}</td>
+              <td className="p-4 text-center font-bold text-pixel-red">{r.alpha}</td>
+              <td className="p-4">
+               <div className="flex items-center gap-3">
+                <div className="flex-1 h-2.5 bg-slate-700 rounded-none overflow-hidden min-w-[60px]">
+                 <div className={`h-full rounded-none transition-all ${r.percentage >= 80 ? 'bg-pixel-green' : r.percentage >= 60 ? 'bg-amber-500' : 'bg-pixel-red'}`}
+                  style={{ width: `${Math.min(r.percentage, 100)}%` }} />
+                </div>
+                <span className={`font-bold shrink-0 text-xs ${r.percentage >= 80 ? 'text-pixel-green' : r.percentage >= 60 ? 'text-pixel-orange' : 'text-pixel-red'}`}>{r.percentage}%</span>
+               </div>
+              </td>
+              <td className="p-4 text-center pr-6">
+               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-none text-[10px] font-bold uppercase border ${statusColor}`}>
+                {statusLabel}
+               </span>
+              </td>
+             </tr>
+            )
+           })}
+          </tbody>
+         </table>
+        </div>
+       </div>
+      </div>
+     )}
     {/* ═══ TAB: Laporan Nilai Siswa ═════════════════════════════════════════ */}
     {activeTab === 'grades' && (
      <div className="bg-pixel-panel border border-pixel-gray/30 rounded-none shadow-pixel-sm overflow-hidden">

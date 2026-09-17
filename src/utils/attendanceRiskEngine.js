@@ -47,32 +47,33 @@ export function isSessionApplicableToStudent(session, student, specialParticipan
 /**
  * Hitung alpa berturut-turut terkini (trailing consecutive alpha).
  * Dimulai dari sesi valid terbaru ke belakang sampai menemukan hadir/izin.
+ * Sesi yang sudah terlaksana tanpa catatan hadir/izin dihitung sebagai ketidakhadiran (alpa).
  * @param {Array} studentAtts - Record absensi siswa
  * @param {Array} validSessions - Sesi valid terurut (bisa ascending atau descending)
  * @returns {number}
  */
 export function calculateTrailingConsecutiveAlpha(studentAtts, validSessions) {
-  if (!studentAtts || studentAtts.length === 0 || !validSessions || validSessions.length === 0) {
+  if (!validSessions || validSessions.length === 0) {
     return 0
   }
 
   // Pastikan terurut dari terbaru ke terlama (descending date)
   const sortedDesc = [...validSessions].sort((a, b) => new Date(b.session_date) - new Date(a.session_date))
-  const attMap = new Map(studentAtts.map(a => [a.session_id, a]))
+  const attMap = new Map((studentAtts || []).map(a => [a.session_id, a]))
 
   let consecutive = 0
   for (const session of sortedDesc) {
     const att = attMap.get(session.id)
-    if (!att) {
-      // Sesi tanpa record absensi dilewati (tidak dianggap alpa)
-      continue
-    }
-
-    if (att.status === 'alpha') {
-      consecutive++
+    if (att) {
+      if (att.status === 'alpha') {
+        consecutive++
+      } else {
+        // Hadir / Izin / Sakit memutus rangkaian alpa
+        break
+      }
     } else {
-      // Hadir / Izin / Sakit memutus rangkaian alpa
-      break
+      // Sesi yang sudah terlaksana tapi siswa tidak ada record hadir/izin = alpa
+      consecutive++
     }
   }
 
@@ -86,28 +87,29 @@ export function calculateTrailingConsecutiveAlpha(studentAtts, validSessions) {
  * @returns {number}
  */
 export function calculateMaxHistoricalConsecutiveAlpha(studentAtts, validSessions) {
-  if (!studentAtts || studentAtts.length === 0 || !validSessions || validSessions.length === 0) {
+  if (!validSessions || validSessions.length === 0) {
     return 0
   }
 
   // Terurut kronologis (ascending date)
   const sortedAsc = [...validSessions].sort((a, b) => new Date(a.session_date) - new Date(b.session_date))
-  const attMap = new Map(studentAtts.map(a => [a.session_id, a]))
+  const attMap = new Map((studentAtts || []).map(a => [a.session_id, a]))
 
   let maxStreak = 0
   let currentStreak = 0
 
   for (const session of sortedAsc) {
     const att = attMap.get(session.id)
-    if (!att) continue
-
-    if (att.status === 'alpha') {
-      currentStreak++
-      if (currentStreak > maxStreak) {
-        maxStreak = currentStreak
+    if (att) {
+      if (att.status === 'alpha') {
+        currentStreak++
+        if (currentStreak > maxStreak) maxStreak = currentStreak
+      } else {
+        currentStreak = 0
       }
     } else {
-      currentStreak = 0
+      currentStreak++
+      if (currentStreak > maxStreak) maxStreak = currentStreak
     }
   }
 
@@ -116,13 +118,14 @@ export function calculateMaxHistoricalConsecutiveAlpha(studentAtts, validSession
 
 /**
  * Evaluasi status risiko absensi siswa untuk 1 kegiatan ekstrakurikuler.
+ * Menggunakan standar laporan resmi sekolah (Wali Kelas, BK, Kesiswaan, Kepala Sekolah).
  * 
  * @param {Object} params
  * @param {Object} params.student - { id, full_name, class, nis }
  * @param {Object} params.ekskul - { id, name, is_mandatory, mandatory_class }
  * @param {Array} params.studentAtts - Record absensi siswa untuk ekskul ini
  * @param {Array} params.validSessions - Daftar sesi valid yang relevan untuk siswa ini
- * @returns {Object} Hasil evaluasi risiko
+ * @returns {Object} Hasil evaluasi risiko lengkap
  */
 export function evaluateAttendanceRisk({
   student,
@@ -132,9 +135,19 @@ export function evaluateAttendanceRisk({
 }) {
   const hadir = studentAtts.filter(a => a.status === 'hadir').length
   const izin = studentAtts.filter(a => a.status === 'izin').length
-  const alpha = studentAtts.filter(a => a.status === 'alpha').length
-  const total = studentAtts.length
+  const recordedAlpha = studentAtts.filter(a => a.status === 'alpha').length
+  
+  // Total sesi yang wajib diikuti siswa adalah seluruh sesi terlaksana yang valid untuk siswa ini
+  const totalSessions = validSessions.length
+  
+  // Sesi yang sudah terlaksana tapi tidak ada record absensi dianggap tidak hadir (alpa)
+  const unrecordedAlpha = Math.max(0, totalSessions - (hadir + izin + recordedAlpha))
+  const alpha = recordedAlpha + unrecordedAlpha
 
+  // Total pertemuan yang dihitung adalah seluruh sesi yang terlaksana
+  const total = totalSessions
+
+  // Persentase kehadiran riil
   const percentage = total > 0 ? Math.round((hadir / total) * 100) : 0
   const consecutiveAlpha = calculateTrailingConsecutiveAlpha(studentAtts, validSessions)
   const maxConsecutiveAlpha = calculateMaxHistoricalConsecutiveAlpha(studentAtts, validSessions)
@@ -145,19 +158,23 @@ export function evaluateAttendanceRisk({
   let warningLevel = null // 'TEGURAN' | 'PERINGATAN' | null (Aman)
   let warningLabel = ''
   let warningReasons = []
+  let actionRecommendation = 'Pertahankan keaktifan dan kehadiran.'
   const riskTags = []
 
-  // Jika belum ada record sesi sama sekali, status aman (belum mulai/belum diisi)
+  // Jika belum ada sesi yang terlaksana sama sekali
   if (total === 0) {
     return {
       warningLevel: null,
-      warningLabel: 'BELUM_ADA_DATA',
+      warningLabel: 'BELUM_ADA_SESI',
       warningReasons: [],
+      actionRecommendation: 'Belum ada sesi latihan terlaksana.',
       riskTags: [],
       isAtRisk: false,
       hadir: 0,
       izin: 0,
       alpha: 0,
+      recordedAlpha: 0,
+      unrecordedAlpha: 0,
       total: 0,
       percentage: 0,
       consecutiveAlpha: 0,
@@ -171,28 +188,27 @@ export function evaluateAttendanceRisk({
   // ──────────────────────────────────────────────────────────────────────────
 
   if (isMandatory) {
-    // 🔴 EKSKUL WAJIB (Standar Ketat: Min. Kehadiran 80%)
+    // 🔴 EKSKUL WAJIB (Pramuka / Karate / Taekwondo - Standar Min. 80%)
 
-    // 1. Cek Kondisi TEGURAN (Kritis / Pelanggaran Berat)
     const isCriticalStreak = consecutiveAlpha >= 2
     const isCriticalTotalAlpha = alpha >= 3
     const isCriticalPercentage = percentage < 70
     const isPassiveStudent = total >= 4 && hadir <= 1
 
-    // 2. Cek Kondisi PERINGATAN (Waspada)
     const isWarningTotalAlpha = alpha >= 1 && alpha < 3
     const isWarningPercentage = percentage >= 70 && percentage < 80
 
     if (isCriticalStreak || isCriticalTotalAlpha || isCriticalPercentage || isPassiveStudent) {
       warningLevel = 'TEGURAN'
       warningLabel = 'TEGURAN'
+      actionRecommendation = 'Panggil Siswa & Orang Tua ke Ruang BK / Terbitkan Surat Peringatan (SP).'
 
       if (isCriticalStreak) {
-        warningReasons.push(`${consecutiveAlpha}x Alpha Berturut-turut`)
+        warningReasons.push(`${consecutiveAlpha}x Alpa Berturut-turut`)
         riskTags.push('STREAK_ALPHA')
       }
       if (isCriticalTotalAlpha && !isCriticalStreak) {
-        warningReasons.push(`Total ${alpha}x Alpha`)
+        warningReasons.push(`Total ${alpha}x Alpa`)
         riskTags.push('HIGH_ALPHA')
       }
       if (isCriticalPercentage) {
@@ -206,26 +222,25 @@ export function evaluateAttendanceRisk({
     } else if (isWarningTotalAlpha || isWarningPercentage) {
       warningLevel = 'PERINGATAN'
       warningLabel = 'PERINGATAN'
+      actionRecommendation = 'Pembinaan & Konfirmasi Kehadiran oleh Wali Kelas & Pelatih.'
 
       if (isWarningTotalAlpha) {
-        warningReasons.push(`${alpha}x Alpha`)
+        warningReasons.push(`${alpha}x Alpa`)
         riskTags.push('ALPHA_DETECTED')
       }
       if (isWarningPercentage) {
-        warningReasons.push(`Kehadiran ${percentage}% (Perlu ditingkatkan, min. 80%)`)
+        warningReasons.push(`Kehadiran ${percentage}% (Target min. 80%)`)
         riskTags.push('MODERATE_ATTENDANCE')
       }
     }
   } else {
-    // 🔵 EKSKUL PILIHAN (Standar: Min. Kehadiran 70%)
+    // 🔵 EKSKUL PILIHAN (Standar Min. 70%)
 
-    // 1. Cek Kondisi TEGURAN (Kritis / Indikasi Mangkir / Berhenti)
     const isCriticalStreak = consecutiveAlpha >= 4
     const isCriticalTotalAlpha = alpha >= 5
     const isCriticalPercentage = percentage < 55
     const isPassiveStudent = total >= 5 && hadir <= 1
 
-    // 2. Cek Kondisi PERINGATAN (Waspada)
     const isWarningStreak = consecutiveAlpha >= 2 && consecutiveAlpha < 4
     const isWarningTotalAlpha = alpha >= 3 && alpha < 5
     const isWarningPercentage = percentage >= 55 && percentage < 70
@@ -233,17 +248,18 @@ export function evaluateAttendanceRisk({
     if (isCriticalStreak || isCriticalTotalAlpha || isCriticalPercentage || isPassiveStudent) {
       warningLevel = 'TEGURAN'
       warningLabel = 'TEGURAN'
+      actionRecommendation = 'Panggilan BK & Klarifikasi Komitmen / Pengunduran Diri Ekskul.'
 
       if (isCriticalStreak) {
-        warningReasons.push(`${consecutiveAlpha}x Alpha Berturut-turut`)
+        warningReasons.push(`${consecutiveAlpha}x Alpa Berturut-turut`)
         riskTags.push('STREAK_ALPHA')
       }
       if (isCriticalTotalAlpha && !isCriticalStreak) {
-        warningReasons.push(`Total ${alpha}x Alpha`)
+        warningReasons.push(`Total ${alpha}x Alpa`)
         riskTags.push('HIGH_ALPHA')
       }
       if (isCriticalPercentage) {
-        warningReasons.push(`Kehadiran ${percentage}% (Sangat rendah, min. 70%)`)
+        warningReasons.push(`Kehadiran ${percentage}% (Sangat rendah, target 70%)`)
         riskTags.push('LOW_ATTENDANCE')
       }
       if (isPassiveStudent && !isCriticalPercentage) {
@@ -253,13 +269,14 @@ export function evaluateAttendanceRisk({
     } else if (isWarningStreak || isWarningTotalAlpha || isWarningPercentage) {
       warningLevel = 'PERINGATAN'
       warningLabel = 'PERINGATAN'
+      actionRecommendation = 'Konfirmasi Keaktifan Siswa oleh Wali Kelas & Pelatih.'
 
       if (isWarningStreak) {
-        warningReasons.push(`${consecutiveAlpha}x Alpha Berturut-turut`)
+        warningReasons.push(`${consecutiveAlpha}x Alpa Berturut-turut`)
         riskTags.push('STREAK_ALPHA')
       }
       if (isWarningTotalAlpha && !isWarningStreak) {
-        warningReasons.push(`${alpha}x Alpha`)
+        warningReasons.push(`${alpha}x Alpa`)
         riskTags.push('ALPHA_DETECTED')
       }
       if (isWarningPercentage) {
@@ -269,9 +286,9 @@ export function evaluateAttendanceRisk({
     }
   }
 
-  // Fallback jika ada status tapi belum ada alasan spesifik
+  // Fallback jika berisiko tapi belum terisi alasan
   if (warningLevel && warningReasons.length === 0) {
-    if (alpha > 0) warningReasons.push(`${alpha}x Alpha`)
+    if (alpha > 0) warningReasons.push(`${alpha}x Alpa`)
     if (percentage < (isMandatory ? 80 : 70)) {
       warningReasons.push(`Kehadiran ${percentage}%`)
     }
@@ -281,11 +298,14 @@ export function evaluateAttendanceRisk({
     warningLevel,
     warningLabel: warningLevel || 'AMAN',
     warningReasons,
+    actionRecommendation,
     riskTags,
     isAtRisk: warningLevel !== null,
     hadir,
     izin,
     alpha,
+    recordedAlpha,
+    unrecordedAlpha,
     total,
     percentage,
     consecutiveAlpha,
@@ -295,7 +315,7 @@ export function evaluateAttendanceRisk({
 }
 
 /**
- * Filter dan proses seluruh siswa bermasalah secara batch (untuk RecapManagement & CoachDashboard).
+ * Filter dan proses seluruh siswa bermasalah secara batch.
  * 
  * @param {Object} params
  * @param {Array} params.enrollments - Daftar enrollments
@@ -362,6 +382,7 @@ export function processBatchAttendanceReport({
       warningLevel: risk.warningLevel,
       warningLabel: risk.warningLabel,
       warningReasons: risk.warningReasons,
+      actionRecommendation: risk.actionRecommendation,
       riskTags: risk.riskTags,
       isAtRisk: risk.isAtRisk
     })
