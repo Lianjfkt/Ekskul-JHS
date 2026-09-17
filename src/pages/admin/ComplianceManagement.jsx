@@ -10,6 +10,7 @@ import {
 import { jsPDF } from 'jspdf'
 import 'jspdf-autotable'
 import { addKopSuratToPDF } from '../../utils/pdfHelper'
+import { isSessionApplicableToStudent, evaluateAttendanceRisk } from '../../utils/attendanceRiskEngine'
 import * as XLSX from 'xlsx'
 
 export default function ComplianceManagement() {
@@ -188,26 +189,26 @@ export default function ComplianceManagement() {
       const ekskul = en.extracurricular
       if (!student || !ekskul) return
 
-      // Filter hanya sesi yang sudah diisi absensinya DAN siswa terdaftar/diundang jika itu sesi khusus
+      // Filter sesi yang berlaku untuk siswa ini
       const validSessions = sessions.filter(s => {
         if (s.extracurricular_id !== ekskul.id) return false
-        const isFilled = attendances.some(a => a.session_id === s.id)
-        const isInvited = !s.is_special_training || specialParticipants.some(sp => sp.session_id === s.id && sp.student_id === student.id)
-        return isFilled && isInvited
+        return isSessionApplicableToStudent(s, student, specialParticipants, attendances)
       })
 
-      const sessionIds = validSessions.map(s => s.id)
-      const studentAtts = attendances.filter(a => a.student_id === student.id && sessionIds.includes(a.session_id))
-      // Total hanya dihitung dari sesi yang BENAR-BENAR memiliki record absensi untuk siswa ini
-      const totalSessions = studentAtts.length
-      if (totalSessions === 0) return
+      const sessionIds = new Set(validSessions.map(s => s.id))
+      const studentAtts = attendances.filter(a => a.student_id === student.id && sessionIds.has(a.session_id))
+      if (studentAtts.length === 0) return
 
-      const attendedCount = studentAtts.filter(a => a.status === 'hadir').length
-      const percentage = Math.round((attendedCount / totalSessions) * 100)
+      const risk = evaluateAttendanceRisk({
+        student,
+        ekskul,
+        studentAtts,
+        validSessions
+      })
 
       const ekskulType = getEkskulType(student.class, ekskul.name)
 
-      if (percentage < 80) {
+      if (risk.percentage < 80) {
         lowAttendance.push({
           id: `${student.id}-${ekskul.id}`,
           nis: student.nis,
@@ -217,40 +218,18 @@ export default function ComplianceManagement() {
           ekskulName: ekskul.name,
           ekskulId: ekskul.id,
           ekskulType,
-          attended: attendedCount,
-          total: totalSessions,
-          percentage
+          attended: risk.hadir,
+          total: risk.total,
+          percentage: risk.percentage,
+          warningLevel: risk.warningLevel,
+          warningReasons: risk.warningReasons
         })
       }
 
-      // Hanya gunakan sesi yang memiliki record absensi ASLI untuk siswa ini
-      const sortedAtts = validSessions
-        .map(session => {
-          const att = studentAtts.find(a => a.session_id === session.id)
-          if (!att) return null // skip sesi tanpa record
-          return {
-            session_date: session.session_date,
-            topic: session.topic,
-            status: att.status,
-            notes: att.notes || 'Tidak ada keterangan'
-          }
-        })
-        .filter(Boolean)
+      // Ambil alpa beruntun (aktif streak maupun historis maksimum)
+      const isConsecutiveIssue = risk.consecutiveAlpha >= (risk.isMandatory ? 2 : 3) || risk.maxConsecutiveAlpha >= 3
 
-      let maxConsecutiveAlpha = 0
-      let currentConsecutiveAlpha = 0
-      sortedAtts.forEach(att => {
-        if (att.status === 'alpha') {
-          currentConsecutiveAlpha++
-          if (currentConsecutiveAlpha > maxConsecutiveAlpha) {
-            maxConsecutiveAlpha = currentConsecutiveAlpha
-          }
-        } else {
-          currentConsecutiveAlpha = 0
-        }
-      })
-
-      if (maxConsecutiveAlpha >= 3) {
+      if (isConsecutiveIssue) {
         consecutiveAbsences.push({
           id: `${student.id}-${ekskul.id}-consecutive`,
           nis: student.nis,
@@ -260,7 +239,9 @@ export default function ComplianceManagement() {
           ekskulName: ekskul.name,
           ekskulId: ekskul.id,
           ekskulType,
-          consecutiveCount: maxConsecutiveAlpha
+          consecutiveCount: Math.max(risk.consecutiveAlpha, risk.maxConsecutiveAlpha),
+          warningLevel: risk.warningLevel,
+          warningReasons: risk.warningReasons
         })
       }
     })

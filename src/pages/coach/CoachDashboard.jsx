@@ -11,6 +11,7 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer
 } from 'recharts'
+import { isSessionApplicableToStudent, evaluateAttendanceRisk } from '../../utils/attendanceRiskEngine'
 
 export default function CoachDashboard() {
  const { user } = useAuthStore()
@@ -98,92 +99,65 @@ export default function CoachDashboard() {
       }
       setAttendanceTrend(chartData)
       
-      // 5. Identify students with < 75% attendance
+      // 5. Identify students with attendance warnings
       const { data: activeStudents } = await supabase
         .from('enrollments')
-        .select('student_id, students(full_name, class), extracurricular_id, extracurriculars(name)')
+        .select('student_id, students(id, full_name, class, nis), extracurricular_id, extracurriculars(id, name, is_mandatory, mandatory_class)')
         .in('extracurricular_id', ekskulIds)
         .eq('status', 'active')
         
       const warnings = []
       if (activeStudents && activeStudents.length > 0) {
-        const { data: allSessions } = await supabase.from('sessions').select('id, session_date, extracurricular_id, is_special_training, target_class').in('extracurricular_id', ekskulIds)
+        const { data: allSessions } = await supabase
+          .from('sessions')
+          .select('id, session_date, extracurricular_id, is_special_training, target_class, attendance_submitted')
+          .in('extracurricular_id', ekskulIds)
         if (allSessions && allSessions.length > 0) {
            const allSessionIds = allSessions.map(s => s.id)
-           const { data: allAtts } = await supabase.from('attendances').select('student_id, session_id, status').in('session_id', allSessionIds)
+           const { data: allAtts } = await supabase.from('attendances').select('id, student_id, session_id, status').in('session_id', allSessionIds)
            const { data: specialParts } = await supabase.from('special_session_participants').select('session_id, student_id').in('session_id', allSessionIds)
            
            if (allAtts) {
               activeStudents.forEach(enr => {
-                  const ekskul = ekskuls.find(e => e.id === enr.extracurricular_id)
-                  const isMandatory = ekskul?.is_mandatory || false
-                  const ekskulSessions = allSessions
-                    .filter(s => s.extracurricular_id === enr.extracurricular_id)
-                  
-                  // Filter only sessions that have been filled and where the student was invited / targeted
-                  const validSessions = ekskulSessions.filter(s => {
-                    const isFilled = allAtts.some(a => a.session_id === s.id)
-                    const isInvited = !s.is_special_training || (specialParts && specialParts.some(sp => sp.session_id === s.id && sp.student_id === enr.student_id))
-                    const isTargetClass = !s.target_class || s.target_class === 'all' || (enr.students?.class && s.target_class.split(',').some(tc => enr.students.class.trim().startsWith(tc)))
-                    return isFilled && isInvited && isTargetClass
-                  })
+                  const ekskul = ekskuls.find(e => e.id === enr.extracurricular_id) || enr.extracurriculars
+                  const student = enr.students
+                  if (!student || !ekskul) return
 
-                  const validSessionIds = validSessions.map(s => s.id)
-                  const studentAtts = allAtts.filter(a => a.student_id === enr.student_id && validSessionIds.includes(a.session_id))
+                  const ekskulSessions = allSessions.filter(s => s.extracurricular_id === enr.extracurricular_id)
+                  const validSessions = ekskulSessions.filter(s => 
+                    isSessionApplicableToStudent(s, student, specialParts || [], allAtts)
+                  )
+
+                  const validSessionIds = new Set(validSessions.map(s => s.id))
+                  const studentAtts = allAtts.filter(a => a.student_id === enr.student_id && validSessionIds.has(a.session_id))
                   
-                  // Total hanya dari sesi yang BENAR-BENAR memiliki record absensi
                   if (studentAtts.length === 0) return
 
-                  const total = studentAtts.length
-                  const present = studentAtts.filter(a => a.status === 'hadir').length
-                  const alphaCount = studentAtts.filter(a => a.status === 'alpha').length
-                  const percentage = Math.round((present / total) * 100)
+                  const risk = evaluateAttendanceRisk({
+                    student,
+                    ekskul,
+                    studentAtts,
+                    validSessions
+                  })
 
-                  // Hitung alpha berturut-turut (hanya dari record yang ada)
-                  const sortedSessions = validSessions
-                    .slice() // jangan mutasi
-                    .sort((a, b) => new Date(b.session_date) - new Date(a.session_date))
-                  let consecutiveAlpha = 0
-                  for (const session of sortedSessions) {
-                    const att = studentAtts.find(a => a.session_id === session.id)
-                    if (!att) continue // skip sesi tanpa record
-                    if (att.status === 'alpha') consecutiveAlpha++
-                    else break
-                  }
-
-                 // Threshold berbeda: wajib vs pilihan
-                 const shouldWarn = isMandatory
-                   ? (alphaCount >= 1 || percentage < 80)
-                   : (consecutiveAlpha >= 3 || percentage < 70)
-
-                 if (shouldWarn) {
-                    const warningLevel = isMandatory
-                      ? (alphaCount >= 3 || percentage < 70 ? 'TEGURAN' : 'PERINGATAN')
-                      : (consecutiveAlpha >= 5 || percentage < 55 ? 'TEGURAN' : 'PERINGATAN')
-                    
-                    const warningReasons = []
-                    if (isMandatory) {
-                      if (alphaCount >= 1) warningReasons.push(`${alphaCount}x Alpha`)
-                      if (percentage < 80) warningReasons.push(`Kehadiran ${percentage}% (min. 80%)`)
-                    } else {
-                      if (consecutiveAlpha >= 3) warningReasons.push(`${consecutiveAlpha}x Alpha Berturut`)
-                      if (percentage < 70) warningReasons.push(`Kehadiran ${percentage}% (min. 70%)`)
-                    }
-
+                  if (risk.isAtRisk) {
                     warnings.push({
                        id: enr.student_id + enr.extracurricular_id,
                        ekskulId: enr.extracurricular_id,
-                       name: enr.students?.full_name,
-                       class: enr.students?.class,
-                       ekskul: enr.extracurriculars?.name,
-                       percentage,
-                       consecutiveAlpha,
-                       alphaCount,
-                       isMandatory,
-                       warningLevel,
-                       warningReasons
+                       name: student.full_name,
+                       class: student.class,
+                       ekskul: ekskul.name,
+                       percentage: risk.percentage,
+                       consecutiveAlpha: risk.consecutiveAlpha,
+                       maxConsecutiveAlpha: risk.maxConsecutiveAlpha,
+                       alphaCount: risk.alpha,
+                       isMandatory: risk.isMandatory,
+                       warningLevel: risk.warningLevel,
+                       warningLabel: risk.warningLabel,
+                       warningReasons: risk.warningReasons,
+                       riskTags: risk.riskTags
                     })
-                 }
+                  }
               })
            }
         }

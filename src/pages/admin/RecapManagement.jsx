@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { saveAs } from 'file-saver'
 import { addKopSuratToPDF } from '../../utils/pdfHelper'
+import { isSessionApplicableToStudent, evaluateAttendanceRisk } from '../../utils/attendanceRiskEngine'
 import {
  ResponsiveContainer,
  BarChart,
@@ -460,38 +461,18 @@ export default function RecapManagement() {
    // Sesi-sesi ekskul ini yang valid untuk siswa ini
    const validSessions = sessions.filter(s => {
     if (s.extracurricular_id !== ekskul.id) return false
-    // Hanya hitung sesi yang sudah disimpan/disubmit absensinya atau memiliki record absensi
-    const hasAtt = attendances.some(a => a.session_id === s.id)
-    if (!s.attendance_submitted && !hasAtt) return false
-
-    // Cek undangan latihan khusus jika sesi khusus
-    const isInvited = !s.is_special_training || specialParticipants.some(sp => sp.session_id === s.id && sp.student_id === student.id)
-    // Cek target kelas jika diset
-    const isTargetClass = !s.target_class || s.target_class === 'all' || (student.class && s.target_class.split(',').some(tc => student.class.trim().startsWith(tc.trim())))
-
-    return isInvited && isTargetClass
+    return isSessionApplicableToStudent(s, student, specialParticipants, attendances)
    })
 
-   let hadir = 0
-   let izin = 0
-   let alpha = 0
+   const validSessionIds = new Set(validSessions.map(s => s.id))
+   const studentAtts = attendances.filter(a => a.student_id === student.id && validSessionIds.has(a.session_id))
 
-   // HANYA hitung dari record absensi yang BENAR-BENAR ada di database.
-   // Jika tidak ada record untuk siswa ini di sesi tertentu, JANGAN hitung sebagai alpha.
-   // Ini mencegah false-alpha pada siswa yang enroll setelah sesi berlangsung
-   // atau jika pelatih belum merekam absensi untuk siswa tersebut.
-   validSessions.forEach(s => {
-    const att = attendances.find(a => a.session_id === s.id && a.student_id === student.id)
-    if (att) {
-     if (att.status === 'hadir') hadir++
-     else if (att.status === 'izin') izin++
-     else alpha++
-    }
-    // Tidak ada record → tidak dihitung (bukan alpha)
+   const riskEvaluation = evaluateAttendanceRisk({
+    student,
+    ekskul,
+    studentAtts,
+    validSessions
    })
-
-   const total = hadir + izin + alpha
-   const percentage = total > 0 ? Math.round((hadir / total) * 100) : 0
 
    return {
     studentId: student.id,
@@ -502,13 +483,20 @@ export default function RecapManagement() {
     ekskulName: ekskul.name,
     semester: en.semester,
     academicYear: en.academic_year,
-    isMandatory: ekskul.is_mandatory || false,
+    isMandatory: riskEvaluation.isMandatory,
     mandatoryClass: ekskul.mandatory_class || null,
-    hadir,
-    izin,
-    alpha,
-    total,
-    percentage
+    hadir: riskEvaluation.hadir,
+    izin: riskEvaluation.izin,
+    alpha: riskEvaluation.alpha,
+    total: riskEvaluation.total,
+    percentage: riskEvaluation.percentage,
+    consecutiveAlpha: riskEvaluation.consecutiveAlpha,
+    maxConsecutiveAlpha: riskEvaluation.maxConsecutiveAlpha,
+    warningLevel: riskEvaluation.warningLevel,
+    warningLabel: riskEvaluation.warningLabel,
+    warningReasons: riskEvaluation.warningReasons,
+    riskTags: riskEvaluation.riskTags,
+    isAtRisk: riskEvaluation.isAtRisk
    }
   }).filter(Boolean).filter(row => {
    const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
@@ -550,99 +538,18 @@ export default function RecapManagement() {
  }, [grades, selectedEkskul, selectedSemester, selectedAcademicYear, searchQuery])
 
  // ─── Tab 5: Warning Siswa Bermasalah ──────────────────────────────────────
- const getConsecutiveAlpha = (studentId, ekskulId, studentClass) => {
-  const ekskulSessions = sessions
-   .filter(s => s.extracurricular_id === ekskulId)
-   .sort((a, b) => new Date(b.session_date) - new Date(a.session_date)) // terbaru dulu
-
-  let consecutive = 0
-  for (const session of ekskulSessions) {
-   const sessionAtts = attendances.filter(a => a.session_id === session.id)
-   const isFilled = session.attendance_submitted === true || sessionAtts.length > 0
-   const isInvited = !session.is_special_training || specialParticipants.some(sp => sp.session_id === session.id && sp.student_id === studentId)
-   const isTargetClass = !session.target_class || session.target_class === 'all' || (studentClass && session.target_class.split(',').some(tc => studentClass.trim().startsWith(tc.trim())))
-
-   if (isFilled && isInvited && isTargetClass) {
-    const att = sessionAtts.find(a => a.student_id === studentId)
-    if (att) {
-     // Record ada di database → cek statusnya
-     if (att.status === 'alpha') {
-      consecutive++
-     } else {
-      break // hadir/izin → putus chain
-     }
-    }
-    // Tidak ada record → SKIP sesi ini (jangan hitung sebagai alpha)
-   }
-  }
-  return consecutive
- }
-
  const warningRows = useMemo(() => {
-  const result = []
-
-  attendanceReportRows.forEach(row => {
-   if (row.total === 0) return
-
-   const percentage = row.percentage
-   const consecutiveAlpha = getConsecutiveAlpha(row.studentId, row.ekskulId, row.class)
-
-   let warningLevel = null
-   let warningLabel = ''
-   let warningReasons = []
-
-   if (row.isMandatory) {
-    if (row.alpha >= 1 && percentage < 80) {
-     warningReasons.push(`Kehadiran ${percentage}% (min. 80%)`)
-    }
-    if (row.alpha >= 1) {
-     warningReasons.push(`${row.alpha}x Alpha`)
-    }
-    if (row.alpha >= 3 || percentage < 70) {
-     warningLevel = 'TEGURAN'
-     warningLabel = 'TEGURAN'
-    } else if (row.alpha >= 1 || percentage < 80) {
-     warningLevel = 'PERINGATAN'
-     warningLabel = 'PERINGATAN'
-    }
-   } else {
-    if (consecutiveAlpha >= 3) warningReasons.push(`${consecutiveAlpha}x Alpha Berturut-turut`)
-    if (percentage < 70) warningReasons.push(`Kehadiran ${percentage}% (min. 70%)`)
-    if (consecutiveAlpha >= 5 || percentage < 55) {
-     warningLevel = 'TEGURAN'
-     warningLabel = 'TEGURAN'
-    } else if (consecutiveAlpha >= 3 || percentage < 70) {
-     warningLevel = 'PERINGATAN'
-     warningLabel = 'PERINGATAN'
-    }
-   }
-
-   if (!warningLevel) return // hanya tampilkan yang bermasalah
-
-   result.push({
-    ...row,
-    percentage,
-    consecutiveAlpha,
-    warningLevel,
-    warningLabel,
-    warningReasons
-   })
-  })
-
-  return result.filter(row => {
-   const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
-   const matchSearch = searchQuery
-    ? row.studentName.toLowerCase().includes(searchQuery.toLowerCase()) || row.nis.includes(searchQuery)
-    : true
+  return attendanceReportRows.filter(row => {
+   if (!row.isAtRisk || row.total === 0) return false
    const matchType = warningTypeFilter ? (warningTypeFilter === 'wajib' ? row.isMandatory : !row.isMandatory) : true
    const matchLevel = warningLevelFilter ? row.warningLevel === warningLevelFilter : true
-   return matchEkskul && matchSearch && matchType && matchLevel
+   return matchType && matchLevel
   }).sort((a, b) => {
    // TEGURAN dulu, lalu urutkan % kehadiran dari terkecil
    if (a.warningLevel !== b.warningLevel) return a.warningLevel === 'TEGURAN' ? -1 : 1
    return a.percentage - b.percentage
   })
- }, [attendanceReportRows, sessions, attendances, specialParticipants, selectedEkskul, searchQuery, warningTypeFilter, warningLevelFilter])
+ }, [attendanceReportRows, warningTypeFilter, warningLevelFilter])
 
  const warningCount = useMemo(() => warningRows.length, [warningRows])
  const teguranCount = useMemo(() => warningRows.filter(r => r.warningLevel === 'TEGURAN').length, [warningRows])

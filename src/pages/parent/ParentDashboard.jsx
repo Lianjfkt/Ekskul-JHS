@@ -8,6 +8,7 @@ import {
  Waves, CalendarDays, Clock, ChevronRight, 
  TrendingUp, AlertCircle, CheckCircle2, Loader2, AlertTriangle
 } from 'lucide-react'
+import { isSessionApplicableToStudent, evaluateAttendanceRisk } from '../../utils/attendanceRiskEngine'
 
 function SkeletonCard() {
  return (
@@ -84,7 +85,7 @@ export default function ParentDashboard() {
  setUpcomingSessions([])
  setWarnings([])
  }
- }, [studentId])
+ }, [studentId, selectedChild])
 
  const fetchDashboardData = async () => {
  setLoading(true)
@@ -94,7 +95,7 @@ export default function ParentDashboard() {
  .from('enrollments')
  .select(`
  id, semester, academic_year, status,
- extracurriculars(id, name, schedule, description, coach_id,
+ extracurriculars(id, name, schedule, description, coach_id, is_mandatory, mandatory_class,
  coach:coach_id(full_name), coach2:coach_id_2(full_name), coach3:coach_id_3(full_name)
  )
  `)
@@ -105,38 +106,69 @@ export default function ParentDashboard() {
 
  const currentWarnings = []
 
- // For each enrollment, fetch attendance %
+ // For each enrollment, fetch attendance & evaluate risk with central engine
  const enriched = await Promise.all((enrollData || []).map(async enr => {
- const ekskulId = enr.extracurriculars?.id
- if (!ekskulId) return { ...enr, pct: 0, lastGrade: null }
+ const ekskul = enr.extracurriculars
+ const ekskulId = ekskul?.id
+ if (!ekskulId) return { ...enr, pct: 0, lastGrade: null, risk: null }
 
- // Get sessions
+ // Get sessions for this ekskul
  const { data: sessions } = await supabase
  .from('sessions')
- .select('id')
+ .select('id, session_date, topic, is_special_training, target_class, attendance_submitted')
  .eq('extracurricular_id', ekskulId)
+ .order('session_date', { ascending: false })
 
- const sessionIds = (sessions || []).map(s => s.id)
  let pct = 0
  let alphaCount = 0
+ let risk = null
 
- if (sessionIds.length > 0) {
- const { data: atts } = await supabase
+ if (sessions && sessions.length > 0) {
+ const sessionIds = sessions.map(s => s.id)
+ const [attRes, spRes] = await Promise.all([
+ supabase
  .from('attendances')
- .select('status')
+ .select('id, session_id, status, notes')
+ .eq('student_id', studentId)
+ .in('session_id', sessionIds),
+ supabase
+ .from('special_session_participants')
+ .select('session_id, student_id')
  .eq('student_id', studentId)
  .in('session_id', sessionIds)
+ ])
 
- const hadir = (atts || []).filter(a => a.status === 'hadir').length
- alphaCount = (atts || []).filter(a => a.status === 'alpha').length
- pct = atts?.length > 0 ? Math.round((hadir / atts.length) * 100) : 0
- }
+ const rawAtts = attRes.data || []
+ const specialParts = spRes.data || []
+ const student = selectedChild || { id: studentId }
 
- if (pct > 0 && pct < 75) {
- currentWarnings.push({ type: 'attendance_low', ekskulName: enr.extracurriculars.name, pct })
+ const validSessions = sessions.filter(s =>
+ isSessionApplicableToStudent(s, student, specialParts, rawAtts)
+ )
+ const validSessionIds = new Set(validSessions.map(s => s.id))
+ const studentAtts = rawAtts.filter(a => validSessionIds.has(a.session_id))
+
+ risk = evaluateAttendanceRisk({
+ student,
+ ekskul,
+ studentAtts,
+ validSessions
+ })
+
+ pct = risk.percentage
+ alphaCount = risk.alpha
+
+ if (risk.isAtRisk) {
+ currentWarnings.push({
+ type: risk.warningLevel === 'TEGURAN' ? 'critical' : 'warning',
+ warningLevel: risk.warningLevel,
+ ekskulName: ekskul.name,
+ pct: risk.percentage,
+ count: risk.alpha,
+ consecutiveAlpha: risk.consecutiveAlpha,
+ reasons: risk.warningReasons
+ })
  }
- if (alphaCount >= 3) {
- currentWarnings.push({ type: 'alpha_high', ekskulName: enr.extracurriculars.name, count: alphaCount })
  }
 
  // Get last grade
@@ -158,7 +190,7 @@ export default function ParentDashboard() {
  lastGrade = { avg, predikat, semester: gradeData.semester }
  }
 
- return { ...enr, pct, lastGrade }
+ return { ...enr, pct, lastGrade, risk }
  }))
 
  setEnrollments(enriched)
@@ -265,29 +297,48 @@ export default function ParentDashboard() {
  </div>
  </div>
 
- {/* Perlu Perhatian Section */}
- {warnings.length > 0 && !loading && (
- <div className="bg-pixel-red/10 border border-rose-200 rounded-none p-5 shadow-pixel-sm">
- <h2 className="text-sm font-bold text-rose-800 mb-3 flex items-center gap-2">
- <AlertTriangle className="w-4 h-4" /> Perlu Perhatian
- </h2>
- <div className="space-y-2">
- {warnings.map((w, i) => (
- <div key={i} className="flex items-center gap-3 bg-pixel-panel/60 p-3 rounded-none">
- <AlertCircle className="w-5 h-5 text-pixel-red shrink-0" />
- <div className="text-xs text-rose-700 font-medium">
- {w.type === 'attendance_low' && (
- <span>Kehadiran di <b className="font-bold">{w.ekskulName}</b> sangat rendah ({w.pct}%).</span>
- )}
- {w.type === 'alpha_high' && (
- <span>Terdapat <b className="font-bold">{w.count}x Alpha (Tanpa Keterangan)</b> di {w.ekskulName}.</span>
- )}
- </div>
- </div>
- ))}
- </div>
- </div>
- )}
+  {/* Perlu Perhatian Section */}
+  {warnings.length > 0 && !loading && (
+  <div className="bg-pixel-red/10 border border-rose-500/30 rounded-none p-5 shadow-pixel-sm">
+  <h2 className="text-sm font-bold text-rose-400 mb-3 flex items-center gap-2">
+  <AlertTriangle className="w-4 h-4 text-pixel-red" /> Perlu Perhatian & Evaluasi
+  </h2>
+  <div className="space-y-2">
+  {warnings.map((w, i) => (
+  <div key={i} className={`flex items-start gap-3 p-3 rounded-none bg-pixel-panel/80 border-l-2 ${
+    w.warningLevel === 'TEGURAN' ? 'border-l-pixel-red' : 'border-l-amber-500'
+  }`}>
+  <AlertCircle className={`w-5 h-5 shrink-0 mt-0.5 ${
+    w.warningLevel === 'TEGURAN' ? 'text-pixel-red' : 'text-amber-500'
+  }`} />
+  <div className="text-xs text-pixel-white font-medium flex-1">
+  <div className="flex items-center justify-between">
+    <span className="font-bold text-pixel-white">{w.ekskulName}</span>
+    {w.warningLevel && (
+      <span className={`text-[10px] font-bold px-1.5 py-0.5 uppercase ${
+        w.warningLevel === 'TEGURAN' ? 'bg-pixel-red/20 text-pixel-red border border-rose-500/30' : 'bg-amber-900/30 text-amber-400 border border-amber-500/30'
+      }`}>
+        {w.warningLevel}
+      </span>
+    )}
+  </div>
+  {w.reasons && w.reasons.length > 0 ? (
+    <ul className="mt-1.5 text-pixel-lavender text-xs space-y-0.5">
+      {w.reasons.map((r, ri) => (
+        <li key={ri}>• {r}</li>
+      ))}
+    </ul>
+  ) : (
+    <p className="text-pixel-lavender mt-1">
+      Kehadiran {w.pct}% (Total {w.count || 0}x Alpha).
+    </p>
+  )}
+  </div>
+  </div>
+  ))}
+  </div>
+  </div>
+  )}
 
  {/* Ekskul Cards */}
  <div>

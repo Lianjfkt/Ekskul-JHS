@@ -1,9 +1,22 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { evaluateAttendanceRisk, isSessionApplicableToStudent } from '../utils/attendanceRiskEngine'
 
 export function useAttendanceSummary(studentId, extracurricularId) {
-  const [summary, setSummary] = useState({ hadir: 0, izin: 0, alpha: 0, total: 0, percentage: 0 })
+  const [summary, setSummary] = useState({
+    hadir: 0,
+    izin: 0,
+    alpha: 0,
+    total: 0,
+    percentage: 0,
+    consecutiveAlpha: 0,
+    warningLevel: null,
+    warningLabel: 'AMAN',
+    warningReasons: [],
+    isAtRisk: false
+  })
   const [attendances, setAttendances] = useState([])
+  const [risk, setRisk] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const fetchAttendance = useCallback(async () => {
@@ -13,14 +26,22 @@ export function useAttendanceSummary(studentId, extracurricularId) {
     }
     setLoading(true)
     try {
-      // 1. Get student's class to check target_class
-      const { data: studentData } = await supabase
-        .from('students')
-        .select('class')
-        .eq('id', studentId)
-        .single()
+      // 1. Get student & extracurricular info
+      const [studentRes, ekskulRes] = await Promise.all([
+        supabase
+          .from('students')
+          .select('id, full_name, class, nis')
+          .eq('id', studentId)
+          .single(),
+        supabase
+          .from('extracurriculars')
+          .select('id, name, is_mandatory, mandatory_class')
+          .eq('id', extracurricularId)
+          .single()
+      ])
 
-      const studentClass = studentData?.class || ''
+      const student = studentRes.data || { id: studentId }
+      const ekskul = ekskulRes.data || { id: extracurricularId }
 
       // 2. Get all sessions for the extracurricular
       const { data: sessions, error: sErr } = await supabase
@@ -32,14 +53,25 @@ export function useAttendanceSummary(studentId, extracurricularId) {
       if (sErr) throw sErr
 
       if (!sessions || sessions.length === 0) {
-        setSummary({ hadir: 0, izin: 0, alpha: 0, total: 0, percentage: 0 })
+        setSummary({
+          hadir: 0,
+          izin: 0,
+          alpha: 0,
+          total: 0,
+          percentage: 0,
+          consecutiveAlpha: 0,
+          warningLevel: null,
+          warningLabel: 'AMAN',
+          warningReasons: [],
+          isAtRisk: false
+        })
         setAttendances([])
+        setRisk(null)
         setLoading(false)
         return
       }
 
       const sessionIds = sessions.map(s => s.id)
-      const sessionMap = Object.fromEntries(sessions.map(s => [s.id, s]))
 
       // 3. Get attendances and special participants for those sessions
       const [attRes, spRes] = await Promise.all([
@@ -50,31 +82,23 @@ export function useAttendanceSummary(studentId, extracurricularId) {
           .in('session_id', sessionIds),
         supabase
           .from('special_session_participants')
-          .select('session_id')
+          .select('session_id, student_id')
           .eq('student_id', studentId)
           .in('session_id', sessionIds)
       ])
 
       if (attRes.error) throw attRes.error
 
-      const specialSessionIds = new Set((spRes.data || []).map(sp => sp.session_id))
-      const attMap = Object.fromEntries((attRes.data || []).map(a => [a.session_id, a]))
+      const rawAttendances = attRes.data || []
+      const specialParticipants = spRes.data || []
+      const attMap = Object.fromEntries(rawAttendances.map(a => [a.session_id, a]))
 
-      // Sesi yang valid untuk siswa ini
-      const validSessions = sessions.filter(s => {
-        const hasAtt = attMap[s.id] !== undefined
-        if (!s.attendance_submitted && !hasAtt) return false
-        if (s.is_special_training && !specialSessionIds.has(s.id)) return false
-        if (s.target_class && s.target_class !== 'all') {
-          const targetClasses = s.target_class.split(',')
-          if (!studentClass || !targetClasses.some(tc => studentClass.trim().startsWith(tc.trim()))) return false
-        }
-        return true
-      })
+      // Sesi yang valid untuk siswa ini dengan engine
+      const validSessions = sessions.filter(s =>
+        isSessionApplicableToStudent(s, student, specialParticipants, rawAttendances)
+      )
 
-      // HANYA sertakan sesi yang memiliki record absensi ASLI di database.
-      // Jangan buat virtual alpha untuk sesi tanpa record — ini menyebabkan
-      // siswa yang tidak pernah alpa terdeteksi alpa secara palsu.
+      // HANYA sertakan sesi yang memiliki record absensi ASLI di database
       const enriched = validSessions
         .filter(s => attMap[s.id] !== undefined)
         .map(s => {
@@ -95,13 +119,30 @@ export function useAttendanceSummary(studentId, extracurricularId) {
 
       setAttendances(enriched)
 
-      const hadir = enriched.filter(a => a.status === 'hadir').length
-      const izin = enriched.filter(a => a.status === 'izin').length
-      const alpha = enriched.filter(a => a.status === 'alpha').length
-      const total = enriched.length
-      const percentage = total > 0 ? Math.round((hadir / total) * 100) : 0
+      // Hitung risiko menggunakan centralized engine
+      const riskEvaluation = evaluateAttendanceRisk({
+        student,
+        ekskul,
+        studentAtts: enriched,
+        validSessions
+      })
 
-      setSummary({ hadir, izin, alpha, total, percentage })
+      setRisk(riskEvaluation)
+      setSummary({
+        hadir: riskEvaluation.hadir,
+        izin: riskEvaluation.izin,
+        alpha: riskEvaluation.alpha,
+        total: riskEvaluation.total,
+        percentage: riskEvaluation.percentage,
+        consecutiveAlpha: riskEvaluation.consecutiveAlpha,
+        maxConsecutiveAlpha: riskEvaluation.maxConsecutiveAlpha,
+        warningLevel: riskEvaluation.warningLevel,
+        warningLabel: riskEvaluation.warningLabel,
+        warningReasons: riskEvaluation.warningReasons,
+        riskTags: riskEvaluation.riskTags,
+        isAtRisk: riskEvaluation.isAtRisk,
+        isMandatory: riskEvaluation.isMandatory
+      })
     } catch (err) {
       console.error('useAttendanceSummary error:', err)
     } finally {
