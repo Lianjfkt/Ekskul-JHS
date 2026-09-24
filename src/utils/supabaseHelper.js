@@ -1,5 +1,3 @@
-import { supabase } from '../lib/supabaseClient'
-
 /**
  * Supabase Helper Utilities
  * Fungsi utilitas untuk mengatasi keterbatasan Supabase, termasuk:
@@ -19,12 +17,20 @@ import { supabase } from '../lib/supabaseClient'
 export async function fetchAllPaginated(queryFn, pageSize = 1000) {
   let allData = []
   let from = 0
-  while (true) {
+  let hasMore = true
+
+  while (hasMore) {
     const { data, error } = await queryFn(from, from + pageSize - 1)
     if (error) throw error
-    if (!data || data.length === 0) break
+    if (!data || data.length === 0) {
+      hasMore = false
+      break
+    }
     allData = allData.concat(data)
-    if (data.length < pageSize) break
+    if (data.length < pageSize) {
+      hasMore = false
+      break
+    }
     from += pageSize
   }
   return allData

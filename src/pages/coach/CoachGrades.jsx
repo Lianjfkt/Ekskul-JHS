@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuthStore } from '../../stores/authStore'
 import { matchesClass } from '../../utils/classHelper'
@@ -9,6 +9,14 @@ import { Label } from '@/components/ui/label'
 import { 
  GraduationCap, ShieldAlert, Check, Users, Save, Info
 } from 'lucide-react'
+
+// Auto-hitung tahun ajaran: Juli-Des = tahun ajaran baru, Jan-Jun = tahun ajaran lama
+// Didefinisikan di luar komponen agar tidak dibuat ulang setiap render.
+function getDefaultAcademicYear() {
+  const now = new Date()
+  const year = now.getFullYear()
+  return now.getMonth() >= 6 ? `${year}/${year + 1}` : `${year - 1}/${year}`
+}
 
 export default function CoachGrades() {
  const { user } = useAuthStore()
@@ -21,12 +29,6 @@ export default function CoachGrades() {
  const [managedEkskuls, setManagedEkskuls] = useState([])
  const [selectedEkskul, setSelectedEkskul] = useState('')
  const [selectedSemester, setSelectedSemester] = useState('Pertengahan Semester Ganjil')
- // Auto-hitung tahun ajaran: Juli-Des = tahun ajaran baru, Jan-Jun = tahun ajaran lama
- const getDefaultAcademicYear = () => {
-  const now = new Date()
-  const year = now.getFullYear()
-  return now.getMonth() >= 6 ? `${year}/${year + 1}` : `${year - 1}/${year}`
- }
  const [selectedAcademicYear, setSelectedAcademicYear] = useState(getDefaultAcademicYear)
 
  // Data States
@@ -176,31 +178,24 @@ export default function CoachGrades() {
  }
  }
 
- const handleScoreChange = (studentId, field, value) => {
+ const handleScoreChange = useCallback((studentId, field, value) => {
  // Client-side score validation: must be a number between 0 and 100 or empty
  if (value !== '') {
  const num = parseInt(value)
  if (isNaN(num) || num < 0 || num > 100) return
  }
- 
  setGradesSheet(sheet => ({
  ...sheet,
- [studentId]: {
- ...sheet[studentId],
- [field]: value
- }
+ [studentId]: { ...sheet[studentId], [field]: value }
  }))
- }
+ }, [])
 
- const handleNotesChange = (studentId, notes) => {
+ const handleNotesChange = useCallback((studentId, notes) => {
  setGradesSheet(sheet => ({
  ...sheet,
- [studentId]: {
- ...sheet[studentId],
- notes
- }
+ [studentId]: { ...sheet[studentId], notes }
  }))
- }
+ }, [])
 
  const handleSaveGrades = async () => {
  if (!selectedEkskul) return

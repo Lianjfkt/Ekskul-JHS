@@ -15,6 +15,8 @@ export default function ParentGrades() {
  const { selectedChild, loading: childrenLoading } = useParentChildren()
  const studentId = selectedChild?.id
  const [selectedSemester, setSelectedSemester] = useState('')
+ const [exporting, setExporting] = useState(false)
+ const [exportError, setExportError] = useState('')
 
  // Fetch ALL grades, filter locally for performance
  const { grades: allGrades, loading: allLoading } = useGrades(studentId, null)
@@ -55,38 +57,46 @@ export default function ParentGrades() {
  const colors = ['#8b5cf6', '#06b6d4', '#f59e0b', '#10b981', '#f43f5e']
 
  const exportPDF = async () => {
- if (!selectedChild || displayGrades.length === 0) return
- const doc = new jsPDF()
+  if (!selectedChild || displayGrades.length === 0 || exporting) return
+  setExporting(true)
+  setExportError('')
+  try {
+   const doc = new jsPDF()
+   const startY = await addKopSuratToPDF(doc, 'portrait')
 
- const startY = await addKopSuratToPDF(doc, 'portrait')
+   doc.setFontSize(16)
+   doc.text('Laporan Nilai Ekstrakurikuler', 14, startY + 6)
+   doc.setFontSize(12)
+   doc.text(`Nama Anak: ${selectedChild.full_name}`, 14, startY + 14)
+   if (selectedSemester) {
+    doc.text(`Semester: ${selectedSemester}`, 14, startY + 22)
+   }
 
- doc.setFontSize(16)
- doc.text('Laporan Nilai Ekstrakurikuler', 14, startY + 6)
- doc.setFontSize(12)
- doc.text(`Nama Anak: ${selectedChild.full_name}`, 14, startY + 14)
- if (selectedSemester) {
- doc.text(`Semester: ${selectedSemester}`, 14, startY + 22)
- }
+   const tableData = displayGrades.map(g => [
+    g.extracurriculars.name,
+    g.semester,
+    g.attitude_score ?? '-',
+    g.skill_score ?? '-',
+    g.activity_score ?? '-',
+    g.avg,
+    g.predikat
+   ])
 
- const tableData = displayGrades.map(g => [
- g.extracurriculars.name,
- g.semester,
- g.attitude_score ?? '-',
- g.skill_score ?? '-',
- g.activity_score ?? '-',
- g.avg,
- g.predikat
- ])
+   autoTable(doc, {
+    startY: startY + (selectedSemester ? 28 : 20),
+    head: [['Ekstrakurikuler', 'Smstr', 'Sikap', 'Keterampilan', 'Keaktifan', 'Rata-rata', 'Predikat']],
+    body: tableData,
+    theme: 'grid',
+    headStyles: { fillColor: [139, 92, 246] }
+   })
 
- autoTable(doc, {
- startY: startY + (selectedSemester ? 28 : 20),
- head: [['Ekstrakurikuler', 'Smstr', 'Sikap', 'Keterampilan', 'Keaktifan', 'Rata-rata', 'Predikat']],
- body: tableData,
- theme: 'grid',
- headStyles: { fillColor: [139, 92, 246] }
- })
-
- doc.save(`Nilai_${selectedChild.full_name.split(' ')[0]}${selectedSemester ? '_Smt' + selectedSemester : ''}.pdf`)
+   doc.save(`Nilai_${selectedChild.full_name.split(' ')[0]}${selectedSemester ? '_Smt' + selectedSemester : ''}.pdf`)
+  } catch (err) {
+   console.error('Export PDF error:', err)
+   setExportError('Gagal membuat PDF. Silakan coba lagi.')
+  } finally {
+   setExporting(false)
+  }
  }
 
  if (!selectedChild) {
@@ -144,14 +154,29 @@ export default function ParentGrades() {
  )}
  <Button
  onClick={exportPDF}
- disabled={displayGrades.length === 0}
+ disabled={displayGrades.length === 0 || exporting}
  className="bg-violet-600 hover:bg-violet-700 text-white shrink-0"
  >
- <Download className="w-4 h-4 mr-2" />
- Unduh Rapor
+ {exporting ? (
+  <>
+   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+   Mengunduh...
+  </>
+ ) : (
+  <>
+   <Download className="w-4 h-4 mr-2" />
+   Unduh Rapor
+  </>
+ )}
  </Button>
  </div>
  </div>
+
+ {exportError && (
+  <div className="bg-pixel-red/20 border border-pixel-red/50 text-pixel-red text-xs px-4 py-2.5">
+   {exportError}
+  </div>
+ )}
 
  {allGrades.length === 0 ? (
  <div className="bg-pixel-panel rounded-none p-12 text-center border border-violet-50 shadow-pixel-sm">

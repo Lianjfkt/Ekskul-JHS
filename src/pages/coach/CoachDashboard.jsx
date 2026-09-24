@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabaseClient'
@@ -23,9 +23,15 @@ export default function CoachDashboard() {
  })
   
   // Data for charts and warnings
-  const [attendanceTrend, setAttendanceTrend] = useState([])
+ const [attendanceTrend, setAttendanceTrend] = useState([])
   const [attendanceWarnings, setAttendanceWarnings] = useState([])
   const [selectedEkskulFilter, setSelectedEkskulFilter] = useState('')
+
+  // Memoize filtered warnings agar tidak dihitung 2x di JSX (count + map)
+  const filteredWarnings = useMemo(
+    () => attendanceWarnings.filter(w => !selectedEkskulFilter || w.ekskulId === selectedEkskulFilter),
+    [attendanceWarnings, selectedEkskulFilter]
+  )
 
  useEffect(() => {
  if (user) {
@@ -368,7 +374,7 @@ export default function CoachDashboard() {
                    <div className="flex items-center justify-between">
                      <span>Warning Kehadiran</span>
                      <span className="bg-pixel-red text-white px-2 py-0.5 rounded">
-                       {attendanceWarnings.filter(w => !selectedEkskulFilter || w.ekskulId === selectedEkskulFilter).length} Siswa
+                       {filteredWarnings.length} Siswa
                      </span>
                    </div>
                    <div>
@@ -386,10 +392,9 @@ export default function CoachDashboard() {
                  </div>
                  <CardContent className="p-0">
                    <div className="max-h-[360px] overflow-y-auto pixel-scroll divide-y divide-pixel-gray/30">
-                     {attendanceWarnings.filter(w => !selectedEkskulFilter || w.ekskulId === selectedEkskulFilter).length > 0 ? (
-                       attendanceWarnings
-                         .filter(w => !selectedEkskulFilter || w.ekskulId === selectedEkskulFilter)
-                         .map(student => (
+                      {filteredWarnings.length > 0 ? (
+                        filteredWarnings
+                          .map(student => (
                          <div key={student.id} className={`p-4 hover:bg-pixel-navy/30 transition-colors border-l-2 ${
                            student.warningLevel === 'TEGURAN' ? 'border-l-pixel-red' : 'border-l-amber-500'
                          }`}>

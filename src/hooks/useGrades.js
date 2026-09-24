@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { enrichGradeStats } from '../utils/gradeUtils'
 
 export function useGrades(studentId, semesterFilter = null) {
   const [grades, setGrades] = useState([])
@@ -26,16 +27,10 @@ export function useGrades(studentId, semesterFilter = null) {
       const { data, error } = await query
       if (error) throw error
 
-      const enriched = (data || []).map(g => {
-        // Hitung rata-rata hanya dari nilai yang terisi (null tidak dihitung sebagai 0)
-        const scores = [g.attitude_score, g.skill_score, g.activity_score].filter(v => v !== null && v !== undefined)
-        const avg = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
-        let predikat = 'D'
-        if (avg >= 90) predikat = 'A'
-        else if (avg >= 75) predikat = 'B'
-        else if (avg >= 60) predikat = 'C'
-        return { ...g, avg, predikat }
-      })
+      const enriched = (data || []).map(g => ({
+        ...g,
+        ...enrichGradeStats(g)
+      }))
 
       setGrades(enriched)
     } catch (err) {

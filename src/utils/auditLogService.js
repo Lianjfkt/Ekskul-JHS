@@ -21,7 +21,6 @@ export const auditLogService = {
           user_email: email || 'system@sekolah.com',
           action,
           details: typeof details === 'object' ? JSON.stringify(details) : details,
-          ip_address: '127.0.0.1',
           before_state: beforeState || null,
           after_state: afterState || null,
           target_table: targetTable || null,
@@ -103,6 +102,14 @@ export const auditLogService = {
         return {
           success: false,
           message: 'Aksi penghapusan akun pengguna tidak dapat dibatalkan secara otomatis karena melibatkan sistem autentikasi. Harap buat ulang akun secara manual.'
+        }
+      }
+
+      // Jangan perbolehkan revert dari aksi yang sudah merupakan REVERT
+      if (action.startsWith('REVERT_')) {
+        return {
+          success: false,
+          message: 'Aksi revert tidak dapat di-revert kembali. Lakukan tindakan korektif secara manual jika diperlukan.'
         }
       }
 

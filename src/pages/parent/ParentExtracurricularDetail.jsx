@@ -9,6 +9,7 @@ import {
  LineChart, Line, XAxis, YAxis, CartesianGrid
 } from 'recharts'
 import { ArrowLeft, Clock, User, CalendarDays, BookOpen, TrendingUp, Filter, Loader2 } from 'lucide-react'
+import { enrichGradeStats } from '../../utils/gradeUtils'
 
 const STATUS_COLORS = { hadir: '#10b981', izin: '#f59e0b', alpha: '#ef4444' }
 const STATUS_LABEL = { hadir: 'Hadir', izin: 'Izin', alpha: 'Alpha' }
@@ -35,12 +36,6 @@ function PredikatBadge({ predikat }) {
  )
 }
 
-function calcPredikat(avg) {
- if (avg >= 90) return 'A'
- if (avg >= 75) return 'B'
- if (avg >= 60) return 'C'
- return 'D'
-}
 
 export default function ParentExtracurricularDetail() {
  const { id: ekskulId } = useParams()
@@ -83,10 +78,10 @@ export default function ParentExtracurricularDetail() {
  .eq('student_id', studentId)
  .eq('extracurricular_id', ekskulId)
  .order('graded_at', { ascending: true })
- const enriched = (data || []).map(g => {
- const avg = Math.round(((g.attitude_score || 0) + (g.skill_score || 0) + (g.activity_score || 0)) / 3)
- return { ...g, avg, predikat: calcPredikat(avg) }
- })
+ const enriched = (data || []).map(g => ({
+  ...g,
+  ...enrichGradeStats(g)
+ }))
  setGrades(enriched)
  } catch (err) { console.error(err) }
  finally { setLoadingGrades(false) }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { matchesClass } from '../../utils/classHelper'
 import { fetchAllPaginated } from '../../utils/supabaseHelper'
+import { enrichGradeStats } from '../../utils/gradeUtils'
 import { supabase } from '../../lib/supabaseClient'
 import { 
  Card, 
@@ -485,7 +486,7 @@ export default function RecapManagement() {
 
   let totalGradeScore = 0, gradeCount = 0
   grades.forEach(g => {
-   const avg = Math.round(((g.attitude_score || 0) + (g.skill_score || 0) + (g.activity_score || 0)) / 3)
+   const { avg } = enrichGradeStats(g)
    totalGradeScore += avg; gradeCount++
   })
   const avgGrade = gradeCount > 0 ? Math.round(totalGradeScore / gradeCount) : 0
@@ -507,7 +508,7 @@ export default function RecapManagement() {
 
   const gradeStatsByEkskul = {}
   grades.forEach(g => {
-   const avg = Math.round(((g.attitude_score || 0) + (g.skill_score || 0) + (g.activity_score || 0)) / 3)
+   const { avg } = enrichGradeStats(g)
    if (!gradeStatsByEkskul[g.extracurricular_id]) gradeStatsByEkskul[g.extracurricular_id] = { totalScore: 0, count: 0 }
    gradeStatsByEkskul[g.extracurricular_id].totalScore += avg
    gradeStatsByEkskul[g.extracurricular_id].count++
@@ -701,11 +702,7 @@ export default function RecapManagement() {
 
  const gradeReportRows = useMemo(() => {
   return grades.map(g => {
-   const avg = Math.round(((g.attitude_score || 0) + (g.skill_score || 0) + (g.activity_score || 0)) / 3)
-   let predikat = 'D'
-   if (avg >= 90) predikat = 'A'
-   else if (avg >= 75) predikat = 'B'
-   else if (avg >= 60) predikat = 'C'
+   const { avg, predikat } = enrichGradeStats(g)
    return {
     id: g.id, nis: g.student?.nis || '-', studentName: g.student?.full_name || 'Unknown',
     class: g.student?.class || '-', ekskulId: g.extracurricular_id,

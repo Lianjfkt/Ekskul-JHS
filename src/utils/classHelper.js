@@ -98,8 +98,10 @@ export function matchesClass(studentClass, targetClass) {
         return true
       }
     } else {
-      // Jika target spesifik misal '8A'
-      if (normStudent === normTarget || normStudent.startsWith(normTarget) || normTarget.startsWith(normStudent)) {
+      // Jika target spesifik misal '8A', gunakan exact match saja.
+      // Hindari startsWith agar siswa kelas '8' tidak lolos ke sesi target '8A',
+      // dan siswa '8AB' tidak lolos ke sesi target '8A'.
+      if (normStudent === normTarget) {
         return true
       }
     }

@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { Progress } from '@/components/ui/progress'
 import AnnouncementBanner from '../../components/shared/AnnouncementBanner'
 import { evaluateAttendanceRisk, isSessionApplicableToStudent } from '../../utils/attendanceRiskEngine'
+import { enrichGradeStats } from '../../utils/gradeUtils'
 import { 
   Waves, CalendarDays, Clock, ChevronRight, 
   TrendingUp, AlertCircle, CheckCircle2, Loader2
@@ -150,11 +151,8 @@ export default function StudentDashboard() {
 
         let lastGrade = null
         if (gradeData) {
-          const avg = Math.round(
-            ((gradeData.attitude_score || 0) + (gradeData.skill_score || 0) + (gradeData.activity_score || 0)) / 3
-          )
-          const predikat = avg >= 90 ? 'A' : avg >= 75 ? 'B' : avg >= 60 ? 'C' : 'D'
-          lastGrade = { avg, predikat, semester: gradeData.semester }
+          const stats = enrichGradeStats(gradeData)
+          lastGrade = { ...stats, semester: gradeData.semester }
         }
 
         return { ...enr, pct, lastGrade }

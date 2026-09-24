@@ -9,6 +9,7 @@ import {
  TrendingUp, AlertCircle, CheckCircle2, Loader2, AlertTriangle
 } from 'lucide-react'
 import { isSessionApplicableToStudent, evaluateAttendanceRisk } from '../../utils/attendanceRiskEngine'
+import { enrichGradeStats } from '../../utils/gradeUtils'
 
 function SkeletonCard() {
  return (
@@ -183,11 +184,8 @@ export default function ParentDashboard() {
 
  let lastGrade = null
  if (gradeData) {
- const avg = Math.round(
- ((gradeData.attitude_score || 0) + (gradeData.skill_score || 0) + (gradeData.activity_score || 0)) / 3
- )
- const predikat = avg >= 90 ? 'A' : avg >= 75 ? 'B' : avg >= 60 ? 'C' : 'D'
- lastGrade = { avg, predikat, semester: gradeData.semester }
+ const stats = enrichGradeStats(gradeData)
+ lastGrade = { ...stats, semester: gradeData.semester }
  }
 
  return { ...enr, pct, lastGrade, risk }
