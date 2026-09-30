@@ -150,6 +150,15 @@ export default function UsersManagement() {
   setIsStudentModalOpen(true)
  }
 
+ // Helper: timeout wrapper untuk RPC calls
+ const withTimeout = (promise, ms = 15000) =>
+  Promise.race([
+   promise,
+   new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`Request timeout setelah ${ms / 1000} detik. Periksa koneksi atau apakah fungsi RPC sudah terpasang di Supabase.`)), ms)
+   )
+  ])
+
  const handleStudentSubmit = async (e) => {
  e.preventDefault()
  setStudentModalError('')
@@ -185,26 +194,30 @@ export default function UsersManagement() {
  const associatedUser = selectedStudent.users?.[0]
  if (associatedUser) {
  if (associatedUser.email !== cleanEmail || (studentForm.password && studentForm.password.length >= 6)) {
- const { error: uErr } = await supabase.rpc('admin_update_user', {
+ const { error: uErr } = await withTimeout(
+ supabase.rpc('admin_update_user', {
  p_user_id: associatedUser.id,
  p_email: cleanEmail,
  p_password: studentForm.password || null,
  p_full_name: cleanName,
  p_student_id: selectedStudent.id
  })
+ )
  if (uErr) throw uErr
  }
  } else if (cleanEmail) {
  if (!studentForm.password || studentForm.password.length < 6) {
  throw new Error('Password minimal 6 karakter diperlukan untuk membuat akun baru.')
  }
- const { error: uErr } = await supabase.rpc('admin_create_user', {
+ const { error: uErr } = await withTimeout(
+ supabase.rpc('admin_create_user', {
  p_email: cleanEmail,
  p_password: studentForm.password,
  p_full_name: cleanName,
  p_role: 'student',
  p_student_id: selectedStudent.id
  })
+ )
  if (uErr) throw uErr
  }
 
@@ -253,13 +266,15 @@ export default function UsersManagement() {
  if (!studentForm.password || studentForm.password.length < 6) {
  throw new Error('Password minimal 6 karakter diperlukan untuk membuat akun baru.')
  }
- const { error: uErr } = await supabase.rpc('admin_create_user', {
+ const { error: uErr } = await withTimeout(
+ supabase.rpc('admin_create_user', {
  p_email: cleanEmail,
  p_password: studentForm.password,
  p_full_name: cleanName,
  p_role: 'student',
  p_student_id: newStudent.id
  })
+ )
  if (uErr) throw uErr
  }
 
