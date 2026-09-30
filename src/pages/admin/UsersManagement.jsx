@@ -118,6 +118,9 @@ export default function UsersManagement() {
  }
 
  // --- STUDENT CRUD FUNCTIONS ---
+ const [studentSubmitLoading, setStudentSubmitLoading] = useState(false)
+ const [studentModalError, setStudentModalError] = useState('')
+
  const handleOpenStudentModal = (student = null) => {
  if (student) {
  const associatedUser = student.users?.[0]
@@ -143,13 +146,16 @@ export default function UsersManagement() {
  password: ''
  })
  }
- setIsStudentModalOpen(true)
+ setStudentModalError('')
+  setIsStudentModalOpen(true)
  }
 
  const handleStudentSubmit = async (e) => {
  e.preventDefault()
+ setStudentModalError('')
  setErrorMsg('')
  setSuccessMsg('')
+ setStudentSubmitLoading(true)
  try {
  const toTitleCase = (str) => {
  return str
@@ -226,6 +232,8 @@ export default function UsersManagement() {
  }
  )
  setSuccessMsg('Berhasil memperbarui data siswa.')
+ setIsStudentModalOpen(false)
+ fetchData()
  } else {
  // Insert Mode
  const { data: newStudent, error: sErr } = await supabase
@@ -262,11 +270,13 @@ export default function UsersManagement() {
  { targetTable: 'students', targetId: newStudent.id, beforeState: null, afterState: newStudent }
  )
  setSuccessMsg('Berhasil menambahkan siswa baru.')
- }
  setIsStudentModalOpen(false)
  fetchData()
+ }
  } catch (err) {
- setErrorMsg(err.message)
+ setStudentModalError(err.message)
+ } finally {
+ setStudentSubmitLoading(false)
  }
  }
 
@@ -996,10 +1006,16 @@ export default function UsersManagement() {
  <h3 className="font-bold text-pixel-white text-lg">
  {selectedStudent ? 'Ubah Data Siswa' : 'Tambah Siswa Baru'}
  </h3>
- <Button onClick={() => setIsStudentModalOpen(false)} variant="ghost" size="icon" className="h-8 w-8 rounded-none">
+ <Button onClick={() => { setIsStudentModalOpen(false); setStudentModalError('') }} variant="ghost" size="icon" className="h-8 w-8 rounded-none">
  <X className="w-4 h-4" />
  </Button>
  </div>
+ {studentModalError && (
+ <div className="mx-6 mt-4 p-3 bg-red-500/15 border border-red-500/50 rounded text-red-400 text-sm flex items-start gap-2">
+ <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
+ <span>{studentModalError}</span>
+ </div>
+ )}
  <form onSubmit={handleStudentSubmit} className="p-6 space-y-4">
  <div className="space-y-1.5">
  <Label htmlFor="nis">Nomor Induk Siswa (NIS)</Label>
@@ -1081,8 +1097,10 @@ export default function UsersManagement() {
  </div>
  </div>
  <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2">
- <Button type="button" onClick={() => setIsStudentModalOpen(false)} variant="outline">Batal</Button>
- <Button type="submit">Simpan</Button>
+ <Button type="button" onClick={() => { setIsStudentModalOpen(false); setStudentModalError('') }} variant="outline" disabled={studentSubmitLoading}>Batal</Button>
+ <Button type="submit" disabled={studentSubmitLoading}>
+ {studentSubmitLoading ? 'Menyimpan...' : 'Simpan'}
+ </Button>
  </div>
  </form>
  </div>
