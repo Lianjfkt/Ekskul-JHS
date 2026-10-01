@@ -8,36 +8,49 @@ export const useAuthStore = create((set, get) => ({
   isLoading: true,
   _isFetching: false,
 
-  fetchUser: async (silent = false) => {
+  fetchUser: async (silent = false, sessionOverride = undefined) => {
     if (get()._isFetching) return
     if (!silent) set({ isLoading: true })
     set({ _isFetching: true })
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
-    if (sessionError || !session) {
-      set({ user: null, role: null, studentId: null, isLoading: false, _isFetching: false })
-      return
+    try {
+      let session = sessionOverride
+      if (session === undefined) {
+        const { data, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) {
+          console.error('Session error:', sessionError)
+        }
+        session = data?.session || null
+      }
+
+      if (!session) {
+        set({ user: null, role: null, studentId: null, isLoading: false, _isFetching: false })
+        return
+      }
+
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role, student_id')
+        .eq('id', session.user.id)
+        .single()
+
+      if (userError) {
+        console.error('Error fetching user data:', userError)
+        set({ user: null, role: null, studentId: null, isLoading: false, _isFetching: false })
+        return
+      }
+
+      set({ 
+        user: session.user, 
+        role: userData.role, 
+        studentId: userData.student_id, 
+        isLoading: false,
+        _isFetching: false
+      })
+    } catch (err) {
+      console.error('fetchUser error:', err)
+      set({ isLoading: false, _isFetching: false })
     }
-
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('role, student_id')
-      .eq('id', session.user.id)
-      .single()
-
-    if (userError) {
-      console.error('Error fetching user data:', userError)
-      set({ user: null, role: null, studentId: null, isLoading: false, _isFetching: false })
-      return
-    }
-
-    set({ 
-      user: session.user, 
-      role: userData.role, 
-      studentId: userData.student_id, 
-      isLoading: false,
-      _isFetching: false
-    })
   },
 
   login: async (email, password) => {
@@ -65,18 +78,17 @@ export const useAuthStore = create((set, get) => ({
   // Initialize auth state listener (call once on app mount)
   initAuthListener: () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_OUT' || !session) {
-          set({ user: null, role: null, studentId: null, isLoading: false })
-        } else if (event === 'SIGNED_IN') {
-          // Login dari tab lain — refresh data user agar state tetap sinkron
-          await get().fetchUser(true)
-        } else if (event === 'TOKEN_REFRESHED' && session) {
-          // Token silently refreshed in background.
-          // Just update the user object from the new session — no DB call,
-          // no isLoading change, so the current page never blanks out.
-          set(state => ({ ...state, user: session.user }))
-        }
+      (event, session) => {
+        // Defer execution to next tick to avoid blocking Supabase internal events
+        setTimeout(async () => {
+          if (event === 'SIGNED_OUT' || !session) {
+            set({ user: null, role: null, studentId: null, isLoading: false })
+          } else if (event === 'SIGNED_IN') {
+            await get().fetchUser(true, session)
+          } else if (event === 'TOKEN_REFRESHED' && session) {
+            set(state => ({ ...state, user: session.user }))
+          }
+        }, 0)
       }
     )
     return subscription

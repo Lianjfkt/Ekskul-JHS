@@ -152,12 +152,12 @@ export default function UsersManagement() {
   setIsStudentModalOpen(true)
  }
 
- // Helper: timeout wrapper untuk RPC calls
- const withTimeout = (promise, ms = 15000) =>
+ // Helper: timeout wrapper untuk operasi asinkron
+ const withTimeout = (promise, ms = 30000, errorMsg = null) =>
   Promise.race([
    promise,
    new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Request timeout setelah ${ms / 1000} detik. Periksa koneksi atau apakah fungsi RPC sudah terpasang di Supabase.`)), ms)
+    setTimeout(() => reject(new Error(errorMsg || `Permintaan memakan waktu lebih dari ${ms / 1000} detik. Periksa koneksi internet Anda.`)), ms)
    )
   ])
 
@@ -266,35 +266,60 @@ export default function UsersManagement() {
      throw new Error(`NIS "${studentForm.nis.trim()}" sudah digunakan oleh siswa ${existingNis.full_name}.`)
     }
 
-    const { data: newStudent, error: sErr } = await withTimeout(
-     supabase
-      .from('students')
-      .insert([{
-       nis: studentForm.nis.trim(),
-       full_name: cleanName,
-       class: studentForm.class.trim(),
-       gender: studentForm.gender,
-       phone: studentForm.phone.trim()
-      }])
-      .select()
-      .single()
-    )
-    if (sErr) throw sErr
-
     if (cleanEmail) {
-     if (!studentForm.password || studentForm.password.length < 6) {
-      throw new Error('Password minimal 6 karakter diperlukan untuk membuat akun baru.')
+     const existingEmail = allUsers.find(u => u.email?.toLowerCase().trim() === cleanEmail)
+     if (existingEmail) {
+      throw new Error(`Email "${cleanEmail}" sudah digunakan akun lain.`)
      }
-     const { error: uErr } = await withTimeout(
-      supabase.rpc('admin_create_user', {
-       p_email: cleanEmail,
-       p_password: studentForm.password,
-       p_full_name: cleanName,
-       p_role: 'student',
-       p_student_id: newStudent.id
-      })
+     if (!studentForm.password || studentForm.password.length < 6) {
+      throw new Error('Password minimal 6 karakter diperlukan untuk membuat akun login siswa.')
+     }
+    }
+
+    let newStudent = null
+    try {
+     const { data: createdStudent, error: sErr } = await withTimeout(
+      supabase
+       .from('students')
+       .insert([{
+        nis: studentForm.nis.trim(),
+        full_name: cleanName,
+        class: studentForm.class.trim(),
+        gender: studentForm.gender,
+        phone: studentForm.phone.trim()
+       }])
+       .select()
+       .single(),
+      30000,
+      'Gagal menyimpan data siswa: server tidak merespons (timeout).'
      )
-     if (uErr) throw uErr
+     if (sErr) throw sErr
+     newStudent = createdStudent
+
+     if (cleanEmail) {
+      const { error: uErr } = await withTimeout(
+       supabase.rpc('admin_create_user', {
+        p_email: cleanEmail,
+        p_password: studentForm.password,
+        p_full_name: cleanName,
+        p_role: 'student',
+        p_student_id: newStudent.id
+       }),
+       30000,
+       'Gagal membuat akun login siswa: proses server timeout.'
+      )
+      if (uErr) throw uErr
+     }
+    } catch (createErr) {
+     // Rollback orphaned student if account creation failed
+     if (newStudent?.id) {
+      try {
+       await supabase.from('students').delete().eq('id', newStudent.id)
+      } catch (rbErr) {
+       console.warn('Rollback student error:', rbErr)
+      }
+     }
+     throw createErr
     }
 
     try {
@@ -305,7 +330,7 @@ export default function UsersManagement() {
        `Menambah siswa baru: ${cleanName}`,
        { targetTable: 'students', targetId: newStudent.id, beforeState: null, afterState: newStudent }
       ),
-      4000
+      5000
      )
     } catch (logErr) {
      console.warn('Audit log error (non-fatal):', logErr)
