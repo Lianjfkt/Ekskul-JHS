@@ -38,6 +38,8 @@ export default function UsersManagement() {
  const [selectedStudent, setSelectedStudent] = useState(null)
  const [selectedMaster, setSelectedMaster] = useState(null)
  const [selectedUser, setSelectedUser] = useState(null)
+ const [userSubmitLoading, setUserSubmitLoading] = useState(false)
+ const [userModalError, setUserModalError] = useState('')
 
  // Form States - Student
  const [studentForm, setStudentForm] = useState({
@@ -160,139 +162,170 @@ export default function UsersManagement() {
   ])
 
  const handleStudentSubmit = async (e) => {
- e.preventDefault()
- setStudentModalError('')
- setErrorMsg('')
- setSuccessMsg('')
- setStudentSubmitLoading(true)
- try {
- const toTitleCase = (str) => {
- return str
- .toLowerCase()
- .split(' ')
- .map(word => word.charAt(0).toUpperCase() + word.slice(1))
- .join(' ');
- }
-
- const cleanName = toTitleCase(studentForm.full_name.trim())
- const cleanEmail = studentForm.email.toLowerCase().trim()
-
- if (selectedStudent) {
- // Edit Mode
- const { error } = await supabase
- .from('students')
- .update({
- nis: studentForm.nis.trim(),
- full_name: cleanName,
- class: studentForm.class.trim(),
- gender: studentForm.gender,
- phone: studentForm.phone.trim()
- })
- .eq('id', selectedStudent.id)
- if (error) throw error
-
- const associatedUser = selectedStudent.users?.[0]
- if (associatedUser) {
- if (associatedUser.email !== cleanEmail || (studentForm.password && studentForm.password.length >= 6)) {
- const { error: uErr } = await withTimeout(
- supabase.rpc('admin_update_user', {
- p_user_id: associatedUser.id,
- p_email: cleanEmail,
- p_password: studentForm.password || null,
- p_full_name: cleanName,
- p_student_id: selectedStudent.id
- })
- )
- if (uErr) throw uErr
- }
- } else if (cleanEmail) {
- if (!studentForm.password || studentForm.password.length < 6) {
- throw new Error('Password minimal 6 karakter diperlukan untuk membuat akun baru.')
- }
- const { error: uErr } = await withTimeout(
- supabase.rpc('admin_create_user', {
- p_email: cleanEmail,
- p_password: studentForm.password,
- p_full_name: cleanName,
- p_role: 'student',
- p_student_id: selectedStudent.id
- })
- )
- if (uErr) throw uErr
- }
-
- await auditLogService.logEvent(
- user?.id, user?.email,
- 'UPDATE_STUDENT',
- `Memperbarui data siswa: ${cleanName}`,
- {
-   targetTable: 'students',
-   targetId: selectedStudent.id,
-   beforeState: {
-     nis: selectedStudent.nis,
-     full_name: selectedStudent.full_name,
-     class: selectedStudent.class,
-     gender: selectedStudent.gender,
-     phone: selectedStudent.phone
-   },
-   afterState: {
-     nis: studentForm.nis.trim(),
-     full_name: cleanName,
-     class: studentForm.class.trim(),
-     gender: studentForm.gender,
-     phone: studentForm.phone.trim()
+  e.preventDefault()
+  setStudentModalError('')
+  setErrorMsg('')
+  setSuccessMsg('')
+  setStudentSubmitLoading(true)
+  try {
+   const toTitleCase = (str) => {
+    return str
+     .toLowerCase()
+     .split(' ')
+     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+     .join(' ');
    }
- }
- )
- setSuccessMsg('Berhasil memperbarui data siswa.')
- setIsStudentModalOpen(false)
- fetchData()
- } else {
- // Insert Mode
- const { data: newStudent, error: sErr } = await supabase
- .from('students')
- .insert([{
- nis: studentForm.nis.trim(),
- full_name: cleanName,
- class: studentForm.class.trim(),
- gender: studentForm.gender,
- phone: studentForm.phone.trim()
- }])
- .select()
- .single()
- if (sErr) throw sErr
 
- if (cleanEmail) {
- if (!studentForm.password || studentForm.password.length < 6) {
- throw new Error('Password minimal 6 karakter diperlukan untuk membuat akun baru.')
- }
- const { error: uErr } = await withTimeout(
- supabase.rpc('admin_create_user', {
- p_email: cleanEmail,
- p_password: studentForm.password,
- p_full_name: cleanName,
- p_role: 'student',
- p_student_id: newStudent.id
- })
- )
- if (uErr) throw uErr
- }
+   const cleanName = toTitleCase(studentForm.full_name.trim())
+   const cleanEmail = studentForm.email.toLowerCase().trim()
 
- await auditLogService.logEvent(
- user?.id, user?.email,
- 'CREATE_STUDENT',
- `Menambah siswa baru: ${cleanName}`,
- { targetTable: 'students', targetId: newStudent.id, beforeState: null, afterState: newStudent }
- )
- setSuccessMsg('Berhasil menambahkan siswa baru.')
- setIsStudentModalOpen(false)
- fetchData()
- }
- } catch (err) {
- setStudentModalError(err.message)
- } finally {
- setStudentSubmitLoading(false)
- }
+   if (selectedStudent) {
+    // Edit Mode
+    const { error } = await withTimeout(
+     supabase
+      .from('students')
+      .update({
+       nis: studentForm.nis.trim(),
+       full_name: cleanName,
+       class: studentForm.class.trim(),
+       gender: studentForm.gender,
+       phone: studentForm.phone.trim()
+      })
+      .eq('id', selectedStudent.id)
+    )
+    if (error) throw error
+
+    const associatedUser = selectedStudent.users?.[0]
+    if (associatedUser) {
+     if (associatedUser.email !== cleanEmail || (studentForm.password && studentForm.password.length >= 6)) {
+      const { error: uErr } = await withTimeout(
+       supabase.rpc('admin_update_user', {
+        p_user_id: associatedUser.id,
+        p_email: cleanEmail,
+        p_password: studentForm.password || null,
+        p_full_name: cleanName,
+        p_student_id: selectedStudent.id
+       })
+      )
+      if (uErr) throw uErr
+     }
+    } else if (cleanEmail) {
+     if (!studentForm.password || studentForm.password.length < 6) {
+      throw new Error('Password minimal 6 karakter diperlukan untuk membuat akun baru.')
+     }
+     const { error: uErr } = await withTimeout(
+      supabase.rpc('admin_create_user', {
+       p_email: cleanEmail,
+       p_password: studentForm.password,
+       p_full_name: cleanName,
+       p_role: 'student',
+       p_student_id: selectedStudent.id
+      })
+     )
+     if (uErr) throw uErr
+    }
+
+    try {
+     await withTimeout(
+      auditLogService.logEvent(
+       user?.id, user?.email,
+       'UPDATE_STUDENT',
+       `Memperbarui data siswa: ${cleanName}`,
+       {
+        targetTable: 'students',
+        targetId: selectedStudent.id,
+        beforeState: {
+         nis: selectedStudent.nis,
+         full_name: selectedStudent.full_name,
+         class: selectedStudent.class,
+         gender: selectedStudent.gender,
+         phone: selectedStudent.phone
+        },
+        afterState: {
+         nis: studentForm.nis.trim(),
+         full_name: cleanName,
+         class: studentForm.class.trim(),
+         gender: studentForm.gender,
+         phone: studentForm.phone.trim()
+        }
+       }
+      ),
+      4000
+     )
+    } catch (logErr) {
+     console.warn('Audit log error (non-fatal):', logErr)
+    }
+
+    setSuccessMsg('Berhasil memperbarui data siswa.')
+    setIsStudentModalOpen(false)
+    fetchData()
+   } else {
+    // Insert Mode
+    const existingNis = students.find(s => s.nis?.trim() === studentForm.nis.trim())
+    if (existingNis) {
+     throw new Error(`NIS "${studentForm.nis.trim()}" sudah digunakan oleh siswa ${existingNis.full_name}.`)
+    }
+
+    const { data: newStudent, error: sErr } = await withTimeout(
+     supabase
+      .from('students')
+      .insert([{
+       nis: studentForm.nis.trim(),
+       full_name: cleanName,
+       class: studentForm.class.trim(),
+       gender: studentForm.gender,
+       phone: studentForm.phone.trim()
+      }])
+      .select()
+      .single()
+    )
+    if (sErr) throw sErr
+
+    if (cleanEmail) {
+     if (!studentForm.password || studentForm.password.length < 6) {
+      throw new Error('Password minimal 6 karakter diperlukan untuk membuat akun baru.')
+     }
+     const { error: uErr } = await withTimeout(
+      supabase.rpc('admin_create_user', {
+       p_email: cleanEmail,
+       p_password: studentForm.password,
+       p_full_name: cleanName,
+       p_role: 'student',
+       p_student_id: newStudent.id
+      })
+     )
+     if (uErr) throw uErr
+    }
+
+    try {
+     await withTimeout(
+      auditLogService.logEvent(
+       user?.id, user?.email,
+       'CREATE_STUDENT',
+       `Menambah siswa baru: ${cleanName}`,
+       { targetTable: 'students', targetId: newStudent.id, beforeState: null, afterState: newStudent }
+      ),
+      4000
+     )
+    } catch (logErr) {
+     console.warn('Audit log error (non-fatal):', logErr)
+    }
+
+    setSuccessMsg('Berhasil menambahkan siswa baru.')
+    setIsStudentModalOpen(false)
+    fetchData()
+   }
+  } catch (err) {
+   let msg = err.message || 'Terjadi kesalahan sistem saat menyimpan data.'
+   if (msg.includes('duplicate key') && (msg.includes('students_nis_key') || msg.includes('nis'))) {
+    msg = `NIS "${studentForm.nis}" sudah terdaftar dalam sistem.`
+   } else if (msg.includes('already registered') || msg.includes('sudah terdaftar')) {
+    msg = `Email "${studentForm.email}" sudah digunakan akun lain.`
+   }
+   setStudentModalError(msg)
+  } finally {
+   setStudentSubmitLoading(false)
+  }
  }
 
  const handleStudentDelete = async (student) => {
@@ -464,6 +497,7 @@ export default function UsersManagement() {
 
  // --- USER CRUD FUNCTIONS (Coaches, Parents, Admins) ---
   const handleOpenUserModal = (roleOrUser = 'coach', isEdit = false) => {
+    setUserModalError('')
     if (isEdit && roleOrUser && typeof roleOrUser === 'object') {
       setSelectedUser(roleOrUser)
       setUserForm({
@@ -488,114 +522,150 @@ export default function UsersManagement() {
 
   const handleUserSubmit = async (e) => {
     e.preventDefault()
+    setUserModalError('')
     setErrorMsg('')
     setSuccessMsg('')
+    setUserSubmitLoading(true)
     try {
       if (selectedUser) {
         // Mode Edit User
-        const { error } = await supabase.rpc('admin_update_user', {
-          p_user_id: selectedUser.id,
-          p_email: userForm.email.toLowerCase().trim(),
-          p_password: userForm.password || null,
-          p_full_name: userForm.full_name.trim(),
-          p_student_id: userForm.role === 'parent' || userForm.role === 'student' ? userForm.student_id || null : null
-        })
+        const { error } = await withTimeout(
+          supabase.rpc('admin_update_user', {
+            p_user_id: selectedUser.id,
+            p_email: userForm.email.toLowerCase().trim(),
+            p_password: userForm.password || null,
+            p_full_name: userForm.full_name.trim(),
+            p_student_id: userForm.role === 'parent' || userForm.role === 'student' ? userForm.student_id || null : null
+          })
+        )
 
         if (error) throw error
 
         // Jika role parent, sinkronisasi data/nama di tabel public.parents
         if (userForm.role === 'parent') {
-          // Cari apakah sudah ada di tabel parents
-          const { data: existingParent } = await supabase
-            .from('parents')
-            .select('id')
-            .eq('student_id', selectedUser.student_id)
-            .limit(1)
+          const { data: existingParent } = await withTimeout(
+            supabase
+              .from('parents')
+              .select('id')
+              .eq('student_id', selectedUser.student_id)
+              .limit(1)
+          )
 
           if (existingParent && existingParent.length > 0) {
-            await supabase
-              .from('parents')
-              .update({
-                full_name: userForm.full_name.trim(),
-                student_id: userForm.student_id || null
-              })
-              .eq('id', existingParent[0].id)
+            await withTimeout(
+              supabase
+                .from('parents')
+                .update({
+                  full_name: userForm.full_name.trim(),
+                  student_id: userForm.student_id || null
+                })
+                .eq('id', existingParent[0].id)
+            )
           } else if (userForm.student_id) {
-            await supabase
-              .from('parents')
-              .insert([{
-                student_id: userForm.student_id,
-                full_name: userForm.full_name.trim(),
-                relationship: 'Orang Tua'
-              }])
+            await withTimeout(
+              supabase
+                .from('parents')
+                .insert([{
+                  student_id: userForm.student_id,
+                  full_name: userForm.full_name.trim(),
+                  relationship: 'Orang Tua'
+                }])
+            )
           }
         }
 
-        await auditLogService.logEvent(
-          user?.id, user?.email,
-          'UPDATE_USER',
-          `Memperbarui akun ${userForm.role}: ${userForm.full_name}`,
-          {
-            targetTable: 'users',
-            targetId: selectedUser.id,
-            beforeState: {
-              email: selectedUser.email,
-              full_name: selectedUser.full_name,
-              role: selectedUser.role
-            },
-            afterState: {
-              email: userForm.email.toLowerCase().trim(),
-              full_name: userForm.full_name.trim(),
-              role: userForm.role
-            }
-          }
-        )
+        try {
+          await withTimeout(
+            auditLogService.logEvent(
+              user?.id, user?.email,
+              'UPDATE_USER',
+              `Memperbarui akun ${userForm.role}: ${userForm.full_name}`,
+              {
+                targetTable: 'users',
+                targetId: selectedUser.id,
+                beforeState: {
+                  email: selectedUser.email,
+                  full_name: selectedUser.full_name,
+                  role: selectedUser.role
+                },
+                afterState: {
+                  email: userForm.email.toLowerCase().trim(),
+                  full_name: userForm.full_name.trim(),
+                  role: userForm.role
+                }
+              }
+            ),
+            4000
+          )
+        } catch (logErr) {
+          console.warn('Audit log error (non-fatal):', logErr)
+        }
         setSuccessMsg(`Berhasil memperbarui data akun ${userForm.role}.`)
       } else {
         // Mode Create User
-        const { data, error } = await supabase.rpc('admin_create_user', {
-          p_email: userForm.email.toLowerCase().trim(),
-          p_password: userForm.password,
-          p_full_name: userForm.full_name.trim(),
-          p_role: userForm.role,
-          p_student_id: userForm.role === 'parent' || userForm.role === 'student' ? userForm.student_id || null : null
-        })
+        const { data, error } = await withTimeout(
+          supabase.rpc('admin_create_user', {
+            p_email: userForm.email.toLowerCase().trim(),
+            p_password: userForm.password,
+            p_full_name: userForm.full_name.trim(),
+            p_role: userForm.role,
+            p_student_id: userForm.role === 'parent' || userForm.role === 'student' ? userForm.student_id || null : null
+          })
+        )
 
         if (error) throw error
 
-        // Jika role parent, kita juga sinkronisasi ke tabel public.parents
         if (userForm.role === 'parent' && userForm.student_id) {
-          const { error: pErr } = await supabase
-            .from('parents')
-            .insert([{
-              student_id: userForm.student_id,
-              full_name: userForm.full_name.trim(),
-              relationship: 'Orang Tua'
-            }])
-          if (pErr) console.warn('Gagal sinkron ke tabel parents:', pErr.message)
+          try {
+            await withTimeout(
+              supabase
+                .from('parents')
+                .insert([{
+                  student_id: userForm.student_id,
+                  full_name: userForm.full_name.trim(),
+                  relationship: 'Orang Tua'
+                }]),
+              5000
+            )
+          } catch (pErr) {
+            console.warn('Gagal sinkron ke tabel parents:', pErr.message)
+          }
         }
 
-        await auditLogService.logEvent(
-          user?.id, user?.email,
-          'CREATE_USER',
-          `Membuat akun ${userForm.role}: ${userForm.full_name}`,
-          {
-            targetTable: 'users',
-            targetId: data, // UUID dikembalikan dari admin_create_user RPC
-            beforeState: null,
-            afterState: {
-              email: userForm.email.toLowerCase().trim(),
-              full_name: userForm.full_name.trim(),
-              role: userForm.role
-            }
-          }
-        )
+        try {
+          await withTimeout(
+            auditLogService.logEvent(
+              user?.id, user?.email,
+              'CREATE_USER',
+              `Membuat akun ${userForm.role}: ${userForm.full_name}`,
+              {
+                targetTable: 'users',
+                targetId: data,
+                beforeState: null,
+                afterState: {
+                  email: userForm.email.toLowerCase().trim(),
+                  full_name: userForm.full_name.trim(),
+                  role: userForm.role
+                }
+              }
+            ),
+            4000
+          )
+        } catch (logErr) {
+          console.warn('Audit log error (non-fatal):', logErr)
+        }
         setSuccessMsg(`Berhasil membuat akun ${userForm.role} baru dengan ID: ${data}`)
       }
       setIsUserModalOpen(false)
       fetchData()
     } catch (err) {
-      setErrorMsg(`Gagal membuat user. Pastikan Anda telah menjalankan script SQL update_schema_admin_user_creation.sql di Supabase. Error: ${err.message}`)
+      let msg = err.message || 'Terjadi kesalahan sistem saat menyimpan user.'
+      if (msg.includes('already registered') || msg.includes('sudah terdaftar')) {
+        msg = `Email "${userForm.email}" sudah digunakan akun lain.`
+      }
+      setUserModalError(msg)
+    } finally {
+      setUserSubmitLoading(false)
     }
   }
 
@@ -1130,10 +1200,16 @@ export default function UsersManagement() {
  <h3 className="font-bold text-pixel-white text-lg">
  {selectedUser ? 'Ubah' : 'Daftar'} Akun {userForm.role === 'coach' ? 'Pelatih' : userForm.role === 'parent' ? 'Wali Murid' : 'Siswa'} {selectedUser ? '' : 'Baru'}
  </h3>
- <Button onClick={() => setIsUserModalOpen(false)} variant="ghost" size="icon" className="h-8 w-8 rounded-none">
+ <Button onClick={() => { setIsUserModalOpen(false); setUserModalError('') }} variant="ghost" size="icon" className="h-8 w-8 rounded-none">
  <X className="w-4 h-4" />
  </Button>
  </div>
+ {userModalError && (
+ <div className="mx-6 mt-4 p-3 bg-red-500/15 border border-red-500/50 rounded text-red-400 text-sm flex items-start gap-2">
+ <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
+ <span>{userModalError}</span>
+ </div>
+ )}
  <form onSubmit={handleUserSubmit} className="p-6 space-y-4">
  <div className="space-y-1.5">
  <Label htmlFor="u_name">Nama Lengkap</Label>
@@ -1189,8 +1265,10 @@ export default function UsersManagement() {
  )}
 
  <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2">
- <Button type="button" onClick={() => setIsUserModalOpen(false)} variant="outline">Batal</Button>
- <Button type="submit">{selectedUser ? 'Simpan' : 'Daftarkan Akun'}</Button>
+ <Button type="button" onClick={() => { setIsUserModalOpen(false); setUserModalError('') }} variant="outline" disabled={userSubmitLoading}>Batal</Button>
+ <Button type="submit" disabled={userSubmitLoading}>
+ {userSubmitLoading ? 'Menyimpan...' : (selectedUser ? 'Simpan' : 'Daftarkan Akun')}
+ </Button>
  </div>
  </form>
  </div>
