@@ -31,7 +31,9 @@ import {
  BarChart2,
  TrendingDown,
  Minus,
- RefreshCw
+ RefreshCw,
+ Award,
+ Star
 } from 'lucide-react'
 import { saveAs } from 'file-saver'
 import { addKopSuratToPDF } from '../../utils/pdfHelper'
@@ -324,6 +326,7 @@ export default function RecapManagement() {
  const [attendances, setAttendances] = useState([])
  const [coaches, setCoaches] = useState([])
  const [specialParticipants, setSpecialParticipants] = useState([])
+ const [coachEvaluations, setCoachEvaluations] = useState([])
 
  // Filters
  const [selectedEkskul, setSelectedEkskul] = useState('')
@@ -356,7 +359,8 @@ export default function RecapManagement() {
      sessionsData,
      attendancesData,
      coachesData,
-     spData
+     spData,
+     evalsData
     ] = await Promise.all([
      fetchAllPaginated((from, to) =>
       supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email), coach3:coach_id_3 (id, full_name, email)').order('name', { ascending: true }).range(from, to)
@@ -392,7 +396,15 @@ export default function RecapManagement() {
      ),
      fetchAllPaginated((from, to) =>
       supabase.from('special_session_participants').select('*').range(from, to)
-     )
+     ),
+     fetchAllPaginated((from, to) =>
+      supabase.from('coach_evaluations').select(`
+        *,
+        coach:coach_id (id, full_name, email),
+        student:student_id (id, nis, full_name, class),
+        extracurricular:extracurricular_id (id, name)
+      `).order('created_at', { ascending: false }).range(from, to)
+     ).catch(() => [])
     ])
 
     setExtracurriculars(ekskulData || [])
@@ -402,6 +414,7 @@ export default function RecapManagement() {
     setAttendances(attendancesData || [])
     setCoaches(coachesData || [])
     setSpecialParticipants(spData || [])
+    setCoachEvaluations(evalsData || [])
   } catch (err) {
    console.error('Error fetching recap data:', err.message)
    setErrorMsg('Gagal memuat data laporan: ' + err.message)
@@ -1009,6 +1022,46 @@ export default function RecapManagement() {
   )
  }
 
+ const filteredCoachEvaluations = useMemo(() => {
+   return coachEvaluations.filter((ev) => {
+     const matchSearch =
+       !searchQuery ||
+       ev.coach?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       ev.extracurricular?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       ev.student?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       ev.feedback?.toLowerCase().includes(searchQuery.toLowerCase())
+
+     const matchEkskul = !selectedEkskul || ev.extracurricular_id === selectedEkskul
+     const matchCoach = !selectedCoach || ev.coach_id === selectedCoach
+     const matchSemester = !selectedSemester || ev.semester === selectedSemester
+     const matchAcademicYear = !selectedAcademicYear || ev.academic_year === selectedAcademicYear
+
+     return matchSearch && matchEkskul && matchCoach && matchSemester && matchAcademicYear
+   })
+ }, [coachEvaluations, searchQuery, selectedEkskul, selectedCoach, selectedSemester, selectedAcademicYear])
+
+ const exportEvaluationsToExcel = () => {
+   const rows = filteredCoachEvaluations.map((ev, idx) => [
+     idx + 1,
+     ev.coach?.full_name || 'Pelatih',
+     ev.extracurricular?.name || 'Ekskul',
+     ev.student?.full_name || 'Siswa',
+     ev.student?.nis || '-',
+     ev.student?.class || '-',
+     ev.semester || 'Ganjil',
+     ev.academic_year || '2024/2025',
+     ev.rating,
+     ev.feedback || '-',
+     ev.created_at ? formatDateIndo(ev.created_at) : '-'
+   ])
+   exportToExcel(
+     rows,
+     ['No', 'Nama Pelatih', 'Ekstrakurikuler', 'Nama Siswa', 'NIS', 'Kelas', 'Semester', 'Tahun Ajaran', 'Rating (1-5)', 'Saran & Masukan', 'Tanggal Penilaian'],
+     'Evaluasi Pelatih',
+     'laporan_evaluasi_pelatih.xlsx'
+   )
+ }
+
 
  const exportCoachSessionsDetailToExcel = async (rowGroup) => {
   const XLSX = await import('xlsx')
@@ -1370,6 +1423,7 @@ export default function RecapManagement() {
   { id: 'grades', label: 'Laporan Nilai Siswa' },
   { id: 'coachSessions', label: 'Kehadiran Pelatih' },
   { id: 'activity', label: '📈 Keaktifan Ekskul' },
+  { id: 'coachEvaluations', label: `⭐ Evaluasi Pelatih${coachEvaluations.length > 0 ? ` (${coachEvaluations.length})` : ''}` },
  ]
 
  const resetFilters = (tabId) => {
@@ -1556,6 +1610,7 @@ export default function RecapManagement() {
          activeTab === 'fillTracking' ? "Cari ekskul atau pelatih..." :
          activeTab === 'coachSessions' ? "Cari pelatih, ekskul atau materi..." :
          activeTab === 'activity' ? "Cari nama ekskul..." :
+         activeTab === 'coachEvaluations' ? "Cari pelatih, ekskul, siswa, atau saran..." :
          "Cari nama siswa atau NIS..."
         }
         value={searchQuery}
@@ -1563,6 +1618,27 @@ export default function RecapManagement() {
         className="w-full text-sm pl-9 pr-4 py-2 bg-pixel-panel border border-pixel-gray rounded-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
        />
       </div>
+
+      {activeTab === 'coachEvaluations' && (
+       <>
+        <select value={selectedCoach} onChange={e => setSelectedCoach(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300">
+         <option value="">Semua Pelatih</option>
+         {coaches.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+        </select>
+        <select value={selectedEkskul} onChange={e => setSelectedEkskul(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300">
+         <option value="">Semua Ekskul</option>
+         {extracurriculars.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+        </select>
+        <select value={selectedSemester} onChange={e => setSelectedSemester(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300">
+         <option value="">Semua Semester</option>
+         {semesters.map(s => <option key={s} value={s}>Semester {s}</option>)}
+        </select>
+        <select value={selectedAcademicYear} onChange={e => setSelectedAcademicYear(e.target.value)} className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300">
+         <option value="">Semua Tahun Ajaran</option>
+         {academicYears.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+       </>
+      )}
 
       {activeTab === 'fillTracking' && (
        <>
@@ -1707,6 +1783,7 @@ export default function RecapManagement() {
         activeTab === 'grades' ? exportGradesToExcel :
         activeTab === 'coachSessions' ? exportCoachSessionsToExcel :
         activeTab === 'warnings' ? exportWarningsToExcel :
+        activeTab === 'coachEvaluations' ? exportEvaluationsToExcel :
         exportActivityToExcel
        }
        disabled={
@@ -1716,7 +1793,8 @@ export default function RecapManagement() {
         (activeTab === 'grades' && gradeReportRows.length === 0) ||
         (activeTab === 'coachSessions' && coachSessionReportRows.length === 0) ||
         (activeTab === 'warnings' && warningRows.length === 0) ||
-        (activeTab === 'activity' && ekskulActivityRanking.length === 0)
+        (activeTab === 'activity' && ekskulActivityRanking.length === 0) ||
+        (activeTab === 'coachEvaluations' && filteredCoachEvaluations.length === 0)
        }
        className="bg-indigo-600 hover:bg-indigo-700 text-pixel-white shadow-pixel-sm flex items-center gap-2 w-full md:w-auto"
       >
@@ -2370,6 +2448,118 @@ export default function RecapManagement() {
             </td>
            </tr>
           ))}
+         </tbody>
+        </table>
+       </div>
+      </div>
+     </div>
+    )}
+
+    {/* ═══ TAB: Evaluasi Pelatih ═══════════════════════════════════════════ */}
+    {activeTab === 'coachEvaluations' && (
+     <div className="space-y-6">
+      {/* Metrik Ringkas Evaluasi */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+       <Card className="bg-pixel-panel border border-pixel-gray/40">
+        <CardContent className="p-4 flex items-center gap-3">
+         <div className="p-3 bg-pixel-yellow/20 rounded-none border border-pixel-yellow/40">
+          <Award className="w-6 h-6 text-pixel-yellow" />
+         </div>
+         <div>
+          <p className="text-xs text-pixel-lavender font-retro">Total Evaluasi Masuk</p>
+          <p className="text-2xl font-pixel text-pixel-white">{coachEvaluations.length}</p>
+         </div>
+        </CardContent>
+       </Card>
+
+       <Card className="bg-pixel-panel border border-pixel-gray/40">
+        <CardContent className="p-4 flex items-center gap-3">
+         <div className="p-3 bg-pixel-yellow/20 rounded-none border border-pixel-yellow/40">
+          <Star className="w-6 h-6 fill-pixel-yellow text-pixel-yellow" />
+         </div>
+         <div>
+          <p className="text-xs text-pixel-lavender font-retro">Rata-rata Skor Bintang</p>
+          <p className="text-2xl font-pixel text-pixel-yellow">
+           {coachEvaluations.length > 0 
+            ? (coachEvaluations.reduce((acc, c) => acc + (c.rating || 0), 0) / coachEvaluations.length).toFixed(1) 
+            : '0'}/5
+          </p>
+         </div>
+        </CardContent>
+       </Card>
+
+       <Card className="bg-pixel-panel border border-pixel-gray/40">
+        <CardContent className="p-4 flex items-center gap-3">
+         <div className="p-3 bg-pixel-green/20 rounded-none border border-pixel-green/40">
+          <CheckCircle className="w-6 h-6 text-pixel-green" />
+         </div>
+         <div>
+          <p className="text-xs text-pixel-lavender font-retro">Data Tampil (Filter)</p>
+          <p className="text-2xl font-pixel text-pixel-green">{filteredCoachEvaluations.length}</p>
+         </div>
+        </CardContent>
+       </Card>
+      </div>
+
+      {/* Tabel Evaluasi Pelatih */}
+      <div className="bg-pixel-panel border border-pixel-gray/30 rounded-none shadow-pixel-sm overflow-hidden">
+       <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse text-sm">
+         <thead>
+          <tr className="bg-pixel-navy/75 border-b border-pixel-gray/30 text-pixel-lavender font-semibold text-xs font-pixel uppercase tracking-wider">
+           <th className="p-3">No</th>
+           <th className="p-3">Pelatih</th>
+           <th className="p-3">Ekstrakurikuler</th>
+           <th className="p-3">Siswa (Penilai)</th>
+           <th className="p-3">Kelas</th>
+           <th className="p-3">Semester</th>
+           <th className="p-3">Rating</th>
+           <th className="p-3 min-w-[200px]">Masukan / Saran</th>
+           <th className="p-3">Tanggal</th>
+          </tr>
+         </thead>
+         <tbody className="divide-y divide-pixel-gray/20">
+          {filteredCoachEvaluations.length > 0 ? (
+           filteredCoachEvaluations.map((ev, idx) => (
+            <tr key={ev.id} className="hover:bg-pixel-navy/30 transition-colors">
+             <td className="p-3 text-pixel-lavender font-mono text-xs">{idx + 1}</td>
+             <td className="p-3 font-semibold text-pixel-white">
+              {ev.coach?.full_name || 'Pelatih'}
+             </td>
+             <td className="p-3 text-pixel-peach">
+              {ev.extracurricular?.name || 'Ekskul'}
+             </td>
+             <td className="p-3 text-pixel-white font-retro">
+              <div>{ev.student?.full_name || 'Siswa'}</div>
+              <div className="text-[10px] text-pixel-lavender font-mono">NIS: {ev.student?.nis || '-'}</div>
+             </td>
+             <td className="p-3 text-pixel-lavender font-mono text-xs">
+              {ev.student?.class || '-'}
+             </td>
+             <td className="p-3 text-pixel-lavender text-xs">
+              {ev.semester} ({ev.academic_year})
+             </td>
+             <td className="p-3">
+              <div className="flex items-center gap-1 text-pixel-yellow">
+               <Star className="w-4 h-4 fill-pixel-yellow" />
+               <span className="font-bold">{ev.rating}/5</span>
+              </div>
+             </td>
+             <td className="p-3 text-xs text-pixel-white italic font-retro">
+              "{ev.feedback || <span className="text-pixel-lavender not-italic">-</span>}"
+             </td>
+             <td className="p-3 text-pixel-lavender text-xs font-mono">
+              {ev.created_at ? formatDateIndo(ev.created_at) : '-'}
+             </td>
+            </tr>
+           ))
+          ) : (
+           <tr>
+            <td colSpan={9} className="p-8 text-center text-pixel-lavender text-xs">
+             Tidak ada data evaluasi pelatih yang sesuai dengan filter.
+            </td>
+           </tr>
+          )}
          </tbody>
         </table>
        </div>
