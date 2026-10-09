@@ -7,11 +7,12 @@ import { Label } from '@/components/ui/label'
 import { 
  Search, Plus, Upload, Trash2, Edit2, UserPlus, 
  Users as UsersIcon, ShieldAlert, GraduationCap, 
- UserCheck, Check, X, FileSpreadsheet
+ UserCheck, Check, X, FileSpreadsheet, KeyRound, Download
 } from 'lucide-react'
 import ImportCSVModal from '../../components/import/ImportCSVModal'
 import { auditLogService } from '../../utils/auditLogService'
 import { useAuthStore } from '../../stores/authStore'
+import { exportStudentAccountsToExcel } from '../../utils/studentAccountExport'
 
 
 
@@ -40,6 +41,13 @@ export default function UsersManagement() {
  const [selectedUser, setSelectedUser] = useState(null)
  const [userSubmitLoading, setUserSubmitLoading] = useState(false)
  const [userModalError, setUserModalError] = useState('')
+
+ // Standardize & Export Accounts State
+ const [isStandardizeModalOpen, setIsStandardizeModalOpen] = useState(false)
+ const [standardizeLoading, setStandardizeLoading] = useState(false)
+ const [selectedClassExport, setSelectedClassExport] = useState('all')
+ const [standardizeResult, setStandardizeResult] = useState(null)
+ const [standardizeError, setStandardizeError] = useState('')
 
  // Form States - Student
  const [studentForm, setStudentForm] = useState({
@@ -520,6 +528,72 @@ export default function UsersManagement() {
    }
  }
 
+  // --- STANDARDIZE & EXPORT STUDENT ACCOUNTS ---
+  const uniqueStudentClasses = Array.from(new Set(students.map(s => s.class).filter(Boolean))).sort()
+
+  const handleRunStandardization = async () => {
+    setStandardizeLoading(true)
+    setStandardizeError('')
+    setStandardizeResult(null)
+    try {
+      const { data, error } = await withTimeout(
+        supabase.rpc('admin_batch_standardize_student_accounts'),
+        60000,
+        'Waktu proses standarisasi habis. Silakan periksa koneksi atau coba beberapa saat lagi.'
+      )
+
+      if (error) throw error
+
+      const accounts = data || []
+      setStandardizeResult(accounts)
+
+      // Otomatis ekspor ke file Excel
+      exportStudentAccountsToExcel(accounts, selectedClassExport)
+
+      try {
+        await auditLogService.logEvent(
+          user?.id, user?.email,
+          'BATCH_STANDARDIZE_STUDENTS',
+          `Standarisasi massal akun siswa dan ekspor Excel (${accounts.length} akun)`,
+          { totalAccounts: accounts.length, targetClass: selectedClassExport }
+        )
+      } catch (logErr) {
+        console.warn('Audit log error:', logErr)
+      }
+
+      setSuccessMsg(`Berhasil men-standarisasi ${accounts.length} akun siswa dan mengunduh file Excel!`)
+      fetchData()
+    } catch (err) {
+      console.error('Error standardizing accounts:', err)
+      setStandardizeError(err.message || 'Gagal menjalankan standarisasi akun.')
+    } finally {
+      setStandardizeLoading(false)
+    }
+  }
+
+  const handleDirectExportExcel = () => {
+    try {
+      if (!students || students.length === 0) {
+        alert('Belum ada data siswa di database.')
+        return
+      }
+
+      const mappedAccounts = students.map((s) => ({
+        nis: s.nis,
+        full_name: s.full_name,
+        class: s.class,
+        email: s.users?.[0]?.email || `${s.nis}@siswa.globalmadani.sch.id`,
+        default_password: 'gm123456',
+        status: s.users?.length > 0 ? 'Sudah Ada Akun' : 'Perlu Dibuatkan'
+      }))
+
+      exportStudentAccountsToExcel(mappedAccounts, selectedClassExport)
+      setSuccessMsg(`File Excel akun siswa (${selectedClassExport === 'all' ? 'Semua Kelas' : 'Kelas ' + selectedClassExport}) berhasil diunduh.`)
+    } catch (err) {
+      alert('Gagal mengunduh file Excel: ' + err.message)
+    }
+  }
+
  // --- USER CRUD FUNCTIONS (Coaches, Parents, Admins) ---
   const handleOpenUserModal = (roleOrUser = 'coach', isEdit = false) => {
     setUserModalError('')
@@ -794,6 +868,13 @@ export default function UsersManagement() {
  </Button>
  <Button onClick={() => handleOpenUserModal('student')} className="gap-2 flex-1 sm:flex-none" variant="secondary">
  <UserPlus className="w-4 h-4" /> Buat Akun Login Siswa
+ </Button>
+ <Button 
+   onClick={() => { setIsStandardizeModalOpen(true); setStandardizeResult(null); setStandardizeError(''); }} 
+   variant="outline" 
+   className="gap-2 flex-1 sm:flex-none border-pixel-yellow text-pixel-yellow hover:bg-pixel-yellow/15"
+ >
+   <KeyRound className="w-4 h-4" /> Reset Akun & Ekspor Excel
  </Button>
  </>
  )}
@@ -1382,6 +1463,103 @@ export default function UsersManagement() {
  type={activeTab === 'siswa' ? 'students' : activeTab === 'master' ? 'student_master' : 'students'}
  onSuccess={() => { fetchData(); setSuccessMsg('Import selesai! Tabel data telah diperbarui.') }}
  />
+
+ {/* --- MODAL STANDARISASI & EKSPOR AKUN SISWA --- */}
+ {isStandardizeModalOpen && (
+   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-xs">
+     <div className="bg-pixel-panel rounded-none shadow-pixel-lg border-2 border-pixel-yellow w-full max-w-lg overflow-hidden pixel-slide-in">
+       <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/40 bg-pixel-navy">
+         <div className="flex items-center gap-2">
+           <KeyRound className="w-5 h-5 text-pixel-yellow" />
+           <h3 className="font-pixel text-xs text-pixel-white tracking-wide">
+             Standarisasi & Ekspor Akun Siswa
+           </h3>
+         </div>
+         <Button onClick={() => setIsStandardizeModalOpen(false)} variant="ghost" size="icon" className="h-8 w-8 rounded-none text-pixel-lavender hover:text-white">
+           <X className="w-4 h-4" />
+         </Button>
+       </div>
+
+       <div className="p-6 space-y-5">
+         <div className="bg-pixel-navy/80 border border-pixel-gray/40 p-4 space-y-2 text-xs font-retro text-pixel-peach">
+           <p className="font-semibold text-pixel-white text-sm">
+             💡 Format Standarisasi Akun Login:
+           </p>
+           <ul className="list-disc list-inside space-y-1 text-pixel-lavender">
+             <li><strong className="text-pixel-white">Email:</strong> [NIS]@siswa.globalmadani.sch.id</li>
+             <li><strong className="text-pixel-white">Password Default:</strong> gm123456</li>
+             <li>Siswa yang sudah memiliki akun akan direset passwordnya menjadi default ini.</li>
+             <li>Siswa yang belum punya akun akan otomatis dibuatkan akun baru.</li>
+           </ul>
+         </div>
+
+         <div className="space-y-2">
+           <Label htmlFor="export_class" className="font-pixel text-[9px] uppercase tracking-wider text-pixel-lavender">
+             Pilih Target Kelas untuk File Excel
+           </Label>
+           <select
+             id="export_class"
+             className="flex h-10 w-full rounded-none border border-pixel-gray bg-pixel-navy px-3 py-2 text-sm text-pixel-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-pixel-yellow font-retro"
+             value={selectedClassExport}
+             onChange={(e) => setSelectedClassExport(e.target.value)}
+           >
+             <option value="all">📂 Semua Kelas (Workbook dengan Sheet per Kelas)</option>
+             {uniqueStudentClasses.map((cls) => (
+               <option key={cls} value={cls}>
+                 📄 Khusus Kelas {cls}
+               </option>
+             ))}
+           </select>
+           <p className="text-[11px] text-pixel-lavender">
+             Wali kelas masing-masing dapat langsung menerima sheet/file sesuai kelasnya.
+           </p>
+         </div>
+
+         {standardizeError && (
+           <div className="p-3 bg-pixel-red/20 border border-pixel-red text-pixel-red text-xs">
+             <span className="font-bold">Gagal: </span> {standardizeError}
+           </div>
+         )}
+
+         {standardizeResult && (
+           <div className="p-3 bg-pixel-green/20 border border-pixel-green text-pixel-green text-xs space-y-1">
+             <div className="font-bold">✓ Berhasil Diproses!</div>
+             <div>Total: {standardizeResult.length} akun telah diselaraskan dan file Excel telah diunduh.</div>
+           </div>
+         )}
+
+         <div className="pt-4 border-t border-pixel-gray/30 flex flex-col sm:flex-row justify-end gap-2">
+           <Button
+             type="button"
+             variant="outline"
+             onClick={handleDirectExportExcel}
+             disabled={standardizeLoading}
+             className="gap-2 text-pixel-white border-pixel-gray"
+           >
+             <Download className="w-4 h-4 text-pixel-peach" /> Hanya Unduh Excel
+           </Button>
+           <Button
+             type="button"
+             onClick={handleRunStandardization}
+             disabled={standardizeLoading}
+             className="gap-2 bg-pixel-yellow text-pixel-navy hover:bg-pixel-yellow/90 font-bold"
+           >
+             {standardizeLoading ? (
+               <>
+                 <div className="w-4 h-4 border-2 border-pixel-navy border-t-transparent rounded-full animate-spin" />
+                 Memproses Akun...
+               </>
+             ) : (
+               <>
+                 <KeyRound className="w-4 h-4" /> Reset Akun & Unduh Excel
+               </>
+             )}
+           </Button>
+         </div>
+       </div>
+     </div>
+   </div>
+ )}
  </div>
  )
 }
