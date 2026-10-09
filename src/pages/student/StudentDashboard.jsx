@@ -9,8 +9,10 @@ import { evaluateAttendanceRisk, isSessionApplicableToStudent } from '../../util
 import { enrichGradeStats } from '../../utils/gradeUtils'
 import { 
   Waves, CalendarDays, Clock, ChevronRight, 
-  TrendingUp, AlertCircle, CheckCircle2, Loader2
+  TrendingUp, AlertCircle, CheckCircle2, Loader2,
+  Award, Star
 } from 'lucide-react'
+import CoachEvaluationModal from '../../components/student/CoachEvaluationModal'
 
 function SkeletonCard() {
   return (
@@ -42,6 +44,9 @@ export default function StudentDashboard() {
   const [upcomingSessions, setUpcomingSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAll, setShowAll] = useState(false)
+  const [evaluations, setEvaluations] = useState({})
+  const [selectedEvalItem, setSelectedEvalItem] = useState(null)
+  const [isEvalModalOpen, setIsEvalModalOpen] = useState(false)
 
   useEffect(() => {
     if (studentId) {
@@ -160,6 +165,22 @@ export default function StudentDashboard() {
 
  setEnrollments(enriched)
 
+ // Fetch existing coach evaluations by this student
+ try {
+   const { data: evalData } = await supabase
+     .from('coach_evaluations')
+     .select('*')
+     .eq('student_id', studentId)
+
+   const evalMap = {}
+   ;(evalData || []).forEach((ev) => {
+     evalMap[ev.extracurricular_id] = ev
+   })
+   setEvaluations(evalMap)
+ } catch (evErr) {
+   console.warn('Tabel coach_evaluations mungkin belum dibuat:', evErr.message)
+ }
+
  // Fetch upcoming sessions (this week) from enrolled ekskuls
  const ekskulIds = (enrollData || []).map(e => e.extracurriculars?.id).filter(Boolean)
  if (ekskulIds.length > 0) {
@@ -253,6 +274,97 @@ export default function StudentDashboard() {
  </div>
  </div>
  </div>
+
+ {/* Seksi Evaluasi Pelatih Akhir Semester */}
+ {enrollments.length > 0 && (
+   <div className="bg-pixel-panel border-2 border-pixel-yellow p-5 shadow-pixel-sm space-y-3">
+     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+       <div className="flex items-center gap-2.5">
+         <div className="p-2 bg-pixel-yellow/20 rounded-none border border-pixel-yellow/40">
+           <Award className="w-5 h-5 text-pixel-yellow" />
+         </div>
+         <div>
+           <h2 className="font-pixel text-[11px] text-pixel-white tracking-wide">
+             Evaluasi Pelatih Ekskul (Semester 1)
+           </h2>
+           <p className="text-xs text-pixel-lavender font-retro">
+             Beri penilaian dan masukan anonim untuk pelatih kamu di akhir semester ini!
+           </p>
+         </div>
+       </div>
+       <div className="text-xs font-retro text-pixel-peach bg-pixel-navy px-2.5 py-1 border border-pixel-gray/40">
+         🔒 Penilaian 100% Anonim
+       </div>
+     </div>
+
+     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+       {enrollments.map((enr) => {
+         const ekskul = enr.extracurriculars
+         if (!ekskul) return null
+         const evalItem = evaluations[ekskul.id]
+         const coachName =
+           ekskul.coach?.full_name ||
+           ekskul.coach2?.full_name ||
+           ekskul.coach3?.full_name ||
+           'Pelatih Belum Ditentukan'
+
+         return (
+           <div
+             key={enr.id}
+             className="bg-pixel-navy/80 border border-pixel-gray/40 p-3.5 flex flex-col justify-between space-y-3"
+           >
+             <div>
+               <span className="text-[9px] font-pixel text-pixel-peach uppercase tracking-wider block">
+                 {ekskul.name}
+               </span>
+               <span className="text-sm font-retro font-bold text-pixel-white line-clamp-1">
+                 Pelatih: {coachName}
+               </span>
+             </div>
+
+             <div className="pt-2 border-t border-pixel-gray/30 flex items-center justify-between">
+               {evalItem ? (
+                 <div className="flex items-center gap-1.5 text-xs text-pixel-green font-retro">
+                   <CheckCircle2 className="w-4 h-4 text-pixel-green" />
+                   <span>Dinilai: </span>
+                   <div className="flex items-center text-pixel-yellow">
+                     <Star className="w-3.5 h-3.5 fill-pixel-yellow" />
+                     <span className="font-bold ml-0.5">{evalItem.rating}/5</span>
+                   </div>
+                 </div>
+               ) : (
+                 <span className="text-xs text-amber-400 font-retro">
+                   🟡 Belum Dinilai
+                 </span>
+               )}
+
+               <button
+                 type="button"
+                 onClick={() => {
+                   setSelectedEvalItem({
+                     extracurricular: ekskul,
+                     coach: ekskul.coach || { id: ekskul.coach_id, full_name: coachName },
+                     existingEvaluation: evalItem || null,
+                     semester: enr.semester || 'Ganjil',
+                     academicYear: enr.academic_year || '2024/2025'
+                   })
+                   setIsEvalModalOpen(true)
+                 }}
+                 className={`px-3 py-1 text-xs font-retro cursor-pointer transition-colors ${
+                   evalItem
+                     ? 'bg-pixel-gray/30 text-pixel-lavender hover:bg-pixel-gray/50 border border-pixel-gray/40'
+                     : 'bg-pixel-yellow text-pixel-navy hover:bg-pixel-yellow/90 font-bold shadow-pixel-sm'
+                 }`}
+               >
+                 {evalItem ? 'Lihat Ulasan' : '⭐ Nilai Sekarang'}
+               </button>
+             </div>
+           </div>
+         )
+       })}
+     </div>
+   </div>
+ )}
 
  {/* Ekskul Cards */}
  <div>
@@ -384,9 +496,32 @@ export default function StudentDashboard() {
  </div>
  )
  })}
- </div>
- )}
- </div>
- </div>
- )
+  </div>
+  )}
+  </div>
+
+  {/* Modal Penilaian Pelatih */}
+  {selectedEvalItem && (
+    <CoachEvaluationModal
+      isOpen={isEvalModalOpen}
+      onClose={() => {
+        setIsEvalModalOpen(false)
+        setSelectedEvalItem(null)
+      }}
+      extracurricular={selectedEvalItem.extracurricular}
+      coach={selectedEvalItem.coach}
+      studentId={studentId}
+      semester={selectedEvalItem.semester}
+      academicYear={selectedEvalItem.academicYear}
+      existingEvaluation={selectedEvalItem.existingEvaluation}
+      onSuccess={(savedEval) => {
+        setEvaluations((prev) => ({
+          ...prev,
+          [selectedEvalItem.extracurricular.id]: savedEval
+        }))
+      }}
+    />
+  )}
+  </div>
+  )
 }
