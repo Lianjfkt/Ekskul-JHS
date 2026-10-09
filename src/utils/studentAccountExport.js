@@ -69,7 +69,7 @@ export function exportStudentAccountsToExcel(accounts = [], selectedClass = 'all
     const rows = formatRows(filtered.length > 0 ? filtered : accounts)
     const ws = XLSX.utils.aoa_to_sheet(rows)
     setColumnWidths(ws)
-    const sheetName = `Kelas ${String(selectedClass).replace(/[\/\\?*:[\]]/g, '_')}`.slice(0, 31)
+    const sheetName = `Kelas ${String(selectedClass).replace(/[/\\?*:[\]]/g, '_')}`.slice(0, 31)
     XLSX.utils.book_append_sheet(wb, ws, sheetName)
 
     const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
@@ -105,7 +105,7 @@ export function exportStudentAccountsToExcel(accounts = [], selectedClass = 'all
     const wsClass = XLSX.utils.aoa_to_sheet(classRows)
     setColumnWidths(wsClass)
     // Nama sheet max 31 karakter dan tidak boleh ada karakter khusus Excel
-    const safeSheetName = `Kelas ${cls}`.replace(/[\/\\?*:[\]]/g, '_').slice(0, 31)
+    const safeSheetName = `Kelas ${cls}`.replace(/[/\\?*:[\]]/g, '_').slice(0, 31)
     XLSX.utils.book_append_sheet(wb, wsClass, safeSheetName)
   })
 
