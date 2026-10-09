@@ -16,28 +16,33 @@ import { supabase } from '../../lib/supabaseClient'
 import { useState } from 'react'
 
 export default function Navbar({ onMenuClick }) {
-  const { user, role, logout } = useAuthStore()
+  const { user, role, fullName, studentId, logout } = useAuthStore()
   const { children, selectedChild, setSelectedChild, fetchChildren } = useParentChildren()
   const [userData, setUserData] = useState(null)
 
   useEffect(() => {
     if (user && role === 'parent') {
-      const fetchUserData = async () => {
-        const { data } = await supabase.from('users').select('*').eq('id', user.id).single()
-        setUserData(data)
-        if (data) {
-          fetchChildren(user.id, data.full_name, data.student_id)
+      const activeName = fullName || userData?.full_name
+      if (activeName) {
+        fetchChildren(user.id, activeName, studentId)
+      } else {
+        const fetchUserData = async () => {
+          const { data } = await supabase.from('users').select('*').eq('id', user.id).single()
+          setUserData(data)
+          if (data) {
+            fetchChildren(user.id, data.full_name, data.student_id)
+          }
         }
+        fetchUserData()
       }
-      fetchUserData()
-    } else if (user) {
+    } else if (user && !fullName && !userData) {
       const fetchUserData = async () => {
         const { data } = await supabase.from('users').select('*').eq('id', user.id).single()
         setUserData(data)
       }
       fetchUserData()
     }
-  }, [user, role, fetchChildren])
+  }, [user, role, fullName, studentId, userData, fetchChildren])
 
   return (
     <header className="bg-pixel-panel border-b-4 border-pixel-gray h-16 flex items-center justify-between px-4 lg:px-8 shrink-0">
@@ -114,7 +119,7 @@ export default function Navbar({ onMenuClick }) {
           <div className="w-6 h-6 bg-pixel-blue/20 flex items-center justify-center border border-pixel-blue">
             <UserIcon className="w-3.5 h-3.5 text-pixel-blue" />
           </div>
-          <span className="max-w-[120px] truncate">{userData?.full_name || user?.email}</span>
+          <span className="max-w-[120px] truncate">{userData?.full_name || fullName || user?.email}</span>
         </Link>
         
         <Button 

@@ -39,147 +39,139 @@ export default function CoachDashboard() {
  }
  }, [user])
 
- const fetchCoachData = async () => {
- setLoading(true)
- try {
- // 1. Fetch extracurriculars managed by this coach
- const { data: ekskuls, error: eErr } = await supabase
- .from('extracurriculars')
- .select('*, is_mandatory, mandatory_class')
- .or(`coach_id.eq.${user.id},coach_id_2.eq.${user.id},coach_id_3.eq.${user.id}`)
- if (eErr) throw eErr
- setManagedEkskuls(ekskuls || [])
+  const fetchCoachData = async () => {
+    setLoading(true)
+    try {
+      // 1. Fetch extracurriculars managed by this coach
+      const { data: ekskuls, error: eErr } = await supabase
+        .from('extracurriculars')
+        .select('*, is_mandatory, mandatory_class')
+        .or(`coach_id.eq.${user.id},coach_id_2.eq.${user.id},coach_id_3.eq.${user.id}`)
+      if (eErr) throw eErr
+      setManagedEkskuls(ekskuls || [])
 
- if (ekskuls && ekskuls.length > 0) {
- const ekskulIds = ekskuls.map(e => e.id)
+      if (ekskuls && ekskuls.length > 0) {
+        const ekskulIds = ekskuls.map(e => e.id)
 
- // 2. Fetch total sessions held in these extracurriculars
- const { count: sessionCount, error: sErr } = await supabase
- .from('sessions')
- .select('*', { count: 'exact', head: true })
- .in('extracurricular_id', ekskulIds)
- if (sErr) throw sErr
+        // 1. Paralelisasi query tahap 1 (metadata sesi, siswa aktif, dan list sesi)
+        const [
+          { count: sessionCount, error: sErr },
+          { count: studentCount, error: stErr },
+          { data: recentSessions },
+          { data: activeStudents },
+          { data: allSessions }
+        ] = await Promise.all([
+          supabase.from('sessions').select('*', { count: 'exact', head: true }).in('extracurricular_id', ekskulIds),
+          supabase.from('enrollments').select('*', { count: 'exact', head: true }).in('extracurricular_id', ekskulIds).eq('status', 'active'),
+          supabase.from('sessions').select(`id, session_date, topic, extracurricular_id, extracurriculars (name)`).in('extracurricular_id', ekskulIds).order('session_date', { ascending: false }).limit(8),
+          supabase.from('enrollments').select('student_id, students(id, full_name, class, nis), extracurricular_id, extracurriculars(id, name, is_mandatory, mandatory_class)').in('extracurricular_id', ekskulIds).eq('status', 'active'),
+          supabase.from('sessions').select('id, session_date, extracurricular_id, is_special_training, target_class, attendance_submitted').in('extracurricular_id', ekskulIds)
+        ])
 
- // 3. Fetch total students enrolled in these extracurriculars
- const { count: studentCount, error: stErr } = await supabase
- .from('enrollments')
- .select('*', { count: 'exact', head: true })
- .in('extracurricular_id', ekskulIds)
- .eq('status', 'active')
- if (stErr) throw stErr
+        if (sErr) throw sErr
+        if (stErr) throw stErr
 
-      setStats({
-        totalSessions: sessionCount || 0,
-        totalStudents: studentCount || 0
-      })
-      
-      // 4. Fetch recent sessions for chart
-      const { data: recentSessions } = await supabase
-        .from('sessions')
-        .select(`id, session_date, topic, extracurricular_id, extracurriculars (name)`)
-        .in('extracurricular_id', ekskulIds)
-        .order('session_date', { ascending: false })
-        .limit(8)
-        
-      let chartData = []
-      if (recentSessions && recentSessions.length > 0) {
-        const sessionIds = recentSessions.map(s => s.id)
-        const { data: atts } = await supabase
-          .from('attendances')
-          .select('session_id, status')
-          .in('session_id', sessionIds)
-          
-        chartData = [...recentSessions].reverse().map(session => {
-          const sessionAtts = atts?.filter(a => a.session_id === session.id) || []
-          const total = sessionAtts.length
-          const present = sessionAtts.filter(a => a.status === 'hadir').length
-          const percentage = total > 0 ? Math.round((present / total) * 100) : 0
-          return {
-            name: new Date(session.session_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
-            topic: session.topic,
-            ekskul: session.extracurriculars?.name,
-            kehadiran: percentage,
-            total_siswa: total
-          }
+        setStats({
+          totalSessions: sessionCount || 0,
+          totalStudents: studentCount || 0
         })
-      }
-      setAttendanceTrend(chartData)
-      
-      // 5. Identify students with attendance warnings
-      const { data: activeStudents } = await supabase
-        .from('enrollments')
-        .select('student_id, students(id, full_name, class, nis), extracurricular_id, extracurriculars(id, name, is_mandatory, mandatory_class)')
-        .in('extracurricular_id', ekskulIds)
-        .eq('status', 'active')
-        
-      const warnings = []
-      if (activeStudents && activeStudents.length > 0) {
-        const { data: allSessions } = await supabase
-          .from('sessions')
-          .select('id, session_date, extracurricular_id, is_special_training, target_class, attendance_submitted')
-          .in('extracurricular_id', ekskulIds)
-        if (allSessions && allSessions.length > 0) {
-           const allSessionIds = allSessions.map(s => s.id)
-           const { data: allAtts } = await supabase.from('attendances').select('id, student_id, session_id, status').in('session_id', allSessionIds)
-           const { data: specialParts } = await supabase.from('special_session_participants').select('session_id, student_id').in('session_id', allSessionIds)
-           
-           if (allAtts) {
-              activeStudents.forEach(enr => {
-                  const ekskul = ekskuls.find(e => e.id === enr.extracurricular_id) || enr.extracurriculars
-                  const student = enr.students
-                  if (!student || !ekskul) return
 
-                  const ekskulSessions = allSessions.filter(s => s.extracurricular_id === enr.extracurricular_id)
-                  const validSessions = ekskulSessions.filter(s => 
-                    isSessionApplicableToStudent(s, student, specialParts || [], allAtts)
-                  )
+        const recentSessionIds = (recentSessions || []).map(s => s.id)
+        const allSessionIds = (allSessions || []).map(s => s.id)
 
-                  const validSessionIds = new Set(validSessions.map(s => s.id))
-                  const studentAtts = allAtts.filter(a => a.student_id === enr.student_id && validSessionIds.has(a.session_id))
-                  
-                  if (validSessions.length === 0 && studentAtts.length === 0) return
+        // 2. Paralelisasi query tahap 2 (absensi grafik, absensi evaluasi risiko, dan peserta khusus)
+        const [attsRes, allAttsRes, specialPartsRes] = await Promise.all([
+          recentSessionIds.length > 0 
+            ? supabase.from('attendances').select('session_id, status').in('session_id', recentSessionIds)
+            : Promise.resolve({ data: [] }),
+          (allSessionIds.length > 0 && activeStudents && activeStudents.length > 0)
+            ? supabase.from('attendances').select('id, student_id, session_id, status').in('session_id', allSessionIds)
+            : Promise.resolve({ data: [] }),
+          (allSessionIds.length > 0 && activeStudents && activeStudents.length > 0)
+            ? supabase.from('special_session_participants').select('session_id, student_id').in('session_id', allSessionIds)
+            : Promise.resolve({ data: [] })
+        ])
 
-                  const risk = evaluateAttendanceRisk({
-                    student,
-                    ekskul,
-                    studentAtts,
-                    validSessions
-                  })
+        const atts = attsRes.data || []
+        const allAtts = allAttsRes.data || []
+        const specialParts = specialPartsRes.data || []
 
-                  if (risk.isAtRisk) {
-                    warnings.push({
-                       id: enr.student_id + enr.extracurricular_id,
-                       ekskulId: enr.extracurricular_id,
-                       name: student.full_name,
-                       class: student.class,
-                       ekskul: ekskul.name,
-                       percentage: risk.percentage,
-                       consecutiveAlpha: risk.consecutiveAlpha,
-                       maxConsecutiveAlpha: risk.maxConsecutiveAlpha,
-                       alphaCount: risk.alpha,
-                       isMandatory: risk.isMandatory,
-                       warningLevel: risk.warningLevel,
-                       warningLabel: risk.warningLabel,
-                       warningReasons: risk.warningReasons,
-                       riskTags: risk.riskTags
-                    })
-                  }
-              })
-           }
+        // 3. Olah data grafik tren kehadiran
+        let chartData = []
+        if (recentSessions && recentSessions.length > 0) {
+          chartData = [...recentSessions].reverse().map(session => {
+            const sessionAtts = atts.filter(a => a.session_id === session.id)
+            const total = sessionAtts.length
+            const present = sessionAtts.filter(a => a.status === 'hadir').length
+            const percentage = total > 0 ? Math.round((present / total) * 100) : 0
+            return {
+              name: new Date(session.session_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+              topic: session.topic,
+              ekskul: session.extracurriculars?.name,
+              kehadiran: percentage,
+              total_siswa: total
+            }
+          })
         }
-      }
-      setAttendanceWarnings(warnings.sort((a,b) => {
-        if (a.warningLevel !== b.warningLevel) return a.warningLevel === 'TEGURAN' ? -1 : 1
-        return a.percentage - b.percentage
-      }))
+        setAttendanceTrend(chartData)
 
- }
- } catch (err) {
- console.error('Error fetching coach dashboard data:', err.message)
- } finally {
- setLoading(false)
- }
- }
+        // 4. Evaluasi siswa bermasalah absensi
+        const warnings = []
+        if (activeStudents && activeStudents.length > 0 && allSessions && allSessions.length > 0) {
+          activeStudents.forEach(enr => {
+            const ekskul = ekskuls.find(e => e.id === enr.extracurricular_id) || enr.extracurriculars
+            const student = enr.students
+            if (!student || !ekskul) return
+
+            const ekskulSessions = allSessions.filter(s => s.extracurricular_id === enr.extracurricular_id)
+            const validSessions = ekskulSessions.filter(s => 
+              isSessionApplicableToStudent(s, student, specialParts, allAtts)
+            )
+
+            const validSessionIds = new Set(validSessions.map(s => s.id))
+            const studentAtts = allAtts.filter(a => a.student_id === enr.student_id && validSessionIds.has(a.session_id))
+            
+            if (validSessions.length === 0 && studentAtts.length === 0) return
+
+            const risk = evaluateAttendanceRisk({
+              student,
+              ekskul,
+              studentAtts,
+              validSessions
+            })
+
+            if (risk.isAtRisk) {
+              warnings.push({
+                id: enr.student_id + enr.extracurricular_id,
+                ekskulId: enr.extracurricular_id,
+                name: student.full_name,
+                class: student.class,
+                ekskul: ekskul.name,
+                percentage: risk.percentage,
+                consecutiveAlpha: risk.consecutiveAlpha,
+                maxConsecutiveAlpha: risk.maxConsecutiveAlpha,
+                alphaCount: risk.alpha,
+                isMandatory: risk.isMandatory,
+                warningLevel: risk.warningLevel,
+                warningLabel: risk.warningLabel,
+                warningReasons: risk.warningReasons,
+                riskTags: risk.riskTags
+              })
+            }
+          })
+        }
+
+        setAttendanceWarnings(warnings.sort((a,b) => {
+          if (a.warningLevel !== b.warningLevel) return a.warningLevel === 'TEGURAN' ? -1 : 1
+          return a.percentage - b.percentage
+        }))
+      }
+    } catch (err) {
+      console.error('Error fetching coach dashboard data:', err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
  return (
  <div className="space-y-8">

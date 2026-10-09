@@ -15,7 +15,7 @@ const loginSchema = z.object({
 
 export default function Login() {
   const navigate = useNavigate()
-  const { login, role } = useAuthStore()
+  const { login } = useAuthStore()
   
   const { register, handleSubmit, formState: { errors, isSubmitting }, setError } = useForm({
     resolver: zodResolver(loginSchema),
@@ -23,10 +23,12 @@ export default function Login() {
 
   const onSubmit = async (data) => {
     try {
-      await login(data.email, data.password)
-      const currentRole = useAuthStore.getState().role
-      if (currentRole) {
-        navigate(`/${currentRole}/dashboard`)
+      const loginResult = await login(data.email, data.password)
+      const targetRole = loginResult?.role || useAuthStore.getState().role
+      if (targetRole) {
+        navigate(`/${targetRole}/dashboard`, { replace: true })
+      } else {
+        setError("root", { message: "Akun Anda tidak memiliki role yang valid. Hubungi administrator." })
       }
     } catch (error) {
       setError("root", { message: "Login gagal. Periksa kembali email dan password Anda." })

@@ -60,11 +60,17 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchStats()
-    loadAnnouncements()
-    loadAuditLogs()
   }, [])
 
-  // 1. Fetch Tracking Data via RPC & React Query
+  useEffect(() => {
+    if (activeTab === 'announcements' && announcements.length === 0) {
+      loadAnnouncements()
+    } else if (activeTab === 'logs' && logs.length === 0) {
+      loadAuditLogs()
+    }
+  }, [activeTab, announcements.length, logs.length])
+
+  // 1. Fetch Tracking Data via RPC & React Query (Hanya aktif saat tab tracking atau laporan dibuka)
   const { 
     data: trackingStudents = [], 
     isLoading: trackingLoading, 
@@ -76,11 +82,13 @@ export default function AdminDashboard() {
       const { data, error } = await supabase.rpc('get_student_tracking_data')
       if (error) throw error
       return data || []
-    }
+    },
+    enabled: activeTab === 'tracking' || activeTab === 'laporan',
+    staleTime: 5 * 60 * 1000
   })
   const trackingError = trackErr?.message || ''
 
-  // 2. Fetch Ekskul Stats via RPC & React Query
+  // 2. Fetch Ekskul Stats via RPC & React Query (Hanya aktif saat tab laporan dibuka)
   const { 
     data: extracurricularStats = []
   } = useQuery({
@@ -89,7 +97,9 @@ export default function AdminDashboard() {
       const { data, error } = await supabase.rpc('get_ekskul_stats')
       if (error) throw error
       return data || []
-    }
+    },
+    enabled: activeTab === 'laporan',
+    staleTime: 5 * 60 * 1000
   })
 
   // 3. Hitung Mandatory Violations secara reaktif
@@ -199,31 +209,31 @@ export default function AdminDashboard() {
   const fetchStats = async () => {
     setLoading(true)
     try {
-      // 1. Get total students
-      const { count: studentCount, error: sErr } = await supabase
-        .from('students')
-        .select('*', { count: 'exact', head: true })
+      const [
+        { count: studentCount, error: sErr },
+        { count: ekskulCount, error: eErr },
+        { count: coachCount, error: cErr },
+        { count: enrollmentCount, error: enErr },
+        { data: recData, error: recErr }
+      ] = await Promise.all([
+        supabase.from('students').select('*', { count: 'exact', head: true }),
+        supabase.from('extracurriculars').select('*', { count: 'exact', head: true }),
+        supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'coach'),
+        supabase.from('enrollments').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('enrollments').select(`
+          id,
+          enrolled_at,
+          status,
+          student:student_id (full_name, class),
+          extracurricular:extracurricular_id (name)
+        `).order('enrolled_at', { ascending: false }).limit(5)
+      ])
+
       if (sErr) throw sErr
-
-      // 2. Get total extracurriculars
-      const { count: ekskulCount, error: eErr } = await supabase
-        .from('extracurriculars')
-        .select('*', { count: 'exact', head: true })
       if (eErr) throw eErr
-
-      // 3. Get total coaches
-      const { count: coachCount, error: cErr } = await supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true })
-        .eq('role', 'coach')
       if (cErr) throw cErr
-
-      // 4. Get total active enrollments
-      const { count: enrollmentCount, error: enErr } = await supabase
-        .from('enrollments')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active')
       if (enErr) throw enErr
+      if (recErr) throw recErr
 
       setStats({
         totalStudents: studentCount || 0,
@@ -232,19 +242,6 @@ export default function AdminDashboard() {
         totalEnrollments: enrollmentCount || 0
       })
 
-      // 5. Get recent enrollments (limit 5)
-      const { data: recData, error: recErr } = await supabase
-        .from('enrollments')
-        .select(`
-          id,
-          enrolled_at,
-          status,
-          student:student_id (full_name, class),
-          extracurricular:extracurricular_id (name)
-        `)
-        .order('enrolled_at', { ascending: false })
-        .limit(5)
-      if (recErr) throw recErr
       setRecentEnrollments(recData || [])
 
     } catch (err) {
