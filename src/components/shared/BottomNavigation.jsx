@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
+import { soundManager } from '../../utils/soundEffects'
 import { 
   LayoutDashboard, 
   Activity, 
@@ -47,13 +48,17 @@ export default function BottomNavigation() {
             <Link
               key={item.path}
               to={item.path}
+              onClick={() => soundManager.playBlip()}
               className={cn(
-                "flex flex-col items-center justify-center w-full h-full space-y-1",
-                isActive ? "text-pixel-blue" : "text-pixel-lavender hover:text-pixel-peach"
+                "relative flex flex-col items-center justify-center w-full h-full space-y-1 active:scale-95 select-none transition-transform",
+                isActive ? "text-pixel-blue font-bold" : "text-pixel-lavender hover:text-pixel-peach"
               )}
             >
-              <Icon className={cn("w-5 h-5", isActive && "pixel-text-glow")} />
-              <span className="font-pixel text-[6px] uppercase tracking-wider">{item.name}</span>
+              {isActive && (
+                <div className="absolute top-0 left-1/4 right-1/4 h-1 bg-pixel-blue animate-pixel-pop" />
+              )}
+              <Icon className={cn("w-5 h-5", isActive ? "pixel-text-glow scale-110" : "")} />
+              <span className="font-pixel text-[7px] uppercase tracking-wider">{item.name}</span>
             </Link>
           )
         })}

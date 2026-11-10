@@ -9,6 +9,9 @@ import { Label } from '@/components/ui/label'
 import { 
  GraduationCap, ShieldAlert, Check, Users, Save, Info
 } from 'lucide-react'
+import { toast } from '@/stores/toastStore'
+import { soundManager } from '@/utils/soundEffects'
+import XpFloat from '@/components/ui/XpFloat'
 
 // Auto-hitung tahun ajaran: Juli-Des = tahun ajaran baru, Jan-Jun = tahun ajaran lama
 // Didefinisikan di luar komponen agar tidak dibuat ulang setiap render.
@@ -24,6 +27,7 @@ export default function CoachGrades() {
  const [saving, setSaving] = useState(false)
  const [errorMsg, setErrorMsg] = useState('')
  const [successMsg, setSuccessMsg] = useState('')
+ const [showXp, setShowXp] = useState(false)
 
  // Selection States
  const [managedEkskuls, setManagedEkskuls] = useState([])
@@ -236,9 +240,14 @@ export default function CoachGrades() {
  }
 
  setSuccessMsg('Nilai perkembangan siswa berhasil disimpan.')
+ setShowXp(true)
+ soundManager.playSuccess()
+ toast.success('Nilai perkembangan siswa berhasil disimpan!')
  } catch (err) {
  console.error(err)
  setErrorMsg('Gagal menyimpan nilai: ' + err.message)
+ soundManager.playError()
+ toast.error('Gagal menyimpan nilai: ' + err.message)
  } finally {
  setSaving(false)
  }
@@ -267,9 +276,12 @@ export default function CoachGrades() {
  <p className="text-pixel-lavender text-sm">Input nilai sikap, keterampilan, dan aktivitas siswa binaan Anda per semester.</p>
  </div>
  {selectedEkskul && students.length > 0 && (
- <Button onClick={handleSaveGrades} disabled={saving} className="gap-2 w-full sm:w-auto">
- <Save className="w-4 h-4" /> {saving ? 'Menyimpan...' : 'Simpan Nilai'}
- </Button>
+ <div className="relative w-full sm:w-auto">
+   <XpFloat text="+20 XP Nilai Tersimpan!" show={showXp} onComplete={() => setShowXp(false)} className="-top-8 right-0" />
+   <Button onClick={handleSaveGrades} disabled={saving} className="gap-2 w-full sm:w-auto">
+     <Save className="w-4 h-4" /> {saving ? 'Menyimpan...' : 'Simpan Nilai'}
+   </Button>
+ </div>
  )}
  </div>
 
@@ -345,7 +357,7 @@ export default function CoachGrades() {
  {students.map(student => {
  const studentGr = gradesSheet[student.id] || { attitude_score: '', skill_score: '', activity_score: '', notes: '' }
  return (
- <tr key={student.id} className="hover:bg-pixel-navy/30">
+ <tr key={student.id} className="pixel-table-row hover:bg-pixel-navy/40">
  <td className="px-6 py-4 font-semibold text-pixel-white">
  <span className="block">{student.full_name}</span>
  <span className="text-xs text-pixel-lavender font-mono">NIS: {student.nis}</span>

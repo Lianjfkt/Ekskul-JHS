@@ -13,6 +13,8 @@ import ImportCSVModal from '../../components/import/ImportCSVModal'
 import { auditLogService } from '../../utils/auditLogService'
 import { useAuthStore } from '../../stores/authStore'
 import { exportStudentAccountsToExcel } from '../../utils/studentAccountExport'
+import { toast } from '@/stores/toastStore'
+import { soundManager } from '@/utils/soundEffects'
 
 
 
@@ -574,7 +576,8 @@ export default function UsersManagement() {
   const handleDirectExportExcel = () => {
     try {
       if (!students || students.length === 0) {
-        alert('Belum ada data siswa di database.')
+        soundManager.playBlip()
+        toast.info('Belum ada data siswa di database.')
         return
       }
 
@@ -588,9 +591,13 @@ export default function UsersManagement() {
       }))
 
       exportStudentAccountsToExcel(mappedAccounts, selectedClassExport)
-      setSuccessMsg(`File Excel akun siswa (${selectedClassExport === 'all' ? 'Semua Kelas' : 'Kelas ' + selectedClassExport}) berhasil diunduh.`)
+      soundManager.playCoin()
+      const msg = `File Excel akun siswa (${selectedClassExport === 'all' ? 'Semua Kelas' : 'Kelas ' + selectedClassExport}) berhasil diunduh.`
+      setSuccessMsg(msg)
+      toast.success(msg, 'Ekspor Selesai')
     } catch (err) {
-      alert('Gagal mengunduh file Excel: ' + err.message)
+      soundManager.playError()
+      toast.error('Gagal mengunduh file Excel: ' + err.message)
     }
   }
 
@@ -770,8 +777,9 @@ export default function UsersManagement() {
 
  const handleUserDelete = async (id, email) => {
  if (email === 'admin@sekolah.com') {
- alert('Akun administrator utama tidak dapat dihapus.')
- return
+   soundManager.playError()
+   toast.warning('Akun administrator utama tidak dapat dihapus.')
+   return
  }
  if (!confirm('Apakah Anda yakin ingin menghapus akun pengguna ini? Data autentikasi Supabase terkait juga akan terpengaruh.')) return
  setErrorMsg('')

@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Star, ShieldCheck, X, Award, CheckCircle2 } from 'lucide-react'
+import { soundManager } from '@/utils/soundEffects'
+import { toast } from '@/stores/toastStore'
 
 const RATING_LABELS = {
   1: 'Kurang Sekali',
@@ -94,10 +96,14 @@ export default function CoachEvaluationModal({
       if (onSuccess) {
         onSuccess(data || payload)
       }
+      soundManager.playSuccess()
+      toast.success('Terima kasih! Penilaian anonim Anda berhasil dikirim.', '+25 XP Evaluasi Selesai! ⭐')
       onClose()
     } catch (err) {
       console.error('Error submitting coach evaluation:', err)
+      soundManager.playError()
       setErrorMsg(err.message || 'Gagal mengirim penilaian.')
+      toast.error(err.message || 'Gagal mengirim penilaian.')
     } finally {
       setSubmitting(false)
     }
@@ -162,8 +168,16 @@ export default function CoachEvaluationModal({
                     key={starVal}
                     type="button"
                     disabled={isReadOnly}
-                    onClick={() => setRating(starVal)}
-                    onMouseEnter={() => !isReadOnly && setHoverRating(starVal)}
+                    onClick={() => {
+                      soundManager.playCoin()
+                      setRating(starVal)
+                    }}
+                    onMouseEnter={() => {
+                      if (!isReadOnly) {
+                        soundManager.playBlip()
+                        setHoverRating(starVal)
+                      }
+                    }}
                     onMouseLeave={() => !isReadOnly && setHoverRating(0)}
                     className={`p-1.5 transition-transform ${
                       isReadOnly ? 'cursor-default' : 'hover:scale-125 cursor-pointer active:scale-95'

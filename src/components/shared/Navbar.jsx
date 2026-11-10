@@ -4,6 +4,7 @@ import { Menu, LogOut, User as UserIcon, Bell } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useParentChildren } from '../../hooks/useParentChildren'
 import NotificationBell from './NotificationBell'
+import SoundToggle from './SoundToggle'
 import { Button } from '../ui/button'
 import {
   Select,
@@ -108,6 +109,7 @@ export default function Navbar({ onMenuClick }) {
       </div>
 
       <div className="flex items-center gap-3">
+        <SoundToggle />
         {(role === 'student' || role === 'parent' || role === 'coach' || role === 'admin') && (
           <NotificationBell />
         )}

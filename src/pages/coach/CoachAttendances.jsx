@@ -8,8 +8,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { 
  ClipboardCheck, Calendar, ShieldAlert, Check, 
- Users, AlertCircle, Save, Info, Trophy, Search, X
+ Users, AlertCircle, Save, Info, Trophy, Search, X, CheckCheck
 } from 'lucide-react'
+import { toast } from '@/stores/toastStore'
+import { soundManager } from '@/utils/soundEffects'
+import XpFloat from '@/components/ui/XpFloat'
+import { cn } from '@/lib/utils'
 
 export default function CoachAttendances() {
  const { user } = useAuthStore()
@@ -30,6 +34,21 @@ export default function CoachAttendances() {
  // Attendance state: { [studentId]: { status: 'hadir'|'izin'|'alpha', notes: '' } }
  const [attendanceSheet, setAttendanceSheet] = useState({})
  const [searchTerm, setSearchTerm] = useState('')
+ const [showXp, setShowXp] = useState(false)
+
+ const handleMarkAllPresent = () => {
+   if (students.length === 0) return
+   const updated = { ...attendanceSheet }
+   students.forEach(st => {
+     updated[st.id] = {
+       status: 'hadir',
+       notes: updated[st.id]?.notes || ''
+     }
+   })
+   setAttendanceSheet(updated)
+   soundManager.playCoin()
+   toast.success(`Semua ${students.length} siswa ditandai Hadir!`, 'Cepat & Praktis')
+ }
 
  useEffect(() => {
  if (user) {
@@ -234,9 +253,14 @@ export default function CoachAttendances() {
   if (flagError) throw flagError
 
   setSuccessMsg('Absensi berhasil disimpan.')
+  setShowXp(true)
+  soundManager.playSuccess()
+  toast.success('Absensi berhasil disimpan dan disinkronkan!')
  } catch (err) {
  console.error(err)
  setErrorMsg('Gagal menyimpan absensi: ' + err.message)
+ soundManager.playError()
+ toast.error('Gagal menyimpan absensi: ' + err.message)
  } finally {
  setSaving(false)
  }
@@ -277,9 +301,23 @@ export default function CoachAttendances() {
  <p className="text-pixel-lavender text-sm">Pilih kelas ekskul dan sesi latihan, kemudian tandai status kehadiran setiap siswa.</p>
  </div>
  {selectedSession && students.length > 0 && (
- <Button onClick={handleSaveAttendance} disabled={saving} className="gap-2 w-full sm:w-auto">
- <Save className="w-4 h-4" /> {saving ? 'Menyimpan...' : 'Simpan Absensi'}
- </Button>
+ <div className="relative flex items-center gap-2 w-full sm:w-auto">
+   <XpFloat text="+15 XP Absensi Disimpan!" show={showXp} onComplete={() => setShowXp(false)} className="-top-8 right-0" />
+   <Button 
+     type="button"
+     variant="outline"
+     size="sm"
+     onClick={handleMarkAllPresent}
+     className="border-pixel-green/60 text-pixel-green hover:bg-pixel-green/20 hover:border-pixel-green"
+     title="Tandai seluruh siswa dengan status Hadir sekaligus"
+   >
+     <CheckCheck className="w-4 h-4 mr-1.5" />
+     <span className="hidden md:inline">Semua Hadir</span>
+   </Button>
+   <Button onClick={handleSaveAttendance} disabled={saving} className="gap-2 w-full sm:w-auto">
+     <Save className="w-4 h-4" /> {saving ? 'Menyimpan...' : 'Simpan Absensi'}
+   </Button>
+ </div>
  )}
  </div>
 
@@ -399,29 +437,41 @@ export default function CoachAttendances() {
               filteredStudents.map(student => {
  const studentAtt = attendanceSheet[student.id] || { status: 'hadir', notes: '' }
  return (
- <tr key={student.id} className="hover:bg-pixel-navy/30">
+ <tr key={student.id} className="pixel-table-row hover:bg-pixel-navy/40">
  <td className="px-6 py-4 font-mono text-pixel-lavender">{student.nis}</td>
  <td className="px-6 py-4 font-semibold text-pixel-white">{student.full_name}</td>
  <td className="px-6 py-4">
- <span className="px-2.5 py-1 font-retro text-base bg-slate-100 text-pixel-black rounded-none">{student.class}</span>
+ <span className="px-2.5 py-1 font-retro text-base bg-pixel-navy border border-pixel-gray text-pixel-white rounded-none">{student.class}</span>
  </td>
  <td className="px-6 py-4">
- <div className="flex justify-center gap-6">
- {['hadir', 'izin', 'alpha'].map(status => (
- <label key={status} className="flex items-center gap-1.5 cursor-pointer capitalize select-none font-retro text-base text-pixel-peach">
- <input
- type="radio"
- name={`attendance_${student.id}`}
- checked={studentAtt.status === status}
- onChange={() => handleStatusChange(student.id, status)}
- className={`h-4 w-4 border-slate-300 focus:ring-primary ${
- status === 'hadir' ? 'text-pixel-green' :
- status === 'izin' ? 'text-pixel-orange' : 'text-pixel-red'
- }`}
- />
- <span>{status}</span>
- </label>
- ))}
+ <div className="flex justify-center">
+   <div className="inline-flex border-2 border-pixel-gray bg-pixel-navy p-0.5 shadow-pixel-sm">
+     {[
+       { key: 'hadir', label: 'Hadir', activeClass: 'bg-pixel-green text-pixel-navy font-bold' },
+       { key: 'izin', label: 'Izin', activeClass: 'bg-pixel-orange text-pixel-navy font-bold' },
+       { key: 'alpha', label: 'Alpha', activeClass: 'bg-pixel-red text-pixel-white font-bold' }
+     ].map(({ key, label, activeClass }) => {
+       const isActive = studentAtt.status === key
+       return (
+         <button
+           key={key}
+           type="button"
+           onClick={() => {
+             soundManager.playBlip()
+             handleStatusChange(student.id, key)
+           }}
+           className={cn(
+             "px-2.5 py-1 text-xs font-retro uppercase tracking-wider active:translate-x-0.5 active:translate-y-0.5 transition-colors",
+             isActive
+               ? cn(activeClass, "shadow-pixel-sm")
+               : "text-pixel-lavender hover:text-pixel-white hover:bg-pixel-panel"
+           )}
+         >
+           {label}
+         </button>
+       )
+     })}
+   </div>
  </div>
  </td>
  <td className="px-6 py-4">

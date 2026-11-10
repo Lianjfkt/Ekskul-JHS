@@ -72,7 +72,17 @@
 @layer base {
   * {
     @apply border-border;
-    transition: none !important;
+  }
+
+  /* Snappy pixel-appropriate micro-interaction transitions */
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  .pixel-btn,
+  .pixel-interactive {
+    transition: transform 0.08s ease, filter 0.08s ease, background-color 0.1s steps(3), border-color 0.1s steps(3), color 0.1s steps(3), box-shadow 0.08s ease;
   }
 
   body {
@@ -169,10 +179,11 @@
   }
 
   .pixel-btn:active {
-    transform: translate(3px, 3px) !important;
+    transform: translate(2px, 2px) !important;
     box-shadow:
       inset -3px -3px 0 0 rgba(255, 255, 255, 0.1),
-      inset 3px 3px 0 0 rgba(0, 0, 0, 0.4) !important;
+      inset 3px 3px 0 0 rgba(0, 0, 0, 0.4),
+      1px 1px 0 0 rgba(0, 0, 0, 0.6) !important;
   }
 
   /* ===== PIXEL INPUT ===== */
@@ -233,6 +244,11 @@
   @keyframes pixel-slide-in {
     from { transform: translateY(-8px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes toast-progress {
+    from { width: 100%; }
+    to { width: 0%; }
   }
 
   .pixel-blink {
@@ -327,7 +343,6 @@
   /* Interactive card hover styles */
   .pixel-card-interactive {
     cursor: pointer;
-    transition: none !important;
   }
   .pixel-card-interactive:hover {
     transform: translate(-2px, -2px);
@@ -341,5 +356,26 @@
     box-shadow:
       inset -3px -3px 0 0 rgba(255, 255, 255, 0.1),
       inset 3px 3px 0 0 rgba(0, 0, 0, 0.4) !important;
+  }
+
+  /* Retro Pointer indicator for list/nav items */
+  .pixel-nav-item {
+    position: relative;
+  }
+  .pixel-nav-item:hover::before {
+    content: "▶";
+    position: absolute;
+    left: 6px;
+    font-size: 10px;
+    color: var(--pixel-yellow);
+    animation: pixel-blink 0.8s steps(2) infinite;
+  }
+
+  /* Table row hover micro-interaction */
+  .pixel-table-row {
+    transition: background-color 0.1s steps(2);
+  }
+  .pixel-table-row:hover {
+    background-color: rgba(41, 173, 255, 0.08) !important;
   }
 }

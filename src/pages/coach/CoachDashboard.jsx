@@ -13,6 +13,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer
 } from 'recharts'
 import { isSessionApplicableToStudent, evaluateAttendanceRisk } from '../../utils/attendanceRiskEngine'
+import { soundManager } from '../../utils/soundEffects'
 
 export default function CoachDashboard() {
  const { user } = useAuthStore()
@@ -225,7 +226,7 @@ export default function CoachDashboard() {
 
  {/* Stats Cards */}
  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
- <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel">
+ <Card className="pixel-card-interactive border-pixel-gray/40 bg-pixel-panel">
  <CardContent className="p-6 flex items-center justify-between">
  <div className="space-y-1">
  <p className="font-retro text-lg text-pixel-lavender">Ekskul Asuhan</p>
@@ -240,7 +241,7 @@ export default function CoachDashboard() {
  </CardContent>
  </Card>
 
- <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel">
+ <Card className="pixel-card-interactive border-pixel-gray/40 bg-pixel-panel">
  <CardContent className="p-6 flex items-center justify-between">
  <div className="space-y-1">
  <p className="font-retro text-lg text-pixel-lavender">Total Sesi Latihan</p>
@@ -255,7 +256,7 @@ export default function CoachDashboard() {
  </CardContent>
  </Card>
 
- <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel">
+ <Card className="pixel-card-interactive border-pixel-gray/40 bg-pixel-panel">
  <CardContent className="p-6 flex items-center justify-between">
  <div className="space-y-1">
  <p className="font-retro text-lg text-pixel-lavender">Siswa Binaan Aktif</p>
@@ -355,27 +356,39 @@ export default function CoachDashboard() {
  <h2 className="font-pixel text-[10px] pixel-text-shadow leading-loose text-pixel-white">Aksi Cepat Pelatih</h2>
  <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel">
  <CardContent className="p-4 space-y-3">
- <Link to="/coach/sessions" className="flex items-center justify-between p-3 rounded-none border border-pixel-gray/30 hover:bg-pixel-navy group">
+ <Link 
+  to="/coach/sessions" 
+  onClick={() => soundManager.playBlip()} 
+  className="flex items-center justify-between p-3 rounded-none border border-pixel-gray/30 hover:border-pixel-blue hover:bg-pixel-navy group transition-all"
+>
  <div className="flex items-center gap-3">
  <div className="p-2 bg-pixel-green/10 text-pixel-green rounded">
  <CalendarDays className="w-4 h-4" />
  </div>
- <span className="font-retro text-lg text-pixel-peach">Jadwal & Topik Sesi</span>
+ <span className="font-retro text-lg text-pixel-peach group-hover:text-pixel-white">Jadwal & Topik Sesi</span>
  </div>
- <ArrowRight className="w-4 h-4 text-pixel-lavender group-hover:translate-x-1" />
+ <ArrowRight className="w-4 h-4 text-pixel-lavender group-hover:text-pixel-blue group-hover:translate-x-1" />
  </Link>
 
- <Link to="/coach/attendances" className="flex items-center justify-between p-3 rounded-none border border-pixel-gray/30 hover:bg-pixel-navy group">
+ <Link 
+  to="/coach/attendances" 
+  onClick={() => soundManager.playBlip()} 
+  className="flex items-center justify-between p-3 rounded-none border border-pixel-gray/30 hover:border-pixel-blue hover:bg-pixel-navy group transition-all"
+>
  <div className="flex items-center gap-3">
  <div className="p-2 bg-pixel-green/10 text-pixel-green rounded">
  <ClipboardCheck className="w-4 h-4" />
  </div>
- <span className="font-retro text-lg text-pixel-peach">Catat Kehadiran Siswa</span>
+ <span className="font-retro text-lg text-pixel-peach group-hover:text-pixel-white">Catat Kehadiran Siswa</span>
  </div>
- <ArrowRight className="w-4 h-4 text-pixel-lavender group-hover:translate-x-1" />
+ <ArrowRight className="w-4 h-4 text-pixel-lavender group-hover:text-pixel-blue group-hover:translate-x-1" />
  </Link>
 
- <Link to="/coach/grades" className="flex items-center justify-between p-3 rounded-none border border-pixel-gray/30 hover:bg-pixel-navy group">
+ <Link 
+  to="/coach/grades" 
+  onClick={() => soundManager.playBlip()} 
+  className="flex items-center justify-between p-3 rounded-none border border-pixel-gray/30 hover:border-pixel-blue hover:bg-pixel-navy group transition-all"
+>
  <div className="flex items-center gap-3">
  <div className="p-2 bg-amber-50 text-pixel-orange rounded">
  <GraduationCap className="w-4 h-4" />

@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
+import { soundManager } from '../../utils/soundEffects'
 import { 
   LayoutDashboard, 
   Activity, 
@@ -72,15 +73,24 @@ export default function Sidebar({ isOpen }) {
             <Link
               key={item.path}
               to={item.path}
+              onClick={() => soundManager.playBlip()}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-none border-2 font-retro text-lg",
+                "group relative flex items-center gap-3 px-4 py-3 rounded-none border-2 font-retro text-lg active:translate-x-0.5 active:translate-y-0.5",
                 isActive 
-                  ? "bg-pixel-blue/20 text-pixel-blue border-pixel-blue pixel-text-shadow" 
-                  : "text-pixel-peach border-transparent hover:bg-pixel-panel-light hover:border-pixel-gray"
+                  ? "bg-pixel-blue/20 text-pixel-blue border-pixel-blue pixel-text-shadow font-bold" 
+                  : "text-pixel-peach border-transparent hover:bg-pixel-panel-light hover:border-pixel-gray hover:text-pixel-white"
               )}
             >
-              <Icon className="w-5 h-5" />
-              <span>{item.name}</span>
+              {/* Retro pointer arrow */}
+              <span className={cn(
+                "absolute left-1.5 font-pixel text-[8px] text-pixel-yellow",
+                isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 animate-pixel-blink"
+              )}>
+                ▶
+              </span>
+
+              <Icon className={cn("w-5 h-5 ml-2 shrink-0 group-hover:scale-110", isActive && "text-pixel-blue")} />
+              <span className="truncate">{item.name}</span>
             </Link>
           )
         })}

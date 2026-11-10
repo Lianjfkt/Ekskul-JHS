@@ -5,6 +5,7 @@ import AppRouter from './routes/AppRouter'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { PixelToastContainer } from './components/ui/pixel-toast'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,6 +32,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AppRouter />
+        <PixelToastContainer />
         <Analytics />
         <SpeedInsights />
       </BrowserRouter>

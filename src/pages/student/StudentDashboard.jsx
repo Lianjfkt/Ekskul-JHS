@@ -13,6 +13,7 @@ import {
   Award, Star
 } from 'lucide-react'
 import CoachEvaluationModal from '../../components/student/CoachEvaluationModal'
+import { soundManager } from '../../utils/soundEffects'
 
 function SkeletonCard() {
   return (
@@ -399,11 +400,12 @@ export default function StudentDashboard() {
  <Link
  key={enr.id}
  to={`/student/extracurriculars/${ekskul?.id}`}
- className="block bg-pixel-panel rounded-none p-5 shadow-pixel-sm border border-violet-50 hover:brightness-110 hover:border-violet-200 group"
+ onClick={() => soundManager.playBlip()}
+ className="block pixel-box pixel-card-interactive p-5 group"
  >
  <div className="flex items-start justify-between mb-3">
  <div>
- <h3 className="font-bold text-pixel-white group-hover:text-violet-700 line-clamp-1">
+ <h3 className="font-bold text-pixel-white group-hover:text-pixel-blue line-clamp-1">
  {ekskul?.name}
  </h3>
  <p className="text-xs text-pixel-lavender flex items-center gap-1 mt-0.5">
@@ -474,16 +476,16 @@ export default function StudentDashboard() {
  <p className="text-pixel-lavender text-sm">Tidak ada sesi latihan minggu ini 🎉</p>
  </div>
  ) : (
- <div className="bg-pixel-panel rounded-none shadow-pixel-sm border border-violet-50 divide-y divide-slate-50 overflow-hidden">
+ <div className="pixel-box divide-y-2 divide-pixel-gray/40 overflow-hidden">
  {upcomingSessions.map(session => {
  const date = new Date(session.session_date)
  const dayName = date.toLocaleDateString('id-ID', { weekday: 'long' })
  const dateStr = date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
  return (
- <div key={session.id} className="flex items-center gap-4 p-4">
- <div className="w-10 h-10 rounded-none bg-violet-100 flex flex-col items-center justify-center shrink-0">
- <span className="text-xs text-pixel-purple font-bold leading-none">{date.getDate()}</span>
- <span className="text-[9px] text-pixel-purple">{date.toLocaleDateString('id-ID', { month: 'short' })}</span>
+ <div key={session.id} className="flex items-center gap-4 p-4 hover:bg-pixel-navy/30 transition-colors">
+ <div className="w-10 h-10 rounded-none bg-pixel-purple/30 border-2 border-pixel-purple flex flex-col items-center justify-center shrink-0">
+ <span className="font-pixel text-[10px] text-pixel-yellow leading-none">{date.getDate()}</span>
+ <span className="text-[9px] text-pixel-peach uppercase font-retro">{date.toLocaleDateString('id-ID', { month: 'short' })}</span>
  </div>
  <div className="flex-1 min-w-0">
  <p className="font-retro text-lg text-pixel-white truncate">

@@ -23,6 +23,8 @@ import { jsPDF } from 'jspdf'
 import 'jspdf-autotable'
 import { addKopSuratToPDF } from '../../utils/pdfHelper'
 import * as XLSX from 'xlsx'
+import { toast } from '@/stores/toastStore'
+import { soundManager } from '@/utils/soundEffects'
 
 
 export default function AdminDashboard() {
@@ -185,7 +187,8 @@ export default function AdminDashboard() {
       if (error) throw error;
       
       if (!targetUsers || targetUsers.length === 0) {
-        alert(`Siswa ${studentName} atau Orang Tua belum memiliki akun di sistem.`);
+        soundManager.playError();
+        toast.warning(`Siswa ${studentName} atau Orang Tua belum memiliki akun di sistem.`);
         return;
       }
       
@@ -198,10 +201,12 @@ export default function AdminDashboard() {
       const { error: insertError } = await supabase.from('notifications').insert(notifications)
       
       if (insertError) throw insertError;
-      alert(`Pengingat berhasil dikirim ke ${targetUsers.length} akun terkait.`);
+      soundManager.playSuccess();
+      toast.success(`Pengingat berhasil dikirim ke ${targetUsers.length} akun terkait.`);
     } catch (err) {
       console.error(err)
-      alert('Gagal mengirim pengingat: ' + err.message);
+      soundManager.playError();
+      toast.error('Gagal mengirim pengingat: ' + err.message);
     }
   }
 

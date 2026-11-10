@@ -38,6 +38,8 @@ import {
 import { saveAs } from 'file-saver'
 import { addKopSuratToPDF } from '../../utils/pdfHelper'
 import { isSessionApplicableToStudent, evaluateAttendanceRisk } from '../../utils/attendanceRiskEngine'
+import { toast } from '@/stores/toastStore'
+import { soundManager } from '@/utils/soundEffects'
 import {
  ResponsiveContainer,
  BarChart,
@@ -935,7 +937,8 @@ export default function RecapManagement() {
  const copyAllToWhatsApp = () => {
   const problematicRows = fillTrackingRows.filter(r => r.status !== 'completed')
   if (problematicRows.length === 0) {
-   alert('Semua ekskul sudah melengkapi sesi dan absensi!')
+   soundManager.playBlip()
+   toast.info('Semua ekskul sudah melengkapi sesi dan absensi!')
    return
   }
   
@@ -959,7 +962,8 @@ export default function RecapManagement() {
   text += `\nMohon para pelatih terkait segera melengkapinya di aplikasi. Terima kasih.`
   
   navigator.clipboard.writeText(text)
-  alert('Format laporan WhatsApp berhasil disalin!')
+  soundManager.playCoin()
+  toast.success('Format laporan WhatsApp berhasil disalin!', 'Tersalin')
  }
 
  const copySingleToWhatsApp = (row) => {
@@ -979,7 +983,8 @@ export default function RecapManagement() {
   text += `\nSilakan melengkapi data tersebut melalui portal pelatih. Terima kasih!`
   
   navigator.clipboard.writeText(text)
-  alert(`Pesan pengingat untuk ${row.name} berhasil disalin!`)
+  soundManager.playCoin()
+  toast.success(`Pesan pengingat untuk ${row.name} berhasil disalin!`, 'Tersalin')
  }
 
  const exportGradesToExcel = () => {
@@ -1269,7 +1274,8 @@ export default function RecapManagement() {
 
   const targetPeriod = selectedMonth || availablePeriods[0]
   if (!targetPeriod) {
-   alert("Tidak ada periode absensi pelatih yang tersedia.")
+   soundManager.playError()
+   toast.warning("Tidak ada periode absensi pelatih yang tersedia.")
    return
   }
 
@@ -1316,7 +1322,8 @@ export default function RecapManagement() {
 
   const reportRows = Object.values(groups).sort((a, b) => a.coachName.localeCompare(b.coachName))
   if (reportRows.length === 0) {
-   alert("Tidak ada data kehadiran pelatih pada periode ini.")
+   soundManager.playBlip()
+   toast.info("Tidak ada data kehadiran pelatih pada periode ini.")
    return
   }
 
