@@ -156,7 +156,7 @@ export default function StudentGrades() {
  <span className="text-pixel-peach">Sikap</span>
  <span className="font-semibold text-pixel-white">{g.attitude_score}</span>
  </div>
- <div className="h-1.5 w-full bg-slate-100 rounded-none overflow-hidden">
+ <div className="h-1.5 w-full bg-pixel-navy rounded-none overflow-hidden border border-pixel-gray/40">
  <div className="h-full bg-violet-400 rounded-none" style={{ width: `${g.attitude_score}%` }}></div>
  </div>
 
@@ -164,7 +164,7 @@ export default function StudentGrades() {
  <span className="text-pixel-peach">Keterampilan</span>
  <span className="font-semibold text-pixel-white">{g.skill_score}</span>
  </div>
- <div className="h-1.5 w-full bg-slate-100 rounded-none overflow-hidden">
+ <div className="h-1.5 w-full bg-pixel-navy rounded-none overflow-hidden border border-pixel-gray/40">
  <div className="h-full bg-cyan-400 rounded-none" style={{ width: `${g.skill_score}%` }}></div>
  </div>
 
@@ -172,7 +172,7 @@ export default function StudentGrades() {
  <span className="text-pixel-peach">Keaktifan</span>
  <span className="font-semibold text-pixel-white">{g.activity_score}</span>
  </div>
- <div className="h-1.5 w-full bg-slate-100 rounded-none overflow-hidden">
+ <div className="h-1.5 w-full bg-pixel-navy rounded-none overflow-hidden border border-pixel-gray/40">
  <div className="h-full bg-amber-400 rounded-none" style={{ width: `${g.activity_score}%` }}></div>
  </div>
  </div>

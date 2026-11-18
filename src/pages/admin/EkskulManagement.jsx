@@ -389,9 +389,9 @@ export default function EkskulManagement() {
 
       {/* --- MODAL TAMBAH/EDIT EKSKUL --- */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="pixel-box bg-pixel-panel w-full max-w-md overflow-hidden pixel-slide-in">
-            <div className="flex justify-between items-center px-6 py-4 border-b-3 border-pixel-gray bg-pixel-navy">
+        <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+          <div className="pixel-box bg-pixel-panel w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden pixel-slide-in">
+            <div className="flex justify-between items-center px-6 py-4 border-b-3 border-pixel-gray bg-pixel-navy shrink-0">
               <h3 className="font-pixel text-[9px] text-pixel-blue pixel-text-shadow leading-relaxed">
                 {selectedEkskul ? 'UBAH EKSKUL' : 'EKSKUL BARU'}
               </h3>
@@ -399,7 +399,7 @@ export default function EkskulManagement() {
                 <X className="w-4 h-4" />
               </Button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
               <div className="space-y-2">
                 <Label htmlFor="e_name">Nama Ekstrakurikuler</Label>
                 <Input
@@ -522,7 +522,7 @@ export default function EkskulManagement() {
                 <Label htmlFor="e_active" className="cursor-pointer select-none">Ekstrakurikuler Aktif</Label>
               </div>
 
-              <div className="pt-4 border-t-2 border-pixel-gray/30 flex justify-end gap-2">
+              <div className="pt-4 border-t-2 border-pixel-gray/30 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel py-3 z-10 shadow-pixel-sm">
                 <Button type="button" onClick={() => setIsModalOpen(false)} variant="outline">BATAL</Button>
                 <Button type="submit">SIMPAN</Button>
               </div>

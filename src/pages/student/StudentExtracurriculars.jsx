@@ -245,13 +245,13 @@ export default function StudentExtracurriculars() {
  {loading ? (
  <div className="space-y-3">
  {[1, 2, 3].map(i => (
- <div key={i} className="bg-pixel-panel rounded-none p-5 shadow-pixel-sm border border-violet-50 animate-pulse">
+ <div key={i} className="bg-pixel-panel rounded-none p-5 shadow-pixel-sm border border-pixel-gray/40 animate-pulse">
  <div className="flex items-start gap-4">
- <div className="w-12 h-12 rounded-none bg-slate-200"></div>
+ <div className="w-12 h-12 rounded-none bg-pixel-panel-light border border-pixel-gray/30"></div>
  <div className="flex-1 space-y-2">
- <div className="h-4 bg-slate-200 rounded w-1/2"></div>
- <div className="h-3 bg-slate-100 rounded w-3/4"></div>
- <div className="h-3 bg-slate-100 rounded w-1/3"></div>
+ <div className="h-4 bg-pixel-panel-light rounded-none border border-pixel-gray/30 w-1/2"></div>
+ <div className="h-3 bg-pixel-panel-light/70 rounded-none w-3/4"></div>
+ <div className="h-3 bg-pixel-panel-light/50 rounded-none w-1/3"></div>
  </div>
  </div>
  </div>
@@ -341,9 +341,9 @@ export default function StudentExtracurriculars() {
 
  {/* --- MODAL DAFTAR EKSKUL & DATA DIRI --- */}
  {isModalOpen && (
- <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
- <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-lg overflow-hidden my-8 pixel-slide-in">
- <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy">
+ <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+ <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden pixel-slide-in">
+ <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy shrink-0">
  <h3 className="font-bold text-pixel-white text-lg flex items-center gap-2">
  <Award className="w-5 h-5 text-pixel-purple" />
  Pendaftaran & Pembaruan Data Diri
@@ -353,11 +353,11 @@ export default function StudentExtracurriculars() {
  </Button>
  </div>
  
- <form onSubmit={handleSubmitRegistration} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+ <form onSubmit={handleSubmitRegistration} className="p-6 space-y-4 overflow-y-auto flex-1">
  
  {/* Form Data Diri Siswa */}
- <div className="space-y-4 bg-violet-50/40 p-4 rounded-none border border-violet-100">
- <h4 className="text-sm font-bold text-violet-800 uppercase tracking-wider">Lengkapi Data Diri Anda</h4>
+ <div className="space-y-4 bg-pixel-navy/80 p-4 rounded-none border border-pixel-blue/30">
+ <h4 className="text-sm font-bold text-pixel-blue uppercase tracking-wider">Lengkapi Data Diri Anda</h4>
  
  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
  <div className="space-y-1.5">
@@ -426,7 +426,7 @@ export default function StudentExtracurriculars() {
  <div className="space-y-1.5">
  <Label htmlFor="ekskul_select" className="text-pixel-peach">Ekstrakurikuler yang Diminati</Label>
  {availableEkskuls.length === 0 ? (
- <div className="p-3 bg-slate-100 rounded-none text-pixel-lavender text-sm text-center">
+ <div className="p-3 bg-pixel-navy rounded-none border border-pixel-gray/40 text-pixel-lavender text-sm text-center">
  Anda sudah terdaftar atau mengajukan semua ekstrakurikuler yang tersedia.
  </div>
  ) : (
@@ -473,7 +473,7 @@ export default function StudentExtracurriculars() {
  </div>
  </div>
 
- <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2">
+ <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel py-3 z-10 shadow-pixel-sm">
  <Button type="button" onClick={() => setIsModalOpen(false)} variant="outline">
  Batal
  </Button>

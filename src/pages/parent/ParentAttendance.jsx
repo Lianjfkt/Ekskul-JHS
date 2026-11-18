@@ -210,11 +210,11 @@ export default function ParentAttendance() {
  )}
  </div>
  
- <div className="bg-pixel-panel rounded-none p-5 shadow-pixel-sm border border-violet-50">
+ <div className="bg-pixel-panel rounded-none p-5 shadow-pixel-sm border border-pixel-gray/40">
  <h3 className="text-sm font-bold text-pixel-peach mb-4">Statistik Total</h3>
  {attLoading ? (
  <div className="space-y-3">
- {[1,2,3,4].map(i => <div key={i} className="h-10 bg-slate-100 rounded-none animate-pulse"></div>)}
+ {[1,2,3,4].map(i => <div key={i} className="h-10 bg-pixel-panel-light border border-pixel-gray/30 rounded-none animate-pulse"></div>)}
  </div>
  ) : (
  <div className="space-y-3">

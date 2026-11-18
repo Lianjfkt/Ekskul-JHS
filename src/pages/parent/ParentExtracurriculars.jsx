@@ -74,13 +74,13 @@ export default function ParentExtracurriculars() {
  {loading ? (
  <div className="space-y-3">
  {[1,2,3].map(i => (
- <div key={i} className="bg-pixel-panel rounded-none p-5 shadow-pixel-sm border border-violet-50 animate-pulse">
+ <div key={i} className="bg-pixel-panel rounded-none p-5 shadow-pixel-sm border border-pixel-gray/40 animate-pulse">
  <div className="flex items-start gap-4">
- <div className="w-12 h-12 rounded-none bg-slate-200"></div>
+ <div className="w-12 h-12 rounded-none bg-pixel-panel-light border border-pixel-gray/30"></div>
  <div className="flex-1 space-y-2">
- <div className="h-4 bg-slate-200 rounded w-1/2"></div>
- <div className="h-3 bg-slate-100 rounded w-3/4"></div>
- <div className="h-3 bg-slate-100 rounded w-1/3"></div>
+ <div className="h-4 bg-pixel-panel-light rounded-none border border-pixel-gray/30 w-1/2"></div>
+ <div className="h-3 bg-pixel-panel-light/70 rounded-none w-3/4"></div>
+ <div className="h-3 bg-pixel-panel-light/50 rounded-none w-1/3"></div>
  </div>
  </div>
  </div>

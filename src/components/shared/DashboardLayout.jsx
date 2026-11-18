@@ -43,7 +43,7 @@ export default function DashboardLayout() {
       <div className="flex flex-col flex-1 w-full overflow-hidden">
         <Navbar onMenuClick={toggleSidebar} />
         
-        <main className={`flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 ${hasBottomNav ? 'pb-28 lg:pb-8' : ''}`}>
+        <main className={`flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 ${hasBottomNav ? 'pb-32 lg:pb-8' : ''}`}>
           <div className="mx-auto max-w-7xl h-full">
             {/* The routed components will be rendered here */}
             <Outlet />

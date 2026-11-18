@@ -15,28 +15,28 @@ export default function PreviewTable({ rows = [], errorIndices = new Set(), upda
   const preview = rows.slice(0, maxRows)
 
   return (
-    <div className="rounded-xl border border-slate-200 overflow-hidden text-sm">
+    <div className="rounded-none border-2 border-pixel-gray bg-pixel-panel overflow-hidden text-sm">
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-slate-100 text-slate-600">
-              <th className="px-3 py-2.5 text-left font-semibold text-xs uppercase tracking-wider border-b border-slate-200 w-10">
+            <tr className="bg-pixel-navy text-pixel-white font-retro text-base border-b-2 border-pixel-gray">
+              <th className="px-3 py-2.5 text-left font-semibold text-xs uppercase tracking-wider border-b-2 border-pixel-gray text-pixel-lavender w-10">
                 #
               </th>
               {cols.map((col) => (
                 <th
                   key={col}
-                  className="px-3 py-2.5 text-left font-semibold text-xs uppercase tracking-wider border-b border-slate-200 whitespace-nowrap"
+                  className="px-3 py-2.5 text-left font-semibold text-xs uppercase tracking-wider border-b-2 border-pixel-gray text-pixel-lavender whitespace-nowrap"
                 >
                   {col.replace(/_/g, ' ')}
                 </th>
               ))}
-              <th className="px-3 py-2.5 text-left font-semibold text-xs uppercase tracking-wider border-b border-slate-200 w-24">
+              <th className="px-3 py-2.5 text-left font-semibold text-xs uppercase tracking-wider border-b-2 border-pixel-gray text-pixel-lavender w-24">
                 Status
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y-2 divide-pixel-gray/30 font-retro text-base text-pixel-peach">
             {preview.map((row, idx) => {
               const isError = errorIndices.has(idx)
               const isUpdate = updateIndices.has(idx)
@@ -46,33 +46,33 @@ export default function PreviewTable({ rows = [], errorIndices = new Set(), upda
                   key={idx}
                   className={`
                     transition-colors
-                    ${isError ? 'bg-red-50 hover:bg-red-100/70' : ''}
-                    ${isUpdate && !isError ? 'bg-amber-50 hover:bg-amber-100/70' : ''}
-                    ${!isError && !isUpdate ? 'hover:bg-slate-50' : ''}
+                    ${isError ? 'bg-pixel-red/20 hover:bg-pixel-red/30' : ''}
+                    ${isUpdate && !isError ? 'bg-pixel-yellow/15 hover:bg-pixel-yellow/25' : ''}
+                    ${!isError && !isUpdate ? 'hover:bg-pixel-navy/60' : ''}
                   `}
                 >
-                  <td className="px-3 py-2 text-slate-400 font-mono text-xs">{idx + 2}</td>
+                  <td className="px-3 py-2 text-pixel-lavender/70 font-mono text-xs">{idx + 2}</td>
                   {cols.map((col) => (
-                    <td key={col} className={`px-3 py-2 ${isError ? 'text-red-700' : 'text-slate-700'}`}>
+                    <td key={col} className={`px-3 py-2 ${isError ? 'text-pixel-red' : 'text-pixel-white'}`}>
                       <span className="max-w-[180px] block truncate" title={row[col]}>
                         {row[col] !== undefined && row[col] !== '' ? String(row[col]) : (
-                          <span className="text-slate-300 italic">—</span>
+                          <span className="text-pixel-lavender/40 italic">—</span>
                         )}
                       </span>
                     </td>
                   ))}
                   <td className="px-3 py-2">
                     {isError ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-                        ❌ Error
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-none text-[8px] font-pixel bg-pixel-red/20 border border-pixel-red text-pixel-red">
+                        ERR
                       </span>
                     ) : isUpdate ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                        🔄 Update
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-none text-[8px] font-pixel bg-pixel-yellow/20 border border-pixel-yellow text-pixel-yellow">
+                        UPD
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-                        ✅ Baru
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-none text-[8px] font-pixel bg-pixel-green/20 border border-pixel-green text-pixel-green">
+                        BARU
                       </span>
                     )}
                   </td>
@@ -84,7 +84,7 @@ export default function PreviewTable({ rows = [], errorIndices = new Set(), upda
       </div>
 
       {rows.length > maxRows && (
-        <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 text-center">
+        <div className="px-4 py-2.5 bg-pixel-navy/80 border-t-2 border-pixel-gray text-xs font-retro text-pixel-lavender text-center">
           Menampilkan {maxRows} dari {rows.length} baris. Semua baris akan divalidasi dan diproses.
         </div>
       )}

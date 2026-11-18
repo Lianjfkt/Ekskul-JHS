@@ -959,6 +959,12 @@ export default function UsersManagement() {
  <>
  {/* TAB SISWA */}
  {activeTab === 'siswa' && (
+ <div>
+ <div className="sm:hidden flex items-center justify-center gap-2 px-3 py-1.5 bg-pixel-navy/80 border-b border-pixel-gray/30 text-pixel-lavender">
+ <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">◀</span>
+ <span className="font-retro text-sm tracking-wider">GESER TABEL</span>
+ <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">▶</span>
+ </div>
  <div className="overflow-x-auto">
  <table className="w-full text-left border-collapse">
  <thead>
@@ -1002,10 +1008,17 @@ export default function UsersManagement() {
  </tbody>
  </table>
  </div>
+ </div>
  )}
 
  {/* TAB MASTER */}
  {activeTab === 'master' && (
+ <div>
+ <div className="sm:hidden flex items-center justify-center gap-2 px-3 py-1.5 bg-pixel-navy/80 border-b border-pixel-gray/30 text-pixel-lavender">
+ <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">◀</span>
+ <span className="font-retro text-sm tracking-wider">GESER TABEL</span>
+ <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">▶</span>
+ </div>
  <div className="overflow-x-auto">
  <table className="w-full text-left border-collapse">
  <thead>
@@ -1043,10 +1056,17 @@ export default function UsersManagement() {
  </tbody>
  </table>
  </div>
+ </div>
  )}
 
  {/* TAB PELATIH */}
  {activeTab === 'pelatih' && (
+ <div>
+  <div className="sm:hidden flex items-center justify-center gap-2 px-3 py-1.5 bg-pixel-navy/80 border-b border-pixel-gray/30 text-pixel-lavender">
+ <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">◀</span>
+ <span className="font-retro text-sm tracking-wider">GESER TABEL</span>
+ <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">▶</span>
+ </div>
  <div className="overflow-x-auto">
  <table className="w-full text-left border-collapse">
  <thead>
@@ -1082,10 +1102,17 @@ export default function UsersManagement() {
  </tbody>
  </table>
  </div>
+ </div>
  )}
 
  {/* TAB WALI MURID */}
  {activeTab === 'parent' && (
+ <div>
+  <div className="sm:hidden flex items-center justify-center gap-2 px-3 py-1.5 bg-pixel-navy/80 border-b border-pixel-gray/30 text-pixel-lavender">
+ <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">◀</span>
+ <span className="font-retro text-sm tracking-wider">GESER TABEL</span>
+ <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">▶</span>
+ </div>
  <div className="overflow-x-auto">
  <table className="w-full text-left border-collapse">
  <thead>
@@ -1127,10 +1154,17 @@ export default function UsersManagement() {
  </tbody>
  </table>
  </div>
+ </div>
  )}
 
  {/* TAB SEMUA AKUN */}
  {activeTab === 'semua' && (
+ <div>
+  <div className="sm:hidden flex items-center justify-center gap-2 px-3 py-1.5 bg-pixel-navy/80 border-b border-pixel-gray/30 text-pixel-lavender">
+ <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">◀</span>
+ <span className="font-retro text-sm tracking-wider">GESER TABEL</span>
+ <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">▶</span>
+ </div>
  <div className="overflow-x-auto">
  <table className="w-full text-left border-collapse">
  <thead>
@@ -1192,6 +1226,7 @@ export default function UsersManagement() {
  </tbody>
  </table>
  </div>
+ </div>
  )}
  </>
  )}
@@ -1200,9 +1235,9 @@ export default function UsersManagement() {
 
  {/* --- MODAL TAMBAH/EDIT SISWA --- */}
  {isStudentModalOpen && (
- <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
- <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-md overflow-hidden pixel-slide-in">
- <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy">
+ <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+ <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden pixel-slide-in">
+ <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy shrink-0">
  <h3 className="font-bold text-pixel-white text-lg">
  {selectedStudent ? 'Ubah Data Siswa' : 'Tambah Siswa Baru'}
  </h3>
@@ -1216,7 +1251,7 @@ export default function UsersManagement() {
  <span>{studentModalError}</span>
  </div>
  )}
- <form onSubmit={handleStudentSubmit} className="p-6 space-y-4">
+ <form onSubmit={handleStudentSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
  <div className="space-y-1.5">
  <Label htmlFor="nis">Nomor Induk Siswa (NIS)</Label>
  <Input
@@ -1296,7 +1331,7 @@ export default function UsersManagement() {
  </div>
  </div>
  </div>
- <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2">
+ <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel py-3 z-10 shadow-pixel-sm">
  <Button type="button" onClick={() => { setIsStudentModalOpen(false); setStudentModalError('') }} variant="outline" disabled={studentSubmitLoading}>Batal</Button>
  <Button type="submit" disabled={studentSubmitLoading}>
  {studentSubmitLoading ? 'Menyimpan...' : 'Simpan'}
@@ -1309,9 +1344,9 @@ export default function UsersManagement() {
 
  {/* --- MODAL TAMBAH/EDIT AKUN (COACH/PARENT/STUDENT) --- */}
  {isUserModalOpen && (
- <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
- <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-md overflow-hidden pixel-slide-in">
- <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy">
+ <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+ <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden pixel-slide-in">
+ <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy shrink-0">
  <h3 className="font-bold text-pixel-white text-lg">
  {selectedUser ? 'Ubah' : 'Daftar'} Akun {userForm.role === 'coach' ? 'Pelatih' : userForm.role === 'parent' ? 'Wali Murid' : 'Siswa'} {selectedUser ? '' : 'Baru'}
  </h3>
@@ -1325,7 +1360,7 @@ export default function UsersManagement() {
  <span>{userModalError}</span>
  </div>
  )}
- <form onSubmit={handleUserSubmit} className="p-6 space-y-4">
+ <form onSubmit={handleUserSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
  <div className="space-y-1.5">
  <Label htmlFor="u_name">Nama Lengkap</Label>
  <Input
@@ -1379,7 +1414,7 @@ export default function UsersManagement() {
  </div>
  )}
 
- <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2">
+ <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel py-3 z-10 shadow-pixel-sm">
  <Button type="button" onClick={() => { setIsUserModalOpen(false); setUserModalError('') }} variant="outline" disabled={userSubmitLoading}>Batal</Button>
  <Button type="submit" disabled={userSubmitLoading}>
  {userSubmitLoading ? 'Menyimpan...' : (selectedUser ? 'Simpan' : 'Daftarkan Akun')}
@@ -1392,9 +1427,9 @@ export default function UsersManagement() {
 
  {/* --- MODAL DATA MASTER SISWA --- */}
  {isMasterModalOpen && (
- <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
- <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-md overflow-hidden pixel-slide-in">
- <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy">
+ <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+ <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden pixel-slide-in">
+ <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy shrink-0">
  <h3 className="font-bold text-pixel-white text-lg">
  {selectedMaster ? 'Ubah Data Acuan Siswa' : 'Tambah Data Acuan Siswa Baru'}
  </h3>
@@ -1402,7 +1437,7 @@ export default function UsersManagement() {
  <X className="w-4 h-4" />
  </Button>
  </div>
- <form onSubmit={handleMasterSubmit} className="p-6 space-y-4">
+ <form onSubmit={handleMasterSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
  <div className="space-y-1.5">
  <Label htmlFor="m_nis">NIS</Label>
  <Input
@@ -1456,7 +1491,7 @@ export default function UsersManagement() {
  />
  </div>
 
- <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2">
+ <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel py-3 z-10 shadow-pixel-sm">
  <Button type="button" onClick={() => setIsMasterModalOpen(false)} variant="outline">Batal</Button>
  <Button type="submit">{selectedMaster ? 'Simpan' : 'Tambah'}</Button>
  </div>
@@ -1475,9 +1510,9 @@ export default function UsersManagement() {
 
  {/* --- MODAL STANDARISASI & EKSPOR AKUN SISWA --- */}
  {isStandardizeModalOpen && (
-   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-xs">
-     <div className="bg-pixel-panel rounded-none shadow-pixel-lg border-2 border-pixel-yellow w-full max-w-lg overflow-hidden pixel-slide-in">
-       <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/40 bg-pixel-navy">
+   <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+     <div className="bg-pixel-panel rounded-none shadow-pixel-lg border-2 border-pixel-yellow w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden pixel-slide-in">
+       <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/40 bg-pixel-navy shrink-0">
          <div className="flex items-center gap-2">
            <KeyRound className="w-5 h-5 text-pixel-yellow" />
            <h3 className="font-pixel text-xs text-pixel-white tracking-wide">
@@ -1489,7 +1524,7 @@ export default function UsersManagement() {
          </Button>
        </div>
 
-       <div className="p-6 space-y-5">
+       <div className="p-6 space-y-5 overflow-y-auto flex-1">
          <div className="bg-pixel-navy/80 border border-pixel-gray/40 p-4 space-y-2 text-xs font-retro text-pixel-peach">
            <p className="font-semibold text-pixel-white text-sm">
              💡 Format Standarisasi Akun Login:
@@ -1537,7 +1572,7 @@ export default function UsersManagement() {
            </div>
          )}
 
-         <div className="pt-4 border-t border-pixel-gray/30 flex flex-col sm:flex-row justify-end gap-2">
+         <div className="pt-4 border-t border-pixel-gray/30 flex flex-col sm:flex-row justify-end gap-2 sticky bottom-0 bg-pixel-panel py-3 z-10 shadow-pixel-sm">
            <Button
              type="button"
              variant="outline"

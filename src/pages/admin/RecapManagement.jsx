@@ -2967,9 +2967,9 @@ export default function RecapManagement() {
 
    {/* ═══ Modal: Detail Sesi Pelatih ════════════════════════════════════════ */}
    {selectedSessionGroup && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-     <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-2xl overflow-hidden pixel-slide-in">
-      <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy">
+    <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+     <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden pixel-slide-in">
+      <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy shrink-0">
        <div>
         <h3 className="font-bold text-pixel-white text-lg flex items-center gap-2">
          <BookOpen className="w-5 h-5 text-pixel-blue" />

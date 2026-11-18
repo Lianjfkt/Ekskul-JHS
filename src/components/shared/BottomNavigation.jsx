@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { soundManager } from '../../utils/soundEffects'
@@ -49,7 +49,22 @@ export default function BottomNavigation() {
   const { role } = useAuthStore()
   const location = useLocation()
   const [pressedPath, setPressedPath] = useState(null)
+  const [hasModalOpen, setHasModalOpen] = useState(false)
   const timeoutRef = useRef(null)
+
+  // Automatically hide floating nav when any modal or dialog is open in the DOM
+  useEffect(() => {
+    const checkModal = () => {
+      const modal = document.querySelector('.fixed.inset-0.z-\\[60\\], .fixed.inset-0.z-60, [data-modal="true"], [role="dialog"]')
+      setHasModalOpen(!!modal)
+    }
+
+    const observer = new MutationObserver(checkModal)
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+    checkModal()
+
+    return () => observer.disconnect()
+  }, [])
 
   const currentMenu = MENUS[role] || []
   if (!currentMenu.length) return null
@@ -66,7 +81,10 @@ export default function BottomNavigation() {
      * Wrapper: full-width, transparent, pointer-events-none so taps on
      * the transparent area pass through to content underneath.
      */
-    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center items-end pb-4 px-3 lg:hidden pointer-events-none">
+    <div className={cn(
+      "fixed bottom-0 left-0 right-0 z-30 flex justify-center items-end pb-4 px-3 lg:hidden pointer-events-none transition-all duration-200",
+      hasModalOpen ? "opacity-0 translate-y-12 pointer-events-none" : "opacity-100 translate-y-0"
+    )}>
       {/*
        * The floating pill container — styled faithfully like Picture 2:
        *   • Dark pill container

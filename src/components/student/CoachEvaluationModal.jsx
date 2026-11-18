@@ -112,10 +112,10 @@ export default function CoachEvaluationModal({
   const coachName = coach?.full_name || extracurricular?.coach?.full_name || 'Pelatih Ekskul'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-      <div className="bg-pixel-panel border-4 border-pixel-blue rounded-none shadow-pixel-lg w-full max-w-lg overflow-hidden pixel-slide-in">
+    <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+      <div className="bg-pixel-panel border-4 border-pixel-blue rounded-none shadow-pixel-lg w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden pixel-slide-in">
         {/* Header */}
-        <div className="flex justify-between items-center px-6 py-4 bg-pixel-navy border-b-2 border-pixel-gray/40">
+        <div className="flex justify-between items-center px-6 py-4 bg-pixel-navy border-b-2 border-pixel-gray/40 shrink-0">
           <div className="flex items-center gap-2">
             <Award className="w-5 h-5 text-pixel-yellow" />
             <h3 className="font-pixel text-xs text-pixel-white tracking-wide">
@@ -133,7 +133,7 @@ export default function CoachEvaluationModal({
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">
           {/* Info Card */}
           <div className="bg-pixel-navy/70 border border-pixel-gray/40 p-4 space-y-1">
             <div className="text-[10px] font-pixel uppercase tracking-widest text-pixel-peach">
@@ -234,7 +234,7 @@ export default function CoachEvaluationModal({
           )}
 
           {/* Footer Actions */}
-          <div className="pt-2 flex justify-end gap-2">
+          <div className="pt-4 border-t border-pixel-gray/40 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel py-3 z-10 shadow-pixel-sm">
             <Button
               type="button"
               variant="outline"

@@ -684,7 +684,14 @@ export default function ComplianceManagement() {
               <p className="text-base text-pixel-lavender/70 mt-1">Semua siswa mengikuti program dengan tertib sesuai filter saat ini.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div>
+              {/* Mobile scroll hint */}
+              <div className="sm:hidden flex items-center justify-center gap-2 px-3 py-1.5 bg-pixel-navy/80 border-b border-pixel-gray/30 text-pixel-lavender">
+                <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">◀</span>
+                <span className="font-retro text-sm tracking-wider">GESER TABEL</span>
+                <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">▶</span>
+              </div>
+              <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse font-retro text-lg">
                 <thead>
                   <tr className="border-b-3 border-pixel-gray bg-pixel-navy font-pixel text-[7px] text-pixel-lavender uppercase tracking-wider">
@@ -864,13 +871,14 @@ export default function ComplianceManagement() {
                 </tbody>
               </table>
             </div>
+          </div>
           )}
         </CardContent>
       </Card>
 
       {/* Modal Detail Absensi */}
       {selectedAbsenceDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+        <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
           <div className="w-full max-w-2xl bg-pixel-panel border-4 border-pixel-gray rounded-none shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
             {/* Header */}
             <div className="bg-pixel-navy border-b-4 border-pixel-gray p-4 flex justify-between items-center shrink-0">

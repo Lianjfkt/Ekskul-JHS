@@ -481,9 +481,9 @@ export default function EnrollmentManagement() {
 
  {/* --- MODAL DAFTARKAN SISWA --- */}
  {isModalOpen && (
- <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
- <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-md overflow-hidden pixel-slide-in">
- <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy">
+ <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+ <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden pixel-slide-in">
+ <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy shrink-0">
  <h3 className="font-bold text-pixel-white text-lg flex items-center gap-2">
  <BookOpen className="w-5 h-5 text-primary" />
  Pendaftaran Baru
@@ -492,7 +492,7 @@ export default function EnrollmentManagement() {
  <X className="w-4 h-4" />
  </Button>
  </div>
- <form onSubmit={handleSubmit} className="p-6 space-y-4">
+ <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
  
  {/* Autocomplete Input untuk Cari Siswa */}
  <div className="space-y-1.5 relative">
@@ -584,7 +584,7 @@ export default function EnrollmentManagement() {
  </div>
  </div>
 
- <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2">
+ <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel py-3 z-10 shadow-pixel-sm">
  <Button type="button" onClick={() => setIsModalOpen(false)} variant="outline">Batal</Button>
  <Button type="submit">Daftarkan</Button>
  </div>

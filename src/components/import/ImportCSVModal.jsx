@@ -204,7 +204,7 @@ export default function ImportCSVModal({ isOpen, onClose, type = 'students', onS
     : 'Format: .csv / .xlsx dengan kolom nis, extracurricular_name, semester, academic_year'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
+    <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4" onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
       <div className="pixel-box bg-pixel-panel w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden pixel-slide-in">
 
         {/* Header */}

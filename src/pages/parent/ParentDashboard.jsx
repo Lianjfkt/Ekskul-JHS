@@ -13,11 +13,11 @@ import { enrichGradeStats } from '../../utils/gradeUtils'
 
 function SkeletonCard() {
  return (
- <div className="bg-pixel-panel rounded-none p-5 shadow-pixel-sm border border-violet-50 animate-pulse">
- <div className="h-4 bg-slate-200 rounded w-2/3 mb-3"></div>
- <div className="h-3 bg-slate-100 rounded w-1/2 mb-4"></div>
- <div className="h-2 bg-slate-100 rounded w-full mb-2"></div>
- <div className="h-3 bg-slate-200 rounded w-1/4"></div>
+ <div className="bg-pixel-panel rounded-none p-5 shadow-pixel-sm border border-pixel-gray/40 animate-pulse">
+ <div className="h-4 bg-pixel-panel-light rounded-none border border-pixel-gray/30 w-2/3 mb-3"></div>
+ <div className="h-3 bg-pixel-panel-light/70 rounded-none w-1/2 mb-4"></div>
+ <div className="h-2 bg-pixel-navy rounded-none border border-pixel-gray/30 w-full mb-2"></div>
+ <div className="h-3 bg-pixel-panel-light rounded-none border border-pixel-gray/30 w-1/4"></div>
  </div>
  )
 }
@@ -402,7 +402,7 @@ export default function ParentDashboard() {
  <span className="text-xs text-pixel-lavender">Kehadiran Keseluruhan</span>
  <AttendanceBadge pct={pct} />
  </div>
- <div className="h-2 bg-slate-100 rounded-none overflow-hidden">
+ <div className="h-2 bg-pixel-navy rounded-none overflow-hidden border border-pixel-gray/40">
  <div
  className={`h-full rounded-none duration-500 ${progressColor(pct)}`}
  style={{ width: `${pct}%` }}
@@ -412,7 +412,7 @@ export default function ParentDashboard() {
 
  {/* Last grade */}
  {enr.lastGrade && (
- <div className="mt-3 pt-3 border-t border-slate-50 flex items-center gap-2">
+ <div className="mt-3 pt-3 border-t border-pixel-gray/30 flex items-center gap-2">
  <TrendingUp className="w-3.5 h-3.5 text-pixel-purple" />
  <span className="text-xs text-pixel-lavender">
  Nilai {enr.lastGrade.semester}:
@@ -440,17 +440,17 @@ export default function ParentDashboard() {
  Sesi Terdekat
  </h2>
  {loading ? (
- <div className="bg-pixel-panel rounded-none p-4 shadow-pixel-sm border border-violet-50 animate-pulse space-y-3">
+ <div className="bg-pixel-panel rounded-none p-4 shadow-pixel-sm border border-pixel-gray/40 animate-pulse space-y-3">
  {[1,2].map(i => (
- <div key={i} className="h-12 bg-slate-100 rounded-none"></div>
+ <div key={i} className="h-12 bg-pixel-panel-light border border-pixel-gray/30 rounded-none"></div>
  ))}
  </div>
  ) : upcomingSessions.length === 0 ? (
- <div className="bg-pixel-panel rounded-none p-6 text-center border border-violet-50 shadow-pixel-sm">
+ <div className="bg-pixel-panel rounded-none p-6 text-center border border-pixel-gray/40 shadow-pixel-sm">
  <p className="text-pixel-lavender text-sm">Tidak ada sesi latihan minggu ini.</p>
  </div>
  ) : (
- <div className="bg-pixel-panel rounded-none shadow-pixel-sm border border-violet-50 divide-y divide-slate-50 overflow-hidden">
+ <div className="bg-pixel-panel rounded-none shadow-pixel-sm border border-pixel-gray/40 divide-y-2 divide-pixel-gray/30 overflow-hidden">
  {upcomingSessions.map(session => {
  const date = new Date(session.session_date)
  const dayName = date.toLocaleDateString('id-ID', { weekday: 'long' })

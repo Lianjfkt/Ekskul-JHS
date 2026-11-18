@@ -408,7 +408,7 @@ export default function CoachSessions() {
 
  {/* --- MODAL TAMBAH/EDIT SESI --- */}
  {isModalOpen && (
- <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+ <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
  <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-pixel-pop">
  <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy sticky top-0 z-10">
  <h3 className="font-bold text-pixel-white text-lg flex items-center gap-2">
@@ -612,7 +612,7 @@ export default function CoachSessions() {
  />
  </div>
 
- <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel mt-2 py-2">
+ <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel mt-2 py-3 z-10 shadow-pixel-sm">
  <Button type="button" onClick={handleCloseModal} variant="outline">Batal</Button>
  <Button type="submit">Simpan Sesi</Button>
  </div>
