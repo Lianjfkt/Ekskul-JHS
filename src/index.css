@@ -378,4 +378,45 @@
   .pixel-table-row:hover {
     background-color: rgba(41, 173, 255, 0.08) !important;
   }
+
+  /* ===== FLOATING PILL BOTTOM NAVIGATION ===== */
+  @keyframes pill-nav-enter {
+    from { transform: translateY(80px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  @keyframes pill-nav-active-pop {
+    0%   { transform: translateY(0) scale(1); }
+    30%  { transform: translateY(-6px) scale(1.15); }
+    60%  { transform: translateY(-3px) scale(1.08); }
+    100% { transform: translateY(0) scale(1); }
+  }
+
+  @keyframes pill-nav-label-slide {
+    from { opacity: 0; max-width: 0; transform: translateX(-4px); }
+    to   { opacity: 1; max-width: 80px; transform: translateX(0); }
+  }
+
+  @keyframes pixel-glow-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(41, 173, 255, 0.5), 4px 4px 0 rgba(0,0,0,0.5); }
+    50%       { box-shadow: 0 0 0 4px rgba(41, 173, 255, 0.15), 4px 4px 0 rgba(0,0,0,0.5); }
+  }
+
+  .pill-nav-enter {
+    animation: pill-nav-enter 0.4s steps(6) forwards;
+  }
+
+  .pill-nav-active-pop {
+    animation: pill-nav-active-pop 0.3s steps(5) forwards;
+  }
+
+  .pill-nav-label-slide {
+    animation: pill-nav-label-slide 0.2s steps(4) forwards;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .pixel-glow-pulse {
+    animation: pixel-glow-pulse 1.5s steps(4) infinite;
+  }
 }
