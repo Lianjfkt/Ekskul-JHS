@@ -385,6 +385,12 @@ export default function EnrollmentManagement() {
  {loading ? (
  <div className="p-8 text-center text-pixel-lavender">Memuat data pendaftaran...</div>
  ) : (
+ <div>
+ <div className="sm:hidden flex items-center justify-center gap-2 px-3 py-1.5 bg-pixel-navy/80 border-b border-pixel-gray/30 text-pixel-lavender">
+ <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">◀</span>
+ <span className="font-retro text-sm tracking-wider">GESER TABEL</span>
+ <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">▶</span>
+ </div>
  <div className="overflow-x-auto">
  <table className="w-full text-left border-collapse">
  <thead>
@@ -474,6 +480,7 @@ export default function EnrollmentManagement() {
  )}
  </tbody>
  </table>
+ </div>
  </div>
  )}
  </CardContent>
