@@ -4,7 +4,6 @@ import Sidebar from './Sidebar'
 import Navbar from './Navbar'
 import BottomNavigation from './BottomNavigation'
 import { useAuthStore } from '../../stores/authStore'
-import { cn } from '@/lib/utils'
 
 export default function DashboardLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -24,7 +23,7 @@ export default function DashboardLayout() {
 
   return (
     <div className="flex h-screen bg-pixel-navy pixel-bg-grid overflow-hidden">
-      {/* Modern Sidebar Navigation */}
+      {/* Sidebar */}
       <Sidebar 
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)}
@@ -32,23 +31,19 @@ export default function DashboardLayout() {
         onToggleCollapse={setIsCollapsed}
       />
 
-      {/* Backdrop Overlay for mobile when sidebar drawer is open */}
+      {/* Overlay for mobile when sidebar is open */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 z-40 bg-black/75 backdrop-blur-xs lg:hidden animate-in fade-in duration-200"
+          className="fixed inset-0 z-40 bg-black/70 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Main Content Area */}
-      <div className="flex flex-col flex-1 min-w-0 h-screen overflow-hidden p-0 lg:p-3 lg:pl-3 gap-0 lg:gap-3">
+      <div className="flex flex-col flex-1 w-full overflow-hidden">
         <Navbar onMenuClick={toggleSidebar} />
         
-        <main className={cn(
-          "flex-1 overflow-y-auto p-4 sm:p-6 lg:p-6",
-          "lg:rounded-2xl border-0 lg:border-2 border-pixel-gray/40 bg-pixel-panel/30 backdrop-blur-sm shadow-inner pixel-scroll",
-          hasBottomNav ? 'pb-24 lg:pb-6' : ''
-        )}>
+        <main className={`flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 ${hasBottomNav ? 'pb-24 lg:pb-8' : ''}`}>
           <div className="mx-auto max-w-7xl h-full">
             {/* The routed components will be rendered here */}
             <Outlet />

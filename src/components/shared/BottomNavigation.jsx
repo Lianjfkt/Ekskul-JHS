@@ -34,8 +34,8 @@ export default function BottomNavigation() {
   const currentMenu = menus[role] || []
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-pixel-panel/95 backdrop-blur-md border-t-2 border-pixel-gray/50 lg:hidden z-50 pb-safe shadow-2xl">
-      <div className="flex justify-around items-center h-16 px-2">
+    <div className="fixed bottom-0 left-0 right-0 bg-pixel-panel border-t-4 border-pixel-gray lg:hidden z-50 pb-safe">
+      <div className="flex justify-around items-center h-16">
         {currentMenu.map((item) => {
           // Check if active (exact match for dashboard, startsWith for others)
           const isActive = item.path.includes('dashboard') 
