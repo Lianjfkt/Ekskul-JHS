@@ -378,4 +378,17 @@
   .pixel-table-row:hover {
     background-color: rgba(41, 173, 255, 0.08) !important;
   }
+
+  /* ===== MODERN SIDEBAR ANIMATIONS & UTILITIES ===== */
+  .sidebar-container-smooth {
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sidebar-link-smooth {
+    transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
 }

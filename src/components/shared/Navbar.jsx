@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Menu, LogOut, User as UserIcon, Bell } from 'lucide-react'
+import { Menu, LogOut, User as UserIcon } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useParentChildren } from '../../hooks/useParentChildren'
 import NotificationBell from './NotificationBell'
@@ -14,7 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { supabase } from '../../lib/supabaseClient'
-import { useState } from 'react'
+import { soundManager } from '../../utils/soundEffects'
+import { cn } from '@/lib/utils'
 
 export default function Navbar({ onMenuClick }) {
   const { user, role, fullName, studentId, logout } = useAuthStore()
@@ -45,44 +46,69 @@ export default function Navbar({ onMenuClick }) {
     }
   }, [user, role, fullName, studentId, userData, fetchChildren])
 
+  const roleDisplayName = {
+    admin: 'Admin Portal',
+    coach: 'Pelatih Portal',
+    student: 'Siswa Portal',
+    parent: 'Orang Tua Portal'
+  }[role] || `${role} Portal`
+
   return (
-    <header className="bg-pixel-panel border-b-4 border-pixel-gray h-16 flex items-center justify-between px-4 lg:px-8 shrink-0">
-      <div className="flex items-center gap-4">
+    <header className={cn(
+      "h-16 flex items-center justify-between px-4 lg:px-6 shrink-0 z-30 select-none",
+      "bg-gradient-to-r from-pixel-panel via-pixel-panel to-pixel-navy/95",
+      "border-2 border-pixel-gray/40 shadow-pixel-sm backdrop-blur-md",
+      "transition-all duration-300",
+      "lg:rounded-2xl"
+    )}>
+      {/* Left side: Hamburger (Mobile) + Title / Child Selector */}
+      <div className="flex items-center gap-3">
         <button 
-          onClick={onMenuClick}
-          className="p-2 -ml-2 mr-2 lg:hidden rounded-none text-pixel-peach hover:bg-pixel-panel-light border-2 border-transparent hover:border-pixel-gray"
+          onClick={() => {
+            soundManager.playBlip()
+            onMenuClick?.()
+          }}
+          className="p-2 -ml-1 rounded-xl lg:hidden text-pixel-peach hover:text-pixel-white hover:bg-pixel-panel-light border-2 border-transparent hover:border-pixel-gray/50 transition-colors active:scale-95"
+          title="Buka Menu"
         >
-          <Menu className="w-6 h-6" />
+          <Menu className="w-5 h-5" />
         </button>
-        <h2 className="font-pixel text-[9px] text-pixel-peach pixel-text-shadow capitalize hidden sm:block leading-relaxed">
-          {role === 'parent' ? (
-            <div className="flex items-center gap-2">
-              <span className="text-pixel-lavender font-retro text-base">Data:</span>
-              {children.length > 1 ? (
-                <Select
-                  value={selectedChild?.id || ''}
-                  onValueChange={(val) => {
-                    const child = children.find(c => c.id === val)
-                    if (child) setSelectedChild(child)
-                  }}
-                >
-                  <SelectTrigger className="h-8 border-2 border-pixel-gray bg-pixel-navy font-retro text-base w-[180px] text-pixel-blue">
-                    <SelectValue placeholder="Pilih Anak" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {children.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <span className="font-retro text-lg text-pixel-blue">{selectedChild?.full_name || '...'}</span>
-              )}
-            </div>
-          ) : (
-            `${role} Portal`
-          )}
-        </h2>
+
+        <div className="flex items-center gap-2.5">
+          {/* Glowing pulse indicator dot */}
+          <span className="w-2.5 h-2.5 rounded-full bg-pixel-blue shadow-[0_0_8px_#29ADFF] animate-pulse hidden sm:block" />
+
+          <h2 className="font-pixel text-[10px] text-pixel-peach pixel-text-shadow capitalize hidden sm:block leading-relaxed">
+            {role === 'parent' ? (
+              <div className="flex items-center gap-2">
+                <span className="text-pixel-lavender font-retro text-lg">Melihat Data:</span>
+                {children.length > 1 ? (
+                  <Select
+                    value={selectedChild?.id || ''}
+                    onValueChange={(val) => {
+                      const child = children.find(c => c.id === val)
+                      if (child) setSelectedChild(child)
+                    }}
+                  >
+                    <SelectTrigger className="h-8 border-2 border-pixel-gray/60 bg-pixel-navy rounded-xl font-retro text-base w-[180px] text-pixel-blue hover:border-pixel-blue transition-colors">
+                      <SelectValue placeholder="Pilih Anak" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-pixel-navy border-2 border-pixel-gray/60 rounded-xl">
+                      {children.map(c => (
+                        <SelectItem key={c.id} value={c.id} className="font-retro text-base hover:bg-pixel-panel-light">{c.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <span className="font-retro text-xl text-pixel-blue font-bold">{selectedChild?.full_name || '...'}</span>
+                )}
+              </div>
+            ) : (
+              <span className="tracking-wider">{roleDisplayName}</span>
+            )}
+          </h2>
+        </div>
+
         {/* Mobile Title for Parent */}
         <div className="sm:hidden flex items-center h-full">
           {role === 'parent' && children.length > 1 ? (
@@ -93,45 +119,56 @@ export default function Navbar({ onMenuClick }) {
                 if (child) setSelectedChild(child)
               }}
             >
-              <SelectTrigger className="h-8 border-2 border-pixel-gray bg-pixel-navy font-retro text-sm max-w-[140px] truncate text-pixel-blue">
+              <SelectTrigger className="h-8 border-2 border-pixel-gray/60 bg-pixel-navy rounded-xl font-retro text-base max-w-[140px] truncate text-pixel-blue">
                 <SelectValue placeholder="Pilih Anak" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-pixel-navy border-2 border-pixel-gray/60 rounded-xl">
                 {children.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>
+                  <SelectItem key={c.id} value={c.id} className="font-retro text-base">{c.full_name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           ) : role === 'parent' ? (
              <span className="font-retro text-lg text-pixel-blue truncate max-w-[150px]">{selectedChild?.full_name || '...'}</span>
-          ) : null}
+          ) : (
+            <span className="font-pixel text-[9px] text-pixel-peach truncate">{roleDisplayName}</span>
+          )}
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <SoundToggle />
+      {/* Right side: Sound Toggle, Notifications, Profile Chip, Logout */}
+      <div className="flex items-center gap-2.5 sm:gap-3">
+        <SoundToggle className="rounded-xl border border-transparent hover:border-pixel-gray/40 hover:bg-pixel-panel-light/60 transition-all" />
+
         {(role === 'student' || role === 'parent' || role === 'coach' || role === 'admin') && (
           <NotificationBell />
         )}
         
+        {/* User Profile Pill */}
         <Link 
           to="/profile"
-          className="hidden sm:flex items-center gap-2 font-retro text-lg text-pixel-peach bg-pixel-navy px-3 py-1.5 border-2 border-pixel-gray hover:border-pixel-blue hover:text-pixel-blue transition-colors cursor-pointer"
+          onClick={() => soundManager.playBlip()}
+          className="hidden sm:flex items-center gap-2.5 font-retro text-lg text-pixel-peach bg-pixel-navy/80 hover:bg-pixel-navy px-3 py-1.5 rounded-xl border-2 border-pixel-gray/60 hover:border-pixel-blue hover:text-pixel-blue transition-all cursor-pointer group shadow-sm active:scale-95"
+          title="Buka Profil"
         >
-          <div className="w-6 h-6 bg-pixel-blue/20 flex items-center justify-center border border-pixel-blue">
+          <div className="w-6 h-6 rounded-lg bg-pixel-blue/20 flex items-center justify-center border border-pixel-blue/60 group-hover:scale-105 transition-transform">
             <UserIcon className="w-3.5 h-3.5 text-pixel-blue" />
           </div>
           <span className="max-w-[120px] truncate">{userData?.full_name || fullName || user?.email}</span>
         </Link>
         
+        {/* Logout Button */}
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={logout}
-          className="gap-2 text-pixel-peach hover:text-pixel-red hover:border-pixel-red"
+          onClick={() => {
+            soundManager.playBlip()
+            logout()
+          }}
+          className="gap-2 rounded-xl border-2 border-pixel-gray/60 text-pixel-peach hover:text-pixel-red hover:border-pixel-red hover:bg-pixel-red/10 active:scale-95 transition-all shadow-sm"
         >
           <LogOut className="w-4 h-4" />
-          <span className="hidden sm:inline font-retro text-base">Logout</span>
+          <span className="hidden sm:inline font-retro text-lg">Logout</span>
         </Button>
       </div>
     </header>
