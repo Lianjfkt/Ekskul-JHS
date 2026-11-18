@@ -38,6 +38,8 @@ import {
 import { saveAs } from 'file-saver'
 import { addKopSuratToPDF } from '../../utils/pdfHelper'
 import { isSessionApplicableToStudent, evaluateAttendanceRisk } from '../../utils/attendanceRiskEngine'
+import { computeSessionStudentList, formatSessionWhatsAppReport } from '../../utils/sessionAttendanceHelper'
+import { exportSessionAttendanceToExcel, exportSessionAttendanceToPDF } from '../../utils/sessionExportHelper'
 import { toast } from '@/stores/toastStore'
 import { soundManager } from '@/utils/soundEffects'
 import {
@@ -342,6 +344,12 @@ export default function RecapManagement() {
  const [warningLevelFilter, setWarningLevelFilter] = useState('') // 'TEGURAN' | 'PERINGATAN' | ''
  const [trackingStartDate, setTrackingStartDate] = useState(getMondayOfCurrentWeek())
  const [trackingEndDate, setTrackingEndDate] = useState(getSundayOfCurrentWeek())
+
+ // Session Attendance tab states
+ const [sessionEkskulId, setSessionEkskulId] = useState('')
+ const [selectedSessionId, setSelectedSessionId] = useState('')
+ const [sessionStatusFilter, setSessionStatusFilter] = useState('all') // 'all' | 'alpha' | 'izin' | 'hadir'
+ const [sessionSearch, setSessionSearch] = useState('')
 
  useEffect(() => {
   fetchData()
@@ -755,6 +763,112 @@ export default function RecapManagement() {
  const warningCount = useMemo(() => warningRows.length, [warningRows])
  const teguranCount = useMemo(() => warningRows.filter(r => r.warningLevel === 'TEGURAN').length, [warningRows])
  const peringatanCount = useMemo(() => warningRows.filter(r => r.warningLevel === 'PERINGATAN').length, [warningRows])
+
+ // ─── Tab: Absensi per Sesi ─────────────────────────────────────────────────
+
+ // Active extracurriculars list
+ const activeEkskuls = useMemo(() => {
+  return extracurriculars.filter(e => e.is_active)
+ }, [extracurriculars])
+
+ // Default sessionEkskulId when data loads
+ useEffect(() => {
+  if (!sessionEkskulId && activeEkskuls.length > 0) {
+   setSessionEkskulId(activeEkskuls[0].id)
+  }
+ }, [activeEkskuls, sessionEkskulId])
+
+ // Sessions of currently selected ekskul, sorted newest first
+ const availableEkskulSessions = useMemo(() => {
+  if (!sessionEkskulId) return []
+  return sessions
+   .filter(s => s.extracurricular_id === sessionEkskulId)
+   .sort((a, b) => new Date(b.session_date || 0) - new Date(a.session_date || 0))
+ }, [sessions, sessionEkskulId])
+
+ // Auto-select latest session when ekskul changes
+ useEffect(() => {
+  if (availableEkskulSessions.length > 0) {
+   const newestFilled = availableEkskulSessions.find(s => {
+    return attendances.some(a => a.session_id === s.id)
+   })
+   setSelectedSessionId(newestFilled ? newestFilled.id : availableEkskulSessions[0].id)
+  } else {
+   setSelectedSessionId('')
+  }
+ }, [availableEkskulSessions])
+
+ // Active selected session object
+ const currentSelectedSession = useMemo(() => {
+  return availableEkskulSessions.find(s => s.id === selectedSessionId) || null
+ }, [availableEkskulSessions, selectedSessionId])
+
+ // Active selected ekskul object
+ const currentSelectedEkskul = useMemo(() => {
+  return extracurriculars.find(e => e.id === sessionEkskulId) || null
+ }, [extracurriculars, sessionEkskulId])
+
+ // Coach name of selected session
+ const currentSessionCoachName = useMemo(() => {
+  if (!currentSelectedEkskul) return '-'
+  return currentSelectedEkskul.coach?.full_name || currentSelectedEkskul.coach2?.full_name || '-'
+ }, [currentSelectedEkskul])
+
+ // Map of risk evaluations for fast lookup
+ const studentRiskMap = useMemo(() => {
+  const map = {}
+  attendanceReportRows.forEach(row => {
+   map[row.studentId] = {
+    consecutiveAlpha: row.consecutiveAlpha,
+    totalAlpha: row.alpha,
+    warningLevel: row.warningLevel,
+    actionRecommendation: row.actionRecommendation
+   }
+  })
+  return map
+ }, [attendanceReportRows])
+
+ // Computed student list for current session
+ const sessionRawStudentRows = useMemo(() => {
+  if (!currentSelectedSession || !currentSelectedEkskul) return []
+  return computeSessionStudentList({
+   session: currentSelectedSession,
+   extracurricular: currentSelectedEkskul,
+   enrollments,
+   attendances,
+   specialParticipants,
+   studentRiskMap
+  })
+ }, [currentSelectedSession, currentSelectedEkskul, enrollments, attendances, specialParticipants, studentRiskMap])
+
+ // Stats for current session
+ const sessionStats = useMemo(() => {
+  const total = sessionRawStudentRows.length
+  const hadir = sessionRawStudentRows.filter(r => r.status === 'hadir').length
+  const izin = sessionRawStudentRows.filter(r => r.status === 'izin').length
+  const alpha = sessionRawStudentRows.filter(r => r.status === 'alpha').length
+  const pct = total > 0 ? Math.round((hadir / total) * 100) : 0
+  return { total, hadir, izin, alpha, pct }
+ }, [sessionRawStudentRows])
+
+ // Filtered student rows (by status pill and search)
+ const filteredSessionStudentRows = useMemo(() => {
+  return sessionRawStudentRows.filter(r => {
+   if (sessionStatusFilter === 'alpha' && r.status !== 'alpha') return false
+   if (sessionStatusFilter === 'izin' && r.status !== 'izin') return false
+   if (sessionStatusFilter === 'hadir' && r.status !== 'hadir') return false
+
+   if (sessionSearch) {
+    const q = sessionSearch.toLowerCase()
+    const matchName = r.studentName.toLowerCase().includes(q)
+    const matchNis = r.nis.includes(q)
+    const matchClass = r.class.toLowerCase().includes(q)
+    if (!matchName && !matchNis && !matchClass) return false
+   }
+
+   return true
+  })
+ }, [sessionRawStudentRows, sessionStatusFilter, sessionSearch])
 
  // ─── Tab 6: Keaktifan Ekskul ───────────────────────────────────────────────
 
@@ -1409,6 +1523,49 @@ export default function RecapManagement() {
   doc.save(`rekap_frekuensi_kehadiran_pelatih_${sanitize(targetPeriod)}.pdf`)
  }
 
+ // ─── Session Attendance Action Handlers ────────────────────────────────────
+
+ const handleCopySessionWAReport = () => {
+  if (!currentSelectedSession || !currentSelectedEkskul) return
+  const absentStudents = sessionRawStudentRows.filter(r => r.status === 'alpha')
+  const text = formatSessionWhatsAppReport({
+   ekskul: currentSelectedEkskul,
+   session: currentSelectedSession,
+   coachName: currentSessionCoachName,
+   stats: sessionStats,
+   absentStudents
+  })
+  navigator.clipboard.writeText(text)
+  soundManager.playCoin()
+  toast.success('Format Laporan WhatsApp untuk BK & Kepsek berhasil disalin ke clipboard!', 'Tersalin')
+ }
+
+ const handleExportSessionPDF = () => {
+  if (!currentSelectedSession || !currentSelectedEkskul) return
+  exportSessionAttendanceToPDF({
+   session: currentSelectedSession,
+   extracurricular: currentSelectedEkskul,
+   coachName: currentSessionCoachName,
+   rows: sessionRawStudentRows,
+   stats: sessionStats
+  })
+  soundManager.playCoin()
+  toast.success('Dokumen PDF Berita Acara Sesi berhasil diunduh!', 'Sukses')
+ }
+
+ const handleExportSessionExcel = () => {
+  if (!currentSelectedSession || !currentSelectedEkskul) return
+  exportSessionAttendanceToExcel({
+   session: currentSelectedSession,
+   extracurricular: currentSelectedEkskul,
+   coachName: currentSessionCoachName,
+   rows: sessionRawStudentRows,
+   stats: sessionStats
+  })
+  soundManager.playCoin()
+  toast.success('File Excel Rekap Sesi berhasil diunduh!', 'Sukses')
+ }
+
  // ─── Loading State ─────────────────────────────────────────────────────────
 
  if (loading) {
@@ -1425,6 +1582,7 @@ export default function RecapManagement() {
  const tabs = [
   { id: 'overview', label: 'Ringkasan Ekskul' },
   { id: 'fillTracking', label: 'Tracking Pengisian' },
+  { id: 'sessionAttendance', label: '📅 Absensi per Sesi' },
   { id: 'warnings', label: `⚠️ Siswa Bermasalah${warningRows.length > 0 ? ` (${warningRows.length})` : ''}` },
   { id: 'attendance', label: 'Laporan Absensi Siswa' },
   { id: 'grades', label: 'Laporan Nilai Siswa' },
@@ -1998,6 +2156,235 @@ export default function RecapManagement() {
          </table>
         </div>
        </div>
+      </div>
+     )}
+
+    {/* ═══ TAB: Absensi per Sesi ════════════════════════════════════════════ */}
+     {activeTab === 'sessionAttendance' && (
+      <div className="space-y-6">
+       {/* Ekskul & Session Selectors */}
+       <div className="bg-pixel-navy border border-pixel-gray/30 rounded-none p-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <div className="flex flex-col gap-1">
+         <label className="text-xs text-pixel-lavender font-semibold uppercase tracking-wider">Ekstrakurikuler</label>
+         <select
+          value={sessionEkskulId}
+          onChange={e => setSessionEkskulId(e.target.value)}
+          className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300 min-w-[200px]"
+         >
+          <option value="">Pilih Ekskul</option>
+          {activeEkskuls.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+         </select>
+        </div>
+        <div className="flex flex-col gap-1">
+         <label className="text-xs text-pixel-lavender font-semibold uppercase tracking-wider">Sesi Pertemuan</label>
+         <select
+          value={selectedSessionId}
+          onChange={e => setSelectedSessionId(e.target.value)}
+          disabled={availableEkskulSessions.length === 0}
+          className="text-sm border border-pixel-gray rounded-none px-3 py-2 bg-pixel-panel text-pixel-peach focus:outline-none focus:ring-2 focus:ring-indigo-300 min-w-[260px]"
+         >
+          <option value="">Pilih Sesi</option>
+          {availableEkskulSessions.map(s => (
+           <option key={s.id} value={s.id}>
+            {formatDateIndo(s.session_date)}{s.topic ? ` — ${s.topic}` : ''}
+           </option>
+          ))}
+         </select>
+        </div>
+       </div>
+
+       {!currentSelectedSession ? (
+        <div className="bg-pixel-panel border border-pixel-gray/30 rounded-none p-12 text-center text-pixel-lavender space-y-2">
+         <Calendar className="w-10 h-10 mx-auto text-pixel-lavender/40" />
+         <p className="text-sm">Pilih ekskul dan sesi untuk melihat data absensi.</p>
+        </div>
+       ) : (
+        <>
+         {/* Session Summary Cards */}
+         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden col-span-2">
+           <CardContent className="p-4">
+            <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider mb-1">📅 Tanggal</p>
+            <p className="font-bold text-pixel-white text-sm">{formatDateIndo(currentSelectedSession.session_date)}</p>
+           </CardContent>
+          </Card>
+          <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden col-span-2">
+           <CardContent className="p-4">
+            <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider mb-1">🧑‍🏫 Pelatih</p>
+            <p className="font-bold text-pixel-peach text-sm">{currentSessionCoachName}</p>
+           </CardContent>
+          </Card>
+          <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden col-span-2">
+           <CardContent className="p-4">
+            <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider mb-1">📝 Topik</p>
+            <p className="font-bold text-pixel-white text-sm">{currentSelectedSession.topic || '-'}</p>
+           </CardContent>
+          </Card>
+          <Card className="border-pixel-gray/30 shadow-pixel-sm bg-emerald-950/20 border-emerald-500/20 overflow-hidden">
+           <CardContent className="p-4 text-center">
+            <p className="font-retro text-[10px] text-emerald-400 uppercase tracking-wider mb-1">Hadir</p>
+            <p className="font-extrabold text-emerald-400 text-2xl">{sessionStats.hadir}</p>
+           </CardContent>
+          </Card>
+          <Card className="border-pixel-gray/30 shadow-pixel-sm bg-amber-950/10 border-amber-500/20 overflow-hidden">
+           <CardContent className="p-4 text-center">
+            <p className="font-retro text-[10px] text-amber-400 uppercase tracking-wider mb-1">Izin</p>
+            <p className="font-extrabold text-amber-400 text-2xl">{sessionStats.izin}</p>
+           </CardContent>
+          </Card>
+          <Card className={`border-pixel-gray/30 shadow-pixel-sm overflow-hidden ${sessionStats.alpha > 0 ? 'bg-rose-950/20 border-rose-500/30' : 'bg-pixel-panel'}`}>
+           <CardContent className="p-4 text-center">
+            <p className={`font-retro text-[10px] uppercase tracking-wider mb-1 ${sessionStats.alpha > 0 ? 'text-rose-400' : 'text-pixel-lavender'}`}>Alpa</p>
+            <p className={`font-extrabold text-2xl ${sessionStats.alpha > 0 ? 'text-rose-400' : 'text-pixel-lavender'}`}>{sessionStats.alpha}</p>
+           </CardContent>
+          </Card>
+          <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+           <CardContent className="p-4 text-center">
+            <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider mb-1">Total</p>
+            <p className="font-extrabold text-pixel-white text-2xl">{sessionStats.total}</p>
+           </CardContent>
+          </Card>
+          <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
+           <CardContent className="p-4 text-center">
+            <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider mb-1">% Hadir</p>
+            <p className={`font-extrabold text-2xl ${sessionStats.pct >= 80 ? 'text-emerald-400' : sessionStats.pct >= 60 ? 'text-amber-400' : 'text-rose-400'}`}>{sessionStats.pct}%</p>
+           </CardContent>
+          </Card>
+         </div>
+
+         {/* Notes */}
+         {currentSelectedSession.notes && (
+          <div className="bg-pixel-navy border border-pixel-gray/30 rounded-none p-4">
+           <p className="text-xs text-pixel-lavender font-semibold uppercase tracking-wider mb-1">📋 Catatan Sesi</p>
+           <p className="text-sm text-pixel-white whitespace-pre-line">{currentSelectedSession.notes}</p>
+          </div>
+         )}
+
+         {/* Action Buttons */}
+         <div className="flex flex-wrap gap-2">
+          <Button
+           onClick={handleCopySessionWAReport}
+           disabled={!currentSelectedSession}
+           variant="outline"
+           className="border-indigo-400 text-indigo-300 hover:bg-indigo-500/10 flex items-center gap-2"
+          >
+           📋 Salin Laporan WA (BK &amp; Kepsek)
+          </Button>
+          <Button
+           onClick={handleExportSessionPDF}
+           disabled={!currentSelectedSession || sessionStats.total === 0}
+           variant="outline"
+           className="border-cyan-400 text-cyan-300 hover:bg-cyan-500/10 flex items-center gap-2"
+          >
+           <Download className="w-4 h-4" /> Unduh PDF Sesi
+          </Button>
+          <Button
+           onClick={handleExportSessionExcel}
+           disabled={!currentSelectedSession || sessionStats.total === 0}
+           className="bg-emerald-700 hover:bg-emerald-800 text-pixel-white shadow-pixel-sm flex items-center gap-2"
+          >
+           <Download className="w-4 h-4" /> Unduh Excel Sesi
+          </Button>
+         </div>
+
+         {/* Filter Pill + Search */}
+         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <div className="flex gap-1 flex-wrap">
+           {[
+            { key: 'all', label: 'Semua' },
+            { key: 'alpha', label: '⚠️ Alpa' },
+            { key: 'izin', label: 'Izin' },
+            { key: 'hadir', label: 'Hadir' }
+           ].map(pill => (
+            <button
+             key={pill.key}
+             onClick={() => setSessionStatusFilter(pill.key)}
+             className={`px-3 py-1.5 text-xs font-semibold rounded-none border transition-colors ${
+              sessionStatusFilter === pill.key
+               ? 'bg-indigo-600 border-indigo-500 text-white'
+               : 'bg-pixel-panel border-pixel-gray/30 text-pixel-lavender hover:text-pixel-white'
+             }`}
+            >
+             {pill.label}
+             {pill.key !== 'all' && (
+              <span className="ml-1 opacity-70">
+               ({pill.key === 'alpha' ? sessionStats.alpha : pill.key === 'izin' ? sessionStats.izin : sessionStats.hadir})
+              </span>
+             )}
+            </button>
+           ))}
+          </div>
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+           <Search className="w-4 h-4 text-pixel-lavender absolute left-3 top-3" />
+           <input
+            type="text"
+            placeholder="Cari nama, NIS, atau kelas..."
+            value={sessionSearch}
+            onChange={e => setSessionSearch(e.target.value)}
+            className="w-full text-sm pl-9 pr-4 py-2 bg-pixel-panel border border-pixel-gray rounded-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
+           />
+          </div>
+         </div>
+
+         {/* Student Table */}
+         <div className="bg-pixel-panel border border-pixel-gray/30 rounded-none shadow-pixel-sm overflow-hidden">
+          <div className="overflow-x-auto">
+           <table className="w-full text-left border-collapse text-sm">
+            <thead>
+             <tr className="bg-pixel-navy/75 border-b border-pixel-gray/30 text-pixel-lavender font-semibold">
+              <th className="p-4 pl-6">Nama Siswa</th>
+              <th className="p-4">NIS</th>
+              <th className="p-4 text-center">Kelas</th>
+              <th className="p-4 text-center">Status</th>
+              <th className="p-4 pr-6">Konteks Risiko</th>
+             </tr>
+            </thead>
+            <tbody className="divide-y divide-pixel-gray/20">
+             {filteredSessionStudentRows.length === 0 ? (
+              <tr>
+               <td colSpan="5" className="p-10 text-center text-pixel-lavender">
+                {sessionStats.total === 0 ? 'Belum ada data absensi untuk sesi ini.' : 'Tidak ada siswa yang cocok dengan filter.'}
+               </td>
+              </tr>
+             ) : filteredSessionStudentRows.map((r, i) => (
+              <tr key={r.studentId || i} className={`hover:bg-pixel-navy/30 ${r.status === 'alpha' ? 'bg-rose-950/10 border-l-2 border-l-rose-500' : ''}`}>
+               <td className="p-4 pl-6 font-semibold text-pixel-white">{r.studentName}</td>
+               <td className="p-4 font-mono text-xs text-pixel-lavender">{r.nis}</td>
+               <td className="p-4 text-center text-pixel-peach font-semibold">{r.class}</td>
+               <td className="p-4 text-center">
+                {r.status === 'alpha' ? (
+                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-none text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                  Alpa
+                 </span>
+                ) : r.status === 'izin' ? (
+                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-none text-xs font-bold bg-amber-500/10 text-amber-400">
+                  Izin
+                 </span>
+                ) : (
+                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-none text-xs font-bold bg-emerald-500/10 text-emerald-400">
+                  Hadir
+                 </span>
+                )}
+               </td>
+               <td className="p-4 pr-6 text-xs text-pixel-lavender">
+                {r.consecutiveAlpha >= 2 && (
+                 <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-950/30 border border-rose-500/30 text-rose-400 font-semibold rounded-none mr-2">
+                  ⚠️ {r.consecutiveAlpha}x Alpa berturut-turut
+                 </span>
+                )}
+                {r.actionRecommendation && r.status === 'alpha' && (
+                 <span className="text-pixel-lavender">{r.actionRecommendation}</span>
+                )}
+                {!r.consecutiveAlpha && !r.actionRecommendation && '-'}
+               </td>
+              </tr>
+             ))}
+            </tbody>
+           </table>
+          </div>
+         </div>
+        </>
+       )}
       </div>
      )}
 
