@@ -411,9 +411,11 @@
   }
 
   .pill-nav-label-slide {
-    animation: pill-nav-label-slide 0.2s steps(4) forwards;
+    animation: pill-nav-label-slide 0.25s steps(5) forwards;
     overflow: hidden;
     white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
   }
 
   .pixel-glow-pulse {

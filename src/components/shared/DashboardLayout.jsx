@@ -18,8 +18,8 @@ export default function DashboardLayout() {
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen)
 
-  // Students and Parents have bottom navigation on mobile
-  const hasBottomNav = role === 'student' || role === 'parent'
+  // ALL roles get the floating pill bottom nav on mobile
+  const hasBottomNav = true
 
   return (
     <div className="flex h-screen bg-pixel-navy pixel-bg-grid overflow-hidden">

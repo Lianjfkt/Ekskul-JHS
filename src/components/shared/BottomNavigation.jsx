@@ -2,13 +2,48 @@ import { useState, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { soundManager } from '../../utils/soundEffects'
-import { 
-  LayoutDashboard, 
-  Activity, 
+import {
+  LayoutDashboard,
+  Activity,
+  CalendarDays,
   ClipboardCheck,
-  GraduationCap
+  GraduationCap,
+  Users,
+  BookOpen,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+/* ------------------------------------------------------------------ */
+/* Nav menus per role (max 5 items so the pill stays compact on mobile) */
+/* ------------------------------------------------------------------ */
+const MENUS = {
+  admin: [
+    { name: 'Dashboard',  path: '/admin/dashboard',        icon: LayoutDashboard },
+    { name: 'Users',      path: '/admin/users',            icon: Users },
+    { name: 'Ekskul',     path: '/admin/extracurriculars', icon: Activity },
+    { name: 'Daftar',     path: '/admin/enrollments',      icon: BookOpen },
+    { name: 'Rekap',      path: '/admin/recap',            icon: FileSpreadsheet },
+  ],
+  coach: [
+    { name: 'Dashboard',  path: '/coach/dashboard',        icon: LayoutDashboard },
+    { name: 'Jadwal',     path: '/coach/sessions',         icon: CalendarDays },
+    { name: 'Absensi',    path: '/coach/attendances',      icon: ClipboardCheck },
+    { name: 'Nilai',      path: '/coach/grades',           icon: GraduationCap },
+  ],
+  student: [
+    { name: 'Beranda',    path: '/student/dashboard',        icon: LayoutDashboard },
+    { name: 'Ekskul',     path: '/student/extracurriculars', icon: Activity },
+    { name: 'Kehadiran',  path: '/student/attendance',       icon: ClipboardCheck },
+    { name: 'Nilai',      path: '/student/grades',           icon: GraduationCap },
+  ],
+  parent: [
+    { name: 'Beranda',    path: '/parent/dashboard',         icon: LayoutDashboard },
+    { name: 'Ekskul',     path: '/parent/extracurriculars',  icon: Activity },
+    { name: 'Kehadiran',  path: '/parent/attendance',        icon: ClipboardCheck },
+    { name: 'Nilai',      path: '/parent/grades',            icon: GraduationCap },
+  ],
+}
 
 export default function BottomNavigation() {
   const { role } = useAuthStore()
@@ -16,25 +51,8 @@ export default function BottomNavigation() {
   const [pressedPath, setPressedPath] = useState(null)
   const timeoutRef = useRef(null)
 
-  // Only show for student and parent
-  if (role !== 'student' && role !== 'parent') return null
-
-  const menus = {
-    student: [
-      { name: 'Beranda',   path: '/student/dashboard',        icon: LayoutDashboard },
-      { name: 'Ekskul',    path: '/student/extracurriculars', icon: Activity },
-      { name: 'Kehadiran', path: '/student/attendance',       icon: ClipboardCheck },
-      { name: 'Nilai',     path: '/student/grades',           icon: GraduationCap },
-    ],
-    parent: [
-      { name: 'Beranda',   path: '/parent/dashboard',         icon: LayoutDashboard },
-      { name: 'Ekskul',    path: '/parent/extracurriculars',  icon: Activity },
-      { name: 'Kehadiran', path: '/parent/attendance',        icon: ClipboardCheck },
-      { name: 'Nilai',     path: '/parent/grades',            icon: GraduationCap },
-    ],
-  }
-
-  const currentMenu = menus[role] || []
+  const currentMenu = MENUS[role] || []
+  if (!currentMenu.length) return null
 
   const handlePress = (path) => {
     soundManager.playBlip()
@@ -44,27 +62,31 @@ export default function BottomNavigation() {
   }
 
   return (
-    /* Outer container: positioned at bottom, full width, transparent */
-    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-4 px-4 lg:hidden pointer-events-none">
-      {/* The floating pill container */}
+    /*
+     * Wrapper: full-width, transparent, pointer-events-none so taps on
+     * the transparent area pass through to content underneath.
+     */
+    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center items-end pb-4 px-3 lg:hidden pointer-events-none">
+      {/*
+       * The floating pill container — styled faithfully like Picture 2:
+       *   • Dark pill container
+       *   • Heavy pixel border and shadow
+       *   • Active item expands into a white sub-pill with icon + label
+       *   • Inactive items are icons only
+       */}
       <nav
-        className={cn(
-          "pointer-events-auto pill-nav-enter",
-          "flex items-center gap-1 px-2 py-2",
-          // Pixel-art pill shape: thick borders, shadow, background
-          "bg-pixel-panel border-4 border-pixel-gray",
-          "shadow-[6px_6px_0_0_rgba(0,0,0,0.6)]",
-          // We use a large border-radius to get the pill look
-          // while keeping square inner elements for pixel feel
-          "rounded-full",
-        )}
-        style={{ borderRadius: '999px' }}
+        className="pointer-events-auto pill-nav-enter flex items-center gap-1 p-1.5"
+        style={{
+          background: '#121829',          /* dark pixel-navy */
+          border: '3px solid #5F574F',    /* pixel-gray */
+          boxShadow: '4px 4px 0 0 rgba(0,0,0,0.65)',
+          borderRadius: '9999px',
+        }}
       >
         {currentMenu.map((item) => {
           const isActive = item.path.includes('dashboard')
             ? location.pathname === item.path
             : location.pathname.startsWith(item.path)
-
           const isPressed = pressedPath === item.path
           const Icon = item.icon
 
@@ -74,64 +96,54 @@ export default function BottomNavigation() {
               to={item.path}
               onClick={() => handlePress(item.path)}
               className={cn(
-                "relative flex items-center gap-2 select-none",
-                "transition-none", // animations handled via CSS classes, not Tailwind transition
-                // Active pill item: filled background
-                isActive
-                  ? cn(
-                      "bg-pixel-blue border-2 border-pixel-navy px-4 py-2",
-                      "shadow-[2px_2px_0_0_rgba(0,0,0,0.5)]",
-                      "pixel-glow-pulse",
-                    )
-                  : cn(
-                      "px-3.5 py-2.5 border-2 border-transparent",
-                      "hover:bg-pixel-panel-light hover:border-pixel-gray",
-                      "active:translate-x-0.5 active:translate-y-0.5",
-                    ),
-                "rounded-full",
-                // Active pop animation when tapped
-                isPressed ? "pill-nav-active-pop" : "",
+                'relative flex items-center select-none active:scale-95 transition-transform',
+                isPressed ? 'pill-nav-active-pop' : '',
               )}
-              style={{ borderRadius: '999px' }}
+              style={{ borderRadius: '9999px' }}
             >
-              {/* Icon */}
-              <Icon
-                className={cn(
-                  "shrink-0",
-                  isActive ? "w-5 h-5 text-pixel-navy" : "w-5 h-5 text-pixel-lavender",
-                  !isActive && "group-hover:text-pixel-peach",
-                )}
-              />
-
-              {/* Label — only shown when active, slides in */}
-              {isActive && (
+              {isActive ? (
+                /*
+                 * ACTIVE sub-pill — white background with dark icon + label,
+                 * exactly as shown in Picture 2 ("Icons only. The active tab shows its label.")
+                 */
                 <span
-                  className={cn(
-                    "font-pixel text-[8px] text-pixel-navy uppercase tracking-wider leading-none",
-                    "pill-nav-label-slide",
-                  )}
+                  className="flex items-center gap-2 px-3.5 py-2 shadow-sm"
+                  style={{
+                    background: '#FFF1E8',   /* pixel-white */
+                    border: '2px solid #1D2B53',
+                    borderRadius: '9999px',
+                  }}
                 >
-                  {item.name}
-                </span>
-              )}
+                  <Icon className="w-[18px] h-[18px] shrink-0 text-pixel-black" />
 
-              {/* Pixel square dot above active icon (retro indicator) */}
-              {isActive && (
+                  {/* Label slides in smoothly */}
+                  <span
+                    className="font-pixel text-[8px] text-pixel-black uppercase tracking-wider leading-none pill-nav-label-slide"
+                  >
+                    {item.name}
+                  </span>
+
+                  {/* Blinking retro indicator dot above */}
+                  <span
+                    className="absolute -top-[6px] left-1/2 -translate-x-1/2 w-[6px] h-[6px] bg-pixel-yellow border border-pixel-black animate-pixel-blink"
+                    style={{ imageRendering: 'pixelated' }}
+                  />
+                </span>
+              ) : (
+                /*
+                 * INACTIVE item — icon only, tap expands it
+                 */
                 <span
-                  className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-pixel-yellow border border-pixel-navy animate-pixel-blink"
-                  style={{ imageRendering: 'pixelated' }}
-                />
+                  className="flex items-center justify-center w-10 h-10 hover:bg-white/10 active:bg-white/20 transition-colors"
+                  style={{ borderRadius: '9999px' }}
+                >
+                  <Icon className="w-[19px] h-[19px] text-pixel-lavender" />
+                </span>
               )}
             </Link>
           )
         })}
       </nav>
-
-      {/* Pixel art 8-bit shadow strip at bottom edge */}
-      <div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2 h-1 bg-pixel-gray/40 pointer-events-none"
-        style={{ width: 'calc(100% - 32px)', borderRadius: '0 0 2px 2px' }}
-      />
     </div>
   )
 }

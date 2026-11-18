@@ -76,6 +76,7 @@ export default {
         lg: "0px",
         md: "0px",
         sm: "0px",
+        full: "9999px",
       },
       boxShadow: {
         'pixel': '4px 4px 0 0 rgba(0, 0, 0, 0.5)',
