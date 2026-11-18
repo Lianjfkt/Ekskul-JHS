@@ -1,4 +1,4 @@
-import { matchesClass } from './classHelper'
+import { matchesClass } from './classHelper.js'
 
 /**
  * Attendance Risk Engine
