@@ -47,23 +47,29 @@ export default function EkskulManagement() {
     setLoading(true)
     setErrorMsg('')
     try {
-      const { data: coachesData, error: cErr } = await supabase
-        .from('users')
-        .select('id, full_name, email')
-        .eq('role', 'coach')
-      if (cErr) throw cErr
-      setCoaches(coachesData || [])
+      const [
+        { data: coachesData, error: cErr },
+        { data: ekskulData, error: eErr }
+      ] = await Promise.all([
+        supabase
+          .from('users')
+          .select('id, full_name, email')
+          .eq('role', 'coach'),
+        supabase
+          .from('extracurriculars')
+          .select(`
+            *,
+            coach:coach_id (id, full_name, email),
+            coach2:coach_id_2 (id, full_name, email),
+            coach3:coach_id_3 (id, full_name, email)
+          `)
+          .order('name', { ascending: true })
+      ])
 
-      const { data: ekskulData, error: eErr } = await supabase
-        .from('extracurriculars')
-        .select(`
-          *,
-          coach:coach_id (id, full_name, email),
-          coach2:coach_id_2 (id, full_name, email),
-          coach3:coach_id_3 (id, full_name, email)
-        `)
-        .order('name', { ascending: true })
+      if (cErr) throw cErr
       if (eErr) throw eErr
+
+      setCoaches(coachesData || [])
       setExtracurriculars(ekskulData || [])
     } catch (err) {
       console.error(err)

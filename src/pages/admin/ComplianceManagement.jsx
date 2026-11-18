@@ -12,7 +12,7 @@ import 'jspdf-autotable'
 import { addKopSuratToPDF } from '../../utils/pdfHelper'
 import { isSessionApplicableToStudent, evaluateAttendanceRisk } from '../../utils/attendanceRiskEngine'
 import { matchesClass } from '../../utils/classHelper'
-import { fetchAllPaginated } from '../../utils/supabaseHelper'
+import { fetchAllPaginated, withTimeout } from '../../utils/supabaseHelper'
 import * as XLSX from 'xlsx'
 
 export default function ComplianceManagement() {
@@ -45,38 +45,42 @@ export default function ComplianceManagement() {
     try {
       const [
         studentsData,
-        ekskulData,
+        ekskulRes,
         enrollmentsData,
         sessionsData,
         attendancesData,
         gradesData,
         spData
-      ] = await Promise.all([
-        fetchAllPaginated((from, to) =>
-          supabase.from('students').select('*').order('full_name', { ascending: true }).range(from, to)
-        ),
-        fetchAllPaginated((from, to) =>
-          supabase.from('extracurriculars').select('*').range(from, to)
-        ),
-        fetchAllPaginated((from, to) =>
-          supabase.from('enrollments').select('*, extracurricular:extracurricular_id(*)').eq('status', 'active').range(from, to)
-        ),
-        fetchAllPaginated((from, to) =>
-          supabase.from('sessions').select('*').order('session_date', { ascending: true }).range(from, to)
-        ),
-        fetchAllPaginated((from, to) =>
-          supabase.from('attendances').select('*').range(from, to)
-        ),
-        fetchAllPaginated((from, to) =>
-          supabase.from('grades').select('*, extracurricular:extracurricular_id(*)').range(from, to)
-        ),
-        fetchAllPaginated((from, to) =>
-          supabase.from('special_session_participants').select('*').range(from, to)
-        )
-      ])
+      ] = await withTimeout(
+        Promise.all([
+          fetchAllPaginated((from, to) =>
+            supabase.from('students').select('*').order('full_name', { ascending: true }).range(from, to)
+          ),
+          supabase.from('extracurriculars').select('*').order('name', { ascending: true }),
+          fetchAllPaginated((from, to) =>
+            supabase.from('enrollments').select('*, extracurricular:extracurricular_id(*)').eq('status', 'active').range(from, to)
+          ),
+          fetchAllPaginated((from, to) =>
+            supabase.from('sessions').select('*').order('session_date', { ascending: true }).range(from, to)
+          ),
+          fetchAllPaginated((from, to) =>
+            supabase.from('attendances').select('*').range(from, to)
+          ),
+          fetchAllPaginated((from, to) =>
+            supabase.from('grades').select('*, extracurricular:extracurricular_id(*)').range(from, to)
+          ),
+          fetchAllPaginated((from, to) =>
+            supabase.from('special_session_participants').select('*').range(from, to)
+          )
+        ]),
+        35000,
+        'Gagal memuat data kepatuhan: batas waktu terlampaui (timeout). Silakan klik Muat Ulang.'
+      )
+
+      if (ekskulRes.error) throw ekskulRes.error
 
       setStudents(studentsData || [])
-      setExtracurriculars(ekskulData || [])
+      setExtracurriculars(ekskulRes.data || [])
       setEnrollments(enrollmentsData || [])
       setSessions(sessionsData || [])
       setAttendances(attendancesData || [])
@@ -114,7 +118,7 @@ export default function ComplianceManagement() {
     for (let part of parts) {
       part = part.trim()
       if (!part) continue
-      const timeMatch = part.match(/(\d{2})[:\.](\d{2})\s*-\s*(\d{2})[:\.](\d{2})/)
+      const timeMatch = part.match(/(\d{2})[:.](\d{2})\s*-\s*(\d{2})[:.](\d{2})/)
       if (!timeMatch) continue
       const startMinutes = parseInt(timeMatch[1], 10) * 60 + parseInt(timeMatch[2], 10)
       const endMinutes = parseInt(timeMatch[3], 10) * 60 + parseInt(timeMatch[4], 10)

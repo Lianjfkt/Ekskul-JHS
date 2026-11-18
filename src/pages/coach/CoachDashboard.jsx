@@ -89,22 +89,24 @@ export default function CoachDashboard() {
         const recentSessionIds = (recentSessions || []).map(s => s.id)
         const allSessionIds = (allSessions || []).map(s => s.id)
 
+        const needsAllAtts = allSessionIds.length > 0 && activeStudents && activeStudents.length > 0
+
         // 2. Paralelisasi query tahap 2 (absensi grafik, absensi evaluasi risiko, dan peserta khusus)
-        const [attsRes, allAttsRes, specialPartsRes] = await Promise.all([
-          recentSessionIds.length > 0 
-            ? supabase.from('attendances').select('session_id, status').in('session_id', recentSessionIds)
-            : Promise.resolve({ data: [] }),
-          (allSessionIds.length > 0 && activeStudents && activeStudents.length > 0)
+        const [allAttsRes, specialPartsRes, fallbackRecentAttsRes] = await Promise.all([
+          needsAllAtts
             ? supabase.from('attendances').select('id, student_id, session_id, status').in('session_id', allSessionIds)
             : Promise.resolve({ data: [] }),
-          (allSessionIds.length > 0 && activeStudents && activeStudents.length > 0)
+          needsAllAtts
             ? supabase.from('special_session_participants').select('session_id, student_id').in('session_id', allSessionIds)
+            : Promise.resolve({ data: [] }),
+          (!needsAllAtts && recentSessionIds.length > 0)
+            ? supabase.from('attendances').select('session_id, status').in('session_id', recentSessionIds)
             : Promise.resolve({ data: [] })
         ])
 
-        const atts = attsRes.data || []
         const allAtts = allAttsRes.data || []
         const specialParts = specialPartsRes.data || []
+        const atts = needsAllAtts ? allAtts : (fallbackRecentAttsRes.data || [])
 
         // 3. Olah data grafik tren kehadiran
         let chartData = []

@@ -53,43 +53,46 @@ export default function EnrollmentManagement() {
  }, [])
 
  const fetchData = async () => {
- setLoading(true)
- setErrorMsg('')
- try {
- // 1. Fetch Students
- const { data: studentsData, error: sErr } = await supabase
- .from('students')
- .select('id, nis, full_name, class')
- .order('full_name', { ascending: true })
- if (sErr) throw sErr
- setStudents(studentsData || [])
+  setLoading(true)
+  setErrorMsg('')
+  try {
+    const [
+      { data: studentsData, error: sErr },
+      { data: ekskulData, error: eErr },
+      { data: enrollmentsData, error: enErr }
+    ] = await Promise.all([
+      supabase
+        .from('students')
+        .select('id, nis, full_name, class')
+        .order('full_name', { ascending: true }),
+      supabase
+        .from('extracurriculars')
+        .select('id, name, is_active')
+        .eq('is_active', true)
+        .order('name', { ascending: true }),
+      supabase
+        .from('enrollments')
+        .select(`
+          *,
+          student:student_id (nis, full_name, class, gender, phone),
+          extracurricular:extracurricular_id (name)
+        `)
+        .order('enrolled_at', { ascending: false })
+    ])
 
- // 2. Fetch Extracurriculars
- const { data: ekskulData, error: eErr } = await supabase
- .from('extracurriculars')
- .select('id, name, is_active')
- .eq('is_active', true)
- .order('name', { ascending: true })
- if (eErr) throw eErr
- setExtracurriculars(ekskulData || [])
+    if (sErr) throw sErr
+    if (eErr) throw eErr
+    if (enErr) throw enErr
 
- // 3. Fetch Enrollments
- const { data: enrollmentsData, error: enErr } = await supabase
- .from('enrollments')
- .select(`
- *,
- student:student_id (nis, full_name, class, gender, phone),
- extracurricular:extracurricular_id (name)
- `)
- .order('enrolled_at', { ascending: false })
- if (enErr) throw enErr
- setEnrollments(enrollmentsData || [])
- } catch (err) {
- console.error(err)
- setErrorMsg('Gagal memuat data pendaftaran: ' + err.message)
- } finally {
- setLoading(false)
- }
+    setStudents(studentsData || [])
+    setExtracurriculars(ekskulData || [])
+    setEnrollments(enrollmentsData || [])
+  } catch (err) {
+    console.error(err)
+    setErrorMsg('Gagal memuat data pendaftaran: ' + err.message)
+  } finally {
+    setLoading(false)
+  }
  }
 
   const handleOpenModal = () => {

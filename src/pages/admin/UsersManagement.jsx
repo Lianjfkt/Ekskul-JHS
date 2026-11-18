@@ -88,39 +88,40 @@ export default function UsersManagement() {
  setLoading(true)
  setErrorMsg('')
  try {
- // 1. Fetch Students
- const { data: studentsData, error: sErr } = await supabase
- .from('students')
- .select(`
- *,
- users:users!student_id (id, email)
- `)
- .order('full_name', { ascending: true })
- if (sErr) throw sErr
- setStudents(studentsData || [])
+ const [studentsRes, usersRes, masterRes] = await Promise.all([
+   supabase
+     .from('students')
+     .select(`
+       *,
+       users:users!student_id (id, email)
+     `)
+     .order('full_name', { ascending: true }),
+   supabase
+     .from('users')
+     .select(`
+       *,
+       students:student_id (full_name, class)
+     `)
+     .order('role', { ascending: true }),
+   supabase
+     .from('student_master')
+     .select('*')
+     .order('full_name', { ascending: true })
+     .then(res => res)
+     .catch(() => ({ data: [], error: null }))
+ ])
 
- // 2. Fetch Users (Coaches, Parents, Admins)
- const { data: usersData, error: uErr } = await supabase
- .from('users')
- .select(`
- *,
- students:student_id (full_name, class)
- `)
- .order('role', { ascending: true })
- if (uErr) throw uErr
- setAllUsers(usersData || [])
- setCoaches(usersData?.filter(u => u.role === 'coach') || [])
- setParents(usersData?.filter(u => u.role === 'parent') || [])
+ if (studentsRes.error) throw studentsRes.error
+ if (usersRes.error) throw usersRes.error
 
-  // 3. Fetch Student Master (graceful — tabel mungkin belum ada)
-  try {
-  const { data: masterData, error: mErr } = await supabase
-  .from('student_master')
-  .select('*')
-  .order('full_name', { ascending: true })
-  if (!mErr) setStudentMaster(masterData || [])
-  else console.warn('Tabel student_master belum tersedia:', mErr.message)
-  } catch (_) { /* tabel belum ada, abaikan */ }
+ setStudents(studentsRes.data || [])
+ setAllUsers(usersRes.data || [])
+ setCoaches(usersRes.data?.filter(u => u.role === 'coach') || [])
+ setParents(usersRes.data?.filter(u => u.role === 'parent') || [])
+
+ if (masterRes?.data) {
+   setStudentMaster(masterRes.data)
+ }
  } catch (err) {
  console.error(err)
  setErrorMsg('Gagal mengambil data dari database: ' + err.message)

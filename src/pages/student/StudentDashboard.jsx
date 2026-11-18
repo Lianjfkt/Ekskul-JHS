@@ -80,7 +80,7 @@ export default function StudentDashboard() {
   const fetchDashboardData = async () => {
     setLoading(true)
     try {
-      // Fetch enrollments + extracurricular info
+      // 1. Fetch enrollments + extracurricular info
       const { data: enrollData, error: eErr } = await supabase
         .from('enrollments')
         .select(`
@@ -94,46 +94,105 @@ export default function StudentDashboard() {
 
       if (eErr) throw eErr
 
-      const student = profile || { id: studentId }
+      if (!enrollData || enrollData.length === 0) {
+        setEnrollments([])
+        setEvaluations({})
+        setUpcomingSessions([])
+        setLoading(false)
+        return
+      }
 
-      // For each enrollment, fetch attendance % using attendance risk engine
-      const enriched = await Promise.all((enrollData || []).map(async enr => {
+      const student = profile || { id: studentId }
+      const ekskulIds = enrollData.map(e => e.extracurriculars?.id).filter(Boolean)
+
+      const today = new Date()
+      const todayStr = today.toISOString().split('T')[0]
+      const weekEnd = new Date(today)
+      weekEnd.setDate(today.getDate() + 7)
+      const weekEndStr = weekEnd.toISOString().split('T')[0]
+
+      // 2. Fetch all related data in PARALLEL in ONE round trip!
+      const [
+        sessionsRes,
+        attRes,
+        spRes,
+        gradesRes,
+        evalRes,
+        upcomingRes
+      ] = await Promise.all([
+        ekskulIds.length > 0
+          ? supabase
+              .from('sessions')
+              .select('id, session_date, topic, is_special_training, target_class, attendance_submitted, extracurricular_id')
+              .in('extracurricular_id', ekskulIds)
+              .order('session_date', { ascending: false })
+          : Promise.resolve({ data: [] }),
+        supabase
+          .from('attendances')
+          .select('id, session_id, status, notes')
+          .eq('student_id', studentId),
+        supabase
+          .from('special_session_participants')
+          .select('session_id, student_id')
+          .eq('student_id', studentId),
+        ekskulIds.length > 0
+          ? supabase
+              .from('grades')
+              .select('attitude_score, skill_score, activity_score, semester, extracurricular_id, graded_at')
+              .eq('student_id', studentId)
+              .in('extracurricular_id', ekskulIds)
+              .order('graded_at', { ascending: false })
+          : Promise.resolve({ data: [] }),
+        supabase
+          .from('coach_evaluations')
+          .select('*')
+          .eq('student_id', studentId)
+          .then(res => res)
+          .catch(() => ({ data: [] })),
+        ekskulIds.length > 0
+          ? supabase
+              .from('sessions')
+              .select('id, session_date, topic, is_special_training, event_name, extracurriculars(name)')
+              .in('extracurricular_id', ekskulIds)
+              .gte('session_date', todayStr)
+              .lte('session_date', weekEndStr)
+              .order('session_date', { ascending: true })
+          : Promise.resolve({ data: [] })
+      ])
+
+      const allSessions = sessionsRes.data || []
+      const rawAtts = attRes.data || []
+      const specialParts = spRes.data || []
+      const allGrades = gradesRes.data || []
+      const evalData = evalRes?.data || []
+      const upcomingData = upcomingRes.data || []
+
+      // In-memory grouping for evaluations
+      const evalMap = {}
+      evalData.forEach((ev) => {
+        evalMap[ev.extracurricular_id] = ev
+      })
+      setEvaluations(evalMap)
+
+      // In-memory calculation for enrollments & attendance risk
+      const enriched = enrollData.map(enr => {
         const ekskul = enr.extracurriculars
         const ekskulId = ekskul?.id
         if (!ekskulId) return { ...enr, pct: 0, lastGrade: null }
 
-        // Get sessions
-        const { data: sessions } = await supabase
-          .from('sessions')
-          .select('id, session_date, topic, is_special_training, target_class, attendance_submitted')
-          .eq('extracurricular_id', ekskulId)
-          .order('session_date', { ascending: false })
-
+        const ekskulSessions = allSessions.filter(s => s.extracurricular_id === ekskulId)
         let pct = 0
 
-        if (sessions && sessions.length > 0) {
-          const sessionIds = sessions.map(s => s.id)
-          const [attRes, spRes] = await Promise.all([
-            supabase
-              .from('attendances')
-              .select('id, session_id, status, notes')
-              .eq('student_id', studentId)
-              .in('session_id', sessionIds),
-            supabase
-              .from('special_session_participants')
-              .select('session_id, student_id')
-              .eq('student_id', studentId)
-              .in('session_id', sessionIds)
-          ])
+        if (ekskulSessions.length > 0) {
+          const ekskulSessionIds = new Set(ekskulSessions.map(s => s.id))
+          const applicableSpecialParts = specialParts.filter(sp => ekskulSessionIds.has(sp.session_id))
+          const studentAttsForEkskul = rawAtts.filter(a => ekskulSessionIds.has(a.session_id))
 
-          const rawAtts = attRes.data || []
-          const specialParts = spRes.data || []
-
-          const validSessions = sessions.filter(s =>
-            isSessionApplicableToStudent(s, student, specialParts, rawAtts)
+          const validSessions = ekskulSessions.filter(s =>
+            isSessionApplicableToStudent(s, student, applicableSpecialParts, studentAttsForEkskul)
           )
           const validSessionIds = new Set(validSessions.map(s => s.id))
-          const studentAtts = rawAtts.filter(a => validSessionIds.has(a.session_id))
+          const studentAtts = studentAttsForEkskul.filter(a => validSessionIds.has(a.session_id))
 
           const risk = evaluateAttendanceRisk({
             student,
@@ -145,16 +204,8 @@ export default function StudentDashboard() {
           pct = risk.percentage
         }
 
-        // Get last grade
-        const { data: gradeData } = await supabase
-          .from('grades')
-          .select('attitude_score, skill_score, activity_score, semester')
-          .eq('student_id', studentId)
-          .eq('extracurricular_id', ekskulId)
-          .order('graded_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
+        // Get last grade (allGrades is already sorted by graded_at desc)
+        const gradeData = allGrades.find(g => g.extracurricular_id === ekskulId)
         let lastGrade = null
         if (gradeData) {
           const stats = enrichGradeStats(gradeData)
@@ -162,62 +213,24 @@ export default function StudentDashboard() {
         }
 
         return { ...enr, pct, lastGrade }
-      }))
+      })
 
- setEnrollments(enriched)
+      setEnrollments(enriched)
 
- // Fetch existing coach evaluations by this student
- try {
-   const { data: evalData } = await supabase
-     .from('coach_evaluations')
-     .select('*')
-     .eq('student_id', studentId)
+      // Filter upcoming sessions
+      const invitedSessionIds = new Set(specialParts.map(i => i.session_id))
+      const filteredUpcoming = upcomingData.filter(s => {
+        if (!s.is_special_training) return true
+        return invitedSessionIds.has(s.id)
+      }).slice(0, 5)
 
-   const evalMap = {}
-   ;(evalData || []).forEach((ev) => {
-     evalMap[ev.extracurricular_id] = ev
-   })
-   setEvaluations(evalMap)
- } catch (evErr) {
-   console.warn('Tabel coach_evaluations mungkin belum dibuat:', evErr.message)
- }
-
- // Fetch upcoming sessions (this week) from enrolled ekskuls
- const ekskulIds = (enrollData || []).map(e => e.extracurriculars?.id).filter(Boolean)
- if (ekskulIds.length > 0) {
- const today = new Date()
- const weekEnd = new Date(today)
- weekEnd.setDate(today.getDate() + 7)
-
- const { data: sessions } = await supabase
- .from('sessions')
- .select('id, session_date, topic, is_special_training, event_name, extracurriculars(name)')
- .in('extracurricular_id', ekskulIds)
- .gte('session_date', today.toISOString().split('T')[0])
- .lte('session_date', weekEnd.toISOString().split('T')[0])
- .order('session_date', { ascending: true })
-
- // Fetch special session invitations for this student
- const { data: invites } = await supabase
-  .from('special_session_participants')
-  .select('session_id')
-  .eq('student_id', studentId)
-
- const invitedSessionIds = new Set((invites || []).map(i => i.session_id))
-
- const filtered = (sessions || []).filter(s => {
-  if (!s.is_special_training) return true
-  return invitedSessionIds.has(s.id)
- }).slice(0, 5)
-
- setUpcomingSessions(filtered)
- }
- } catch (err) {
- console.error('StudentDashboard error:', err)
- } finally {
- setLoading(false)
- }
- }
+      setUpcomingSessions(filteredUpcoming)
+    } catch (err) {
+      console.error('StudentDashboard error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
  const greeting = () => {
  const hour = new Date().getHours()

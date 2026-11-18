@@ -105,49 +105,86 @@ export default function ParentDashboard() {
 
  if (eErr) throw eErr
 
+ if (!enrollData || enrollData.length === 0) {
+ setEnrollments([])
+ setWarnings([])
+ setUpcomingSessions([])
+ setLoading(false)
+ return
+ }
+
+ const ekskulIds = enrollData.map(e => e.extracurriculars?.id).filter(Boolean)
+ const student = selectedChild || { id: studentId }
+
+ const today = new Date()
+ const todayStr = today.toISOString().split('T')[0]
+ const weekEnd = new Date(today)
+ weekEnd.setDate(today.getDate() + 7)
+ const weekEndStr = weekEnd.toISOString().split('T')[0]
+
+ // Batch fetch all data in 1 single round trip
+ const [sessionsRes, attRes, spRes, gradesRes, upcomingRes] = await Promise.all([
+ ekskulIds.length > 0
+   ? supabase
+       .from('sessions')
+       .select('id, session_date, topic, is_special_training, target_class, attendance_submitted, extracurricular_id')
+       .in('extracurricular_id', ekskulIds)
+       .order('session_date', { ascending: false })
+   : Promise.resolve({ data: [] }),
+ supabase
+   .from('attendances')
+   .select('id, session_id, status, notes')
+   .eq('student_id', studentId),
+ supabase
+   .from('special_session_participants')
+   .select('session_id, student_id')
+   .eq('student_id', studentId),
+ ekskulIds.length > 0
+   ? supabase
+       .from('grades')
+       .select('attitude_score, skill_score, activity_score, semester, extracurricular_id, graded_at')
+       .eq('student_id', studentId)
+       .in('extracurricular_id', ekskulIds)
+       .order('graded_at', { ascending: false })
+   : Promise.resolve({ data: [] }),
+ ekskulIds.length > 0
+   ? supabase
+       .from('sessions')
+       .select('id, session_date, topic, is_special_training, event_name, extracurriculars(name)')
+       .in('extracurricular_id', ekskulIds)
+       .gte('session_date', todayStr)
+       .lte('session_date', weekEndStr)
+       .order('session_date', { ascending: true })
+   : Promise.resolve({ data: [] })
+ ])
+
+ const allSessions = sessionsRes.data || []
+ const rawAtts = attRes.data || []
+ const specialParts = spRes.data || []
+ const allGrades = gradesRes.data || []
+ const upcomingSessionsData = upcomingRes.data || []
+
  const currentWarnings = []
 
- // For each enrollment, fetch attendance & evaluate risk with central engine
- const enriched = await Promise.all((enrollData || []).map(async enr => {
+ const enriched = enrollData.map(enr => {
  const ekskul = enr.extracurriculars
  const ekskulId = ekskul?.id
  if (!ekskulId) return { ...enr, pct: 0, lastGrade: null, risk: null }
 
- // Get sessions for this ekskul
- const { data: sessions } = await supabase
- .from('sessions')
- .select('id, session_date, topic, is_special_training, target_class, attendance_submitted')
- .eq('extracurricular_id', ekskulId)
- .order('session_date', { ascending: false })
-
+ const ekskulSessions = allSessions.filter(s => s.extracurricular_id === ekskulId)
  let pct = 0
- let alphaCount = 0
  let risk = null
 
- if (sessions && sessions.length > 0) {
- const sessionIds = sessions.map(s => s.id)
- const [attRes, spRes] = await Promise.all([
- supabase
- .from('attendances')
- .select('id, session_id, status, notes')
- .eq('student_id', studentId)
- .in('session_id', sessionIds),
- supabase
- .from('special_session_participants')
- .select('session_id, student_id')
- .eq('student_id', studentId)
- .in('session_id', sessionIds)
- ])
+ if (ekskulSessions.length > 0) {
+ const ekskulSessionIds = new Set(ekskulSessions.map(s => s.id))
+ const applicableSpecialParts = specialParts.filter(sp => ekskulSessionIds.has(sp.session_id))
+ const studentAttsForEkskul = rawAtts.filter(a => ekskulSessionIds.has(a.session_id))
 
- const rawAtts = attRes.data || []
- const specialParts = spRes.data || []
- const student = selectedChild || { id: studentId }
-
- const validSessions = sessions.filter(s =>
- isSessionApplicableToStudent(s, student, specialParts, rawAtts)
+ const validSessions = ekskulSessions.filter(s =>
+ isSessionApplicableToStudent(s, student, applicableSpecialParts, studentAttsForEkskul)
  )
  const validSessionIds = new Set(validSessions.map(s => s.id))
- const studentAtts = rawAtts.filter(a => validSessionIds.has(a.session_id))
+ const studentAtts = studentAttsForEkskul.filter(a => validSessionIds.has(a.session_id))
 
  risk = evaluateAttendanceRisk({
  student,
@@ -157,7 +194,6 @@ export default function ParentDashboard() {
  })
 
  pct = risk.percentage
- alphaCount = risk.alpha
 
  if (risk.isAtRisk) {
  currentWarnings.push({
@@ -172,16 +208,7 @@ export default function ParentDashboard() {
  }
  }
 
- // Get last grade
- const { data: gradeData } = await supabase
- .from('grades')
- .select('attitude_score, skill_score, activity_score, semester')
- .eq('student_id', studentId)
- .eq('extracurricular_id', ekskulId)
- .order('graded_at', { ascending: false })
- .limit(1)
- .maybeSingle()
-
+ const gradeData = allGrades.find(g => g.extracurricular_id === ekskulId)
  let lastGrade = null
  if (gradeData) {
  const stats = enrichGradeStats(gradeData)
@@ -189,41 +216,18 @@ export default function ParentDashboard() {
  }
 
  return { ...enr, pct, lastGrade, risk }
- }))
+ })
 
  setEnrollments(enriched)
  setWarnings(currentWarnings)
 
- // Fetch upcoming sessions (this week)
- const ekskulIds = (enrollData || []).map(e => e.extracurriculars?.id).filter(Boolean)
- if (ekskulIds.length > 0) {
- const today = new Date()
- const weekEnd = new Date(today)
- weekEnd.setDate(today.getDate() + 7)
-
- const { data: sessions } = await supabase
- .from('sessions')
- .select('id, session_date, topic, is_special_training, event_name, extracurriculars(name)')
- .in('extracurricular_id', ekskulIds)
- .gte('session_date', today.toISOString().split('T')[0])
- .lte('session_date', weekEnd.toISOString().split('T')[0])
- .order('session_date', { ascending: true })
-
- // Fetch special session invitations for this child
- const { data: invites } = await supabase
-  .from('special_session_participants')
-  .select('session_id')
-  .eq('student_id', studentId)
-
- const invitedSessionIds = new Set((invites || []).map(i => i.session_id))
-
- const filtered = (sessions || []).filter(s => {
-  if (!s.is_special_training) return true
-  return invitedSessionIds.has(s.id)
+ const invitedSessionIds = new Set(specialParts.map(i => i.session_id))
+ const filtered = upcomingSessionsData.filter(s => {
+ if (!s.is_special_training) return true
+ return invitedSessionIds.has(s.id)
  }).slice(0, 5)
 
  setUpcomingSessions(filtered)
- }
  } catch (err) {
  console.error('ParentDashboard error:', err)
  } finally {

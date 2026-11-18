@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { matchesClass } from '../../utils/classHelper'
-import { fetchAllPaginated } from '../../utils/supabaseHelper'
+import { fetchAllPaginated, withTimeout } from '../../utils/supabaseHelper'
 import { enrichGradeStats } from '../../utils/gradeUtils'
 import { supabase } from '../../lib/supabaseClient'
 import { 
@@ -363,66 +363,69 @@ export default function RecapManagement() {
    setErrorMsg('')
    try {
     const [
-     ekskulData,
+     ekskulRes,
      enrollmentsData,
      gradesData,
      sessionsData,
      attendancesData,
-     coachesData,
+     coachesRes,
      spData,
      evalsData
-    ] = await Promise.all([
-     fetchAllPaginated((from, to) =>
-      supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email), coach3:coach_id_3 (id, full_name, email)').order('name', { ascending: true }).range(from, to)
-     ),
-     fetchAllPaginated((from, to) =>
-      supabase.from('enrollments').select('*, student:student_id (id, nis, full_name, class)').eq('status', 'active').range(from, to)
-     ),
-     fetchAllPaginated((from, to) =>
-      supabase.from('grades').select('*, student:student_id (id, nis, full_name, class), extracurricular:extracurricular_id (id, name)').range(from, to)
-     ),
-     fetchAllPaginated((from, to) =>
-      supabase.from('sessions').select(`
-        *,
-        creator:created_by (id, full_name, email),
-        extracurricular:extracurricular_id (
-          id,
-          name,
-          coach:coach_id (id, full_name, email),
-          coach2:coach_id_2 (id, full_name, email),
-          coach3:coach_id_3 (id, full_name, email)
-        ),
-        session_coaches (
-          id,
-          coach:coach_id (id, full_name, email)
-        )
-      `).order('session_date', { ascending: false }).range(from, to)
-     ),
-     fetchAllPaginated((from, to) =>
-      supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)').range(from, to)
-     ),
-     fetchAllPaginated((from, to) =>
-      supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true }).range(from, to)
-     ),
-     fetchAllPaginated((from, to) =>
-      supabase.from('special_session_participants').select('*').range(from, to)
-     ),
-     fetchAllPaginated((from, to) =>
-      supabase.from('coach_evaluations').select(`
-        *,
-        coach:coach_id (id, full_name, email),
-        student:student_id (id, nis, full_name, class),
-        extracurricular:extracurricular_id (id, name)
-      `).order('created_at', { ascending: false }).range(from, to)
-     ).catch(() => [])
-    ])
+    ] = await withTimeout(
+     Promise.all([
+      supabase.from('extracurriculars').select('*, coach:coach_id (id, full_name, email), coach2:coach_id_2 (id, full_name, email), coach3:coach_id_3 (id, full_name, email)').order('name', { ascending: true }),
+      fetchAllPaginated((from, to) =>
+       supabase.from('enrollments').select('*, student:student_id (id, nis, full_name, class)').eq('status', 'active').range(from, to)
+      ),
+      fetchAllPaginated((from, to) =>
+       supabase.from('grades').select('*, student:student_id (id, nis, full_name, class), extracurricular:extracurricular_id (id, name)').range(from, to)
+      ),
+      fetchAllPaginated((from, to) =>
+       supabase.from('sessions').select(`
+         *,
+         creator:created_by (id, full_name, email),
+         extracurricular:extracurricular_id (
+           id,
+           name,
+           coach:coach_id (id, full_name, email),
+           coach2:coach_id_2 (id, full_name, email),
+           coach3:coach_id_3 (id, full_name, email)
+         ),
+         session_coaches (
+           id,
+           coach:coach_id (id, full_name, email)
+         )
+       `).order('session_date', { ascending: false }).range(from, to)
+      ),
+      fetchAllPaginated((from, to) =>
+       supabase.from('attendances').select('*, student:student_id (id, nis, full_name, class)').range(from, to)
+      ),
+      supabase.from('users').select('id, full_name, email').eq('role', 'coach').order('full_name', { ascending: true }),
+      fetchAllPaginated((from, to) =>
+       supabase.from('special_session_participants').select('*').range(from, to)
+      ),
+      fetchAllPaginated((from, to) =>
+       supabase.from('coach_evaluations').select(`
+         *,
+         coach:coach_id (id, full_name, email),
+         student:student_id (id, nis, full_name, class),
+         extracurricular:extracurricular_id (id, name)
+       `).order('created_at', { ascending: false }).range(from, to)
+      ).catch(() => [])
+     ]),
+     35000,
+     'Gagal memuat rekap data: batas waktu server terlampaui (timeout). Silakan klik Muat Ulang.'
+    )
 
-    setExtracurriculars(ekskulData || [])
+    if (ekskulRes.error) throw ekskulRes.error
+    if (coachesRes.error) throw coachesRes.error
+
+    setExtracurriculars(ekskulRes.data || [])
     setEnrollments(enrollmentsData || [])
     setGrades(gradesData || [])
     setSessions(sessionsData || [])
     setAttendances(attendancesData || [])
-    setCoaches(coachesData || [])
+    setCoaches(coachesRes.data || [])
     setSpecialParticipants(spData || [])
     setCoachEvaluations(evalsData || [])
   } catch (err) {
