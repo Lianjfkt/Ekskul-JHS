@@ -346,6 +346,31 @@ export default function RecapManagement() {
  const [trackingStartDate, setTrackingStartDate] = useState(getMondayOfCurrentWeek())
  const [trackingEndDate, setTrackingEndDate] = useState(getSundayOfCurrentWeek())
 
+ const hasActiveFilters = Boolean(
+   searchQuery ||
+   selectedEkskul ||
+   selectedClass ||
+   selectedSemester ||
+   selectedAcademicYear ||
+   selectedCoach ||
+   selectedMonth ||
+   warningTypeFilter ||
+   warningLevelFilter
+ )
+
+ const handleResetFilters = () => {
+   soundManager.playBlip?.()
+   setSearchQuery('')
+   setSelectedEkskul('')
+   setSelectedClass('')
+   setSelectedSemester('')
+   setSelectedAcademicYear('')
+   setSelectedCoach('')
+   setSelectedMonth('')
+   setWarningTypeFilter('')
+   setWarningLevelFilter('')
+ }
+
  // Session Attendance tab states
  const [sessionEkskulId, setSessionEkskulId] = useState('')
  const [selectedSessionId, setSelectedSessionId] = useState('')
@@ -1929,6 +1954,20 @@ export default function RecapManagement() {
         </select>
        </>
       )}
+
+      {hasActiveFilters && (
+       <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={handleResetFilters}
+        className="h-9 px-3 text-pixel-red border border-pixel-red/40 hover:bg-pixel-red/10 flex items-center gap-1.5 font-retro text-sm shrink-0"
+        title="Reset semua filter ke kondisi awal"
+       >
+        <X className="w-3.5 h-3.5" />
+        <span>Reset Filter</span>
+       </Button>
+      )}
      </div>
 
      {/* Export Buttons */}
@@ -2010,6 +2049,34 @@ export default function RecapManagement() {
        Ekspor Excel
       </Button>
      </div>
+    </div>
+
+    {/* Bar Status Hasil & Counter Data */}
+    <div className="flex items-center justify-between text-xs text-pixel-lavender font-retro px-1 py-1">
+      <div>
+        Menampilkan{' '}
+        <span className="font-mono font-bold text-pixel-peach">
+          {activeTab === 'overview' ? filteredEkskulSummaries.length :
+           activeTab === 'fillTracking' ? fillTrackingRows.length :
+           activeTab === 'attendance' ? attendanceReportRows.length :
+           activeTab === 'grades' ? gradeReportRows.length :
+           activeTab === 'coachSessions' ? coachSessionReportRows.length :
+           activeTab === 'warnings' ? warningRows.length :
+           activeTab === 'activity' ? ekskulActivityRanking.length :
+           activeTab === 'coachEvaluations' ? filteredCoachEvaluations.length :
+           0}
+        </span>{' '}
+        baris data {hasActiveFilters && <span className="text-pixel-yellow font-bold">(Terfilter)</span>}
+      </div>
+      {hasActiveFilters && (
+        <button
+          type="button"
+          onClick={handleResetFilters}
+          className="text-pixel-red hover:underline text-[11px] font-retro flex items-center gap-1 cursor-pointer"
+        >
+          <X className="w-3 h-3" /> Bersihkan Filter
+        </button>
+      )}
     </div>
 
     {/* ═══ TAB: Ringkasan Ekskul ═══════════════════════════════════════════ */}

@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import PixelConfirmModal from '@/components/ui/PixelConfirmModal'
 import { 
  Search, Plus, Trash2, Edit2, CalendarDays, BookOpen, 
- X, Check, ShieldAlert, FileText, ChevronRight, Trophy
+ X, Check, ShieldAlert, FileText, ChevronRight, Trophy,
+ ClipboardCheck
 } from 'lucide-react'
+import { soundManager } from '@/utils/soundEffects'
 
 export default function CoachSessions() {
   const { user } = useAuthStore()
@@ -25,6 +29,9 @@ export default function CoachSessions() {
  // Modal States
  const [isModalOpen, setIsModalOpen] = useState(false)
  const [selectedSession, setSelectedSession] = useState(null)
+ const [sessionToDelete, setSessionToDelete] = useState(null)
+ const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false)
+ const [isDeleting, setIsDeleting] = useState(false)
 
  // Form States
  const [form, setForm] = useState({
@@ -285,29 +292,35 @@ export default function CoachSessions() {
     }
   }
 
- const handleDelete = async (id) => {
- if (!confirm('Apakah Anda yakin ingin menghapus sesi ini? Semua data absensi siswa pada sesi ini juga akan dihapus.')) return
- setErrorMsg('')
- try {
- const { error } = await supabase
- .from('sessions')
- .delete()
- .eq('id', id)
- if (error) throw error
- setSuccessMsg('Sesi latihan berhasil dihapus.')
- fetchData()
- } catch (err) {
- setErrorMsg(err.message)
- }
- }
+  const confirmDeleteSession = async () => {
+    if (!sessionToDelete) return
+    setIsDeleting(true)
+    setErrorMsg('')
+    try {
+      const { error } = await supabase
+        .from('sessions')
+        .delete()
+        .eq('id', sessionToDelete.id)
+      if (error) throw error
+      soundManager.playSuccess?.()
+      setSuccessMsg('Sesi latihan berhasil dihapus.')
+      setSessionToDelete(null)
+      fetchData()
+    } catch (err) {
+      soundManager.playError?.()
+      setErrorMsg(err.message)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
- const handleStudentCheckbox = (studentId, checked) => {
-   if (checked) {
-     setForm(f => ({...f, selected_students: [...f.selected_students, studentId]}))
-   } else {
-     setForm(f => ({...f, selected_students: f.selected_students.filter(id => id !== studentId)}))
-   }
- }
+  const handleStudentCheckbox = (studentId, checked) => {
+    if (checked) {
+      setForm(f => ({...f, selected_students: [...f.selected_students, studentId]}))
+    } else {
+      setForm(f => ({...f, selected_students: f.selected_students.filter(id => id !== studentId)}))
+    }
+  }
 
   // Cek apakah form sudah diisi (kotor) sebelum menutup modal
   const handleCloseModal = () => {
@@ -317,7 +330,10 @@ export default function CoachSessions() {
       form.event_name.trim() !== '' ||
       form.selected_students.length > 0 ||
       form.target_classes.length > 0
-    if (isDirty && !confirm('Data yang sudah diisi akan hilang. Yakin ingin menutup?')) return
+    if (isDirty) {
+      setIsDiscardConfirmOpen(true)
+      return
+    }
     setIsModalOpen(false)
   }
 
@@ -360,80 +376,161 @@ export default function CoachSessions() {
  ) : (
  <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden">
  <CardContent className="p-0">
- {/* Mobile scroll hint */}
- <div className="sm:hidden flex items-center justify-center gap-2 px-3 py-1.5 bg-pixel-navy/80 border-b border-pixel-gray/30 text-pixel-lavender">
- <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">◀</span>
- <span className="font-retro text-sm tracking-wider">GESER TABEL</span>
- <span className="font-pixel text-[7px] text-pixel-yellow animate-pixel-blink">▶</span>
- </div>
- <div className="overflow-x-auto">
- <table className="w-full text-left border-collapse">
- <thead>
-  <tr className="bg-pixel-navy border-b border-pixel-gray/30 font-retro text-base text-pixel-lavender uppercase tracking-wider">
-  <th className="px-6 py-4">Tanggal</th>
-  <th className="px-6 py-4">Ekstrakurikuler</th>
-  <th className="px-6 py-4">Pelatih Memimpin</th>
-  <th className="px-6 py-4">Topik / Materi Latihan</th>
-  <th className="px-6 py-4">Catatan Sesi</th>
-  <th className="px-6 py-4 text-right">Aksi</th>
-  </tr>
-  </thead>
-  <tbody className="divide-y-2 divide-pixel-gray/30 text-sm text-pixel-peach">
-  {sessions.length === 0 ? (
-  <tr>
-  <td colSpan={6} className="px-6 py-8 text-center text-pixel-lavender">Belum ada sesi latihan yang dibuat.</td>
-  </tr>
-  ) : (
-  sessions.map(session => (
-  <tr key={session.id} className="hover:bg-pixel-panel-light">
-  <td className="px-6 py-4 font-mono font-semibold text-pixel-white">
-  <div className="flex flex-col gap-1 mt-2">
-    <div className="flex items-center gap-1.5">
-      <CalendarDays className="w-4 h-4 text-primary" />
-      {new Date(session.session_date).toLocaleDateString('id-ID', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-      })}
-    </div>
-    {session.is_special_training && (
-      <span className="inline-flex items-center gap-1 text-[10px] uppercase font-retro bg-pixel-orange/20 text-pixel-orange px-1.5 py-0.5 rounded-sm self-start">
-        <Trophy className="w-3 h-3" /> Latihan Khusus
-      </span>
-    )}
-  </div>
-  </td>
-  <td className="px-6 py-4 font-bold text-pixel-white">
-    {session.extracurricular?.name}
-    <div className="text-xs text-pixel-lavender font-mono font-normal mt-1">
-      Target: {!session.target_class || session.target_class === 'all' 
-        ? 'Semua Kelas' 
-        : session.target_class.split(',').map(g => `Kelas ${g}`).join(', ')}
-    </div>
-  </td>
-  <td className="px-6 py-4 text-pixel-yellow font-semibold">{session.session_coaches && session.session_coaches.length > 0 ? session.session_coaches.map(sc => sc.coach?.full_name).filter(Boolean).join(', ') : 'Tidak diketahui'}</td>
-  <td className="px-6 py-4 font-semibold text-pixel-white">
-    {session.topic || 'Sesi Umum'}
-    {session.is_special_training && session.event_name && (
-      <div className="text-xs text-pixel-lavender mt-0.5 font-mono">Event: {session.event_name}</div>
-    )}
-  </td>
-  <td className="px-6 py-4 text-pixel-lavender max-w-xs truncate">{session.notes || '-'}</td>
-  <td className="px-6 py-4 text-right space-x-2">
-  <Button onClick={() => handleOpenModal(session)} variant="ghost" size="icon" className="h-8 w-8 hover:bg-pixel-panel-light hover:text-primary">
-  <Edit2 className="w-4 h-4" />
-  </Button>
-  <Button onClick={() => handleDelete(session.id)} variant="ghost" size="icon" className="h-8 w-8 hover:bg-pixel-red/10 text-pixel-red hover:text-pixel-red">
-  <Trash2 className="w-4 h-4" />
-  </Button>
-  </td>
- </tr>
- ))
+ {sessions.length === 0 ? (
+   <div className="p-8 text-center text-pixel-lavender">Belum ada sesi latihan yang dibuat.</div>
+ ) : (
+   <>
+     {/* Mobile Card View (md:hidden) */}
+     <div className="md:hidden divide-y-2 divide-pixel-gray/30">
+       {sessions.map(session => (
+         <div key={session.id} className="p-4 space-y-3 hover:bg-pixel-panel-light/60 transition-colors">
+           {/* Header: Tanggal & Badge Latihan Khusus */}
+           <div className="flex items-center justify-between gap-2 flex-wrap">
+             <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-pixel-white">
+               <CalendarDays className="w-3.5 h-3.5 text-primary" />
+               {new Date(session.session_date).toLocaleDateString('id-ID', {
+                 weekday: 'short',
+                 year: 'numeric',
+                 month: 'short',
+                 day: 'numeric'
+               })}
+             </div>
+             {session.is_special_training && (
+               <span className="inline-flex items-center gap-1 text-[10px] uppercase font-retro bg-pixel-orange/20 text-pixel-orange px-2 py-0.5 border border-pixel-orange/40">
+                 <Trophy className="w-3 h-3" /> Latihan Khusus
+               </span>
+             )}
+           </div>
+
+           {/* Nama Ekskul & Target Kelas */}
+           <div>
+             <div className="font-bold text-pixel-white text-base leading-snug">
+               {session.extracurricular?.name}
+             </div>
+             <div className="text-xs text-pixel-lavender font-mono mt-0.5">
+               Target: {!session.target_class || session.target_class === 'all' 
+                 ? 'Semua Kelas' 
+                 : session.target_class.split(',').map(g => `Kelas ${g}`).join(', ')}
+             </div>
+           </div>
+
+           {/* Materi / Topik */}
+           <div className="bg-pixel-navy/70 border border-pixel-gray/30 p-2.5 space-y-1">
+             <div className="text-xs font-semibold text-pixel-peach">
+               <span className="text-pixel-lavender font-normal">Topik: </span>
+               {session.topic || 'Sesi Umum'}
+             </div>
+             {session.is_special_training && session.event_name && (
+               <div className="text-xs text-pixel-orange font-mono">
+                 Event: {session.event_name}
+               </div>
+             )}
+             {session.notes && (
+               <div className="text-xs text-pixel-lavender italic pt-1 border-t border-pixel-gray/20">
+                 Catatan: {session.notes}
+               </div>
+             )}
+           </div>
+
+           {/* Pelatih Memimpin */}
+           <div className="text-xs text-pixel-yellow font-retro">
+             Pelatih: {session.session_coaches && session.session_coaches.length > 0 
+               ? session.session_coaches.map(sc => sc.coach?.full_name).filter(Boolean).join(', ') 
+               : 'Tidak diketahui'}
+           </div>
+
+           {/* Tombol Aksi */}
+           <div className="flex items-center justify-end gap-2 pt-1 border-t border-pixel-gray/20">
+             <Button 
+               onClick={() => handleOpenModal(session)} 
+               variant="outline" 
+               size="sm" 
+               className="h-8 px-2.5 text-xs gap-1 border-pixel-gray text-pixel-peach hover:text-pixel-white"
+             >
+               <Edit2 className="w-3.5 h-3.5" />
+               <span>Ubah</span>
+             </Button>
+             <Button 
+               onClick={() => setSessionToDelete(session)} 
+               variant="ghost" 
+               size="sm" 
+               className="h-8 px-2.5 text-xs gap-1 text-pixel-red hover:bg-pixel-red/10"
+             >
+               <Trash2 className="w-3.5 h-3.5" />
+               <span>Hapus</span>
+             </Button>
+           </div>
+         </div>
+       ))}
+     </div>
+
+     {/* Desktop Table View (hidden md:block) */}
+     <div className="hidden md:block overflow-x-auto">
+       <table className="w-full text-left border-collapse">
+         <thead>
+           <tr className="bg-pixel-navy border-b border-pixel-gray/30 font-retro text-base text-pixel-lavender uppercase tracking-wider">
+             <th className="px-6 py-4">Tanggal</th>
+             <th className="px-6 py-4">Ekstrakurikuler</th>
+             <th className="px-6 py-4">Pelatih Memimpin</th>
+             <th className="px-6 py-4">Topik / Materi Latihan</th>
+             <th className="px-6 py-4">Catatan Sesi</th>
+             <th className="px-6 py-4 text-right">Aksi</th>
+           </tr>
+         </thead>
+         <tbody className="divide-y-2 divide-pixel-gray/30 text-sm text-pixel-peach">
+           {sessions.map(session => (
+             <tr key={session.id} className="hover:bg-pixel-panel-light">
+               <td className="px-6 py-4 font-mono font-semibold text-pixel-white">
+                 <div className="flex flex-col gap-1 mt-2">
+                   <div className="flex items-center gap-1.5">
+                     <CalendarDays className="w-4 h-4 text-primary" />
+                     {new Date(session.session_date).toLocaleDateString('id-ID', {
+                       weekday: 'short',
+                       year: 'numeric',
+                       month: 'short',
+                       day: 'numeric'
+                     })}
+                   </div>
+                   {session.is_special_training && (
+                     <span className="inline-flex items-center gap-1 text-[10px] uppercase font-retro bg-pixel-orange/20 text-pixel-orange px-1.5 py-0.5 rounded-sm self-start">
+                       <Trophy className="w-3 h-3" /> Latihan Khusus
+                     </span>
+                   )}
+                 </div>
+               </td>
+               <td className="px-6 py-4 font-bold text-pixel-white">
+                 {session.extracurricular?.name}
+                 <div className="text-xs text-pixel-lavender font-mono font-normal mt-1">
+                   Target: {!session.target_class || session.target_class === 'all' 
+                     ? 'Semua Kelas' 
+                     : session.target_class.split(',').map(g => `Kelas ${g}`).join(', ')}
+                 </div>
+               </td>
+               <td className="px-6 py-4 text-pixel-yellow font-semibold">
+                 {session.session_coaches && session.session_coaches.length > 0 ? session.session_coaches.map(sc => sc.coach?.full_name).filter(Boolean).join(', ') : 'Tidak diketahui'}
+               </td>
+               <td className="px-6 py-4 font-semibold text-pixel-white">
+                 {session.topic || 'Sesi Umum'}
+                 {session.is_special_training && session.event_name && (
+                   <div className="text-xs text-pixel-lavender mt-0.5 font-mono">Event: {session.event_name}</div>
+                 )}
+               </td>
+               <td className="px-6 py-4 text-pixel-lavender max-w-xs truncate">{session.notes || '-'}</td>
+               <td className="px-6 py-4 text-right space-x-2">
+                 <Button onClick={() => handleOpenModal(session)} variant="ghost" size="icon" className="h-8 w-8 hover:bg-pixel-panel-light hover:text-primary">
+                   <Edit2 className="w-4 h-4" />
+                 </Button>
+                 <Button onClick={() => setSessionToDelete(session)} variant="ghost" size="icon" className="h-8 w-8 hover:bg-pixel-red/10 text-pixel-red hover:text-pixel-red">
+                   <Trash2 className="w-4 h-4" />
+                 </Button>
+               </td>
+             </tr>
+           ))}
+         </tbody>
+       </table>
+     </div>
+   </>
  )}
- </tbody>
- </table>
- </div>
  </CardContent>
  </Card>
  )}
@@ -441,8 +538,8 @@ export default function CoachSessions() {
  {/* --- MODAL TAMBAH/EDIT SESI --- */}
  {isModalOpen && (
  <div role="dialog" aria-modal="true" data-modal="true" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
- <div className="bg-pixel-panel rounded-none shadow-pixel-lg border border-pixel-gray/30 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-pixel-pop">
- <div className="flex justify-between items-center px-6 py-4 border-b border-pixel-gray/30 bg-pixel-navy sticky top-0 z-10">
+ <div className="bg-pixel-panel rounded-none shadow-pixel-lg border-4 border-pixel-gray w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-pixel-pop">
+ <div className="flex justify-between items-center px-6 py-4 border-b-2 border-pixel-gray bg-pixel-navy shrink-0">
  <h3 className="font-bold text-pixel-white text-lg flex items-center gap-2">
  <FileText className="w-5 h-5 text-primary" />
  {selectedSession ? 'Ubah Sesi Latihan' : 'Buat Sesi Latihan Baru'}
@@ -451,7 +548,8 @@ export default function CoachSessions() {
  <X className="w-4 h-4" />
  </Button>
  </div>
- <form onSubmit={handleSubmit} className="p-6 space-y-5">
+ <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+ <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 pixel-scroll">
  
   {/* Pilih Ekskul */}
   <div className="space-y-1.5">
@@ -644,7 +742,8 @@ export default function CoachSessions() {
  />
  </div>
 
- <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel mt-2 py-3 z-10 shadow-pixel-sm">
+ </div>
+ <div className="shrink-0 p-4 border-t-2 border-pixel-gray bg-pixel-navy flex justify-end gap-3">
  <Button type="button" onClick={handleCloseModal} variant="outline" disabled={isSubmitting}>Batal</Button>
  <Button type="submit" disabled={isSubmitting} className="gap-2">
    {isSubmitting ? (
@@ -661,6 +760,33 @@ export default function CoachSessions() {
  </div>
  </div>
  )}
+
+ {/* Retro Confirmation Modals */}
+ <PixelConfirmModal
+   isOpen={!!sessionToDelete}
+   onClose={() => setSessionToDelete(null)}
+   onConfirm={confirmDeleteSession}
+   title="HAPUS SESI LATIHAN?"
+   description={`Apakah Anda yakin ingin menghapus sesi "${sessionToDelete?.topic || 'Sesi Latihan'}" pada tanggal ${sessionToDelete?.session_date ? new Date(sessionToDelete.session_date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : ''}? Semua data absensi siswa pada sesi ini juga akan ikut terhapus.`}
+   confirmText="HAPUS SESI"
+   cancelText="BATAL"
+   variant="danger"
+   isLoading={isDeleting}
+ />
+
+ <PixelConfirmModal
+   isOpen={isDiscardConfirmOpen}
+   onClose={() => setIsDiscardConfirmOpen(false)}
+   onConfirm={() => {
+     setIsDiscardConfirmOpen(false)
+     setIsModalOpen(false)
+   }}
+   title="BATALKAN PENGISIAN?"
+   description="Data yang sudah diisi akan hilang dan tidak tersimpan. Yakin ingin menutup form ini?"
+   confirmText="YA, TUTUP"
+   cancelText="LANJUT ISI"
+   variant="danger"
+ />
  </div>
  )
 }
