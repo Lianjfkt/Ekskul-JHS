@@ -161,7 +161,7 @@ export default function Sidebar({
         isOpen ? "translate-x-0" : "-translate-x-full",
         "w-64",
         // Desktop docked state
-        "lg:translate-x-0 lg:static lg:inset-auto h-screen shrink-0 relative",
+        "lg:translate-x-0 lg:static lg:inset-auto h-screen shrink-0",
         isCollapsed ? "lg:w-20" : "lg:w-64"
       )}
     >
