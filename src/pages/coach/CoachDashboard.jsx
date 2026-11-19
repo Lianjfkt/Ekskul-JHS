@@ -217,29 +217,11 @@ export default function CoachDashboard() {
  <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-12 scale-150">
  <Activity className="w-80 h-80 text-pixel-white" />
  </div>
- <div className="relative z-10 space-y-3">
- <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-retro">Selamat Datang Pelatih!</h1>
- <p className="text-pixel-peach max-w-xl text-sm md:text-base font-retro">
+ <div className="relative z-10 space-y-2">
+ <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Selamat Datang Pelatih!</h1>
+ <p className="text-pixel-peach max-w-xl text-sm md:text-base">
  Gunakan portal ini untuk mencatat materi latihan (sesi), mengabsen kehadiran siswa, dan menginput nilai perkembangan ekstrakurikuler.
  </p>
- <div className="pt-1 flex flex-wrap gap-3 items-center">
-   <Link
-     to="/coach/attendances"
-     onClick={() => soundManager.playBlip()}
-     className="pixel-btn bg-pixel-green text-pixel-navy px-4 py-2 text-[9px] flex items-center gap-2 border-2 border-pixel-navy shadow-pixel hover:brightness-110 active:translate-y-0.5"
-   >
-     <ClipboardCheck className="w-4 h-4" />
-     <span>⚡ Input Absensi Sekarang</span>
-   </Link>
-   <Link
-     to="/coach/sessions"
-     onClick={() => soundManager.playBlip()}
-     className="pixel-btn bg-pixel-panel text-pixel-peach hover:text-pixel-white px-4 py-2 text-[9px] flex items-center gap-2 border-2 border-pixel-gray shadow-pixel hover:brightness-110 active:translate-y-0.5"
-   >
-     <CalendarDays className="w-4 h-4 text-pixel-blue" />
-     <span>Jadwal Sesi</span>
-   </Link>
- </div>
  <p className="text-xs text-pixel-lavender font-mono">Email: {user?.email}</p>
  </div>
  </div>
