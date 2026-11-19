@@ -792,6 +792,17 @@ export default function RecapManagement() {
    .sort((a, b) => new Date(b.session_date || 0) - new Date(a.session_date || 0))
  }, [sessions, sessionEkskulId])
 
+ // Hitung frekuensi tanggal sesi dalam availableEkskulSessions
+ const dateCounts = useMemo(() => {
+  const counts = {}
+  availableEkskulSessions.forEach(s => {
+   if (s.session_date) {
+    counts[s.session_date] = (counts[s.session_date] || 0) + 1
+   }
+  })
+  return counts
+ }, [availableEkskulSessions])
+
  // Auto-select latest session when ekskul changes
  useEffect(() => {
   if (availableEkskulSessions.length > 0) {
@@ -2218,6 +2229,7 @@ export default function RecapManagement() {
           <option value="">Pilih Sesi</option>
           {availableEkskulSessions.map(s => (
            <option key={s.id} value={s.id}>
+            {dateCounts[s.session_date] > 1 ? '⚠️ [GANDA] ' : ''}
             {formatDateIndo(s.session_date)}{s.topic ? ` — ${s.topic}` : ''}
            </option>
           ))}
@@ -2237,7 +2249,14 @@ export default function RecapManagement() {
           <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden col-span-2">
            <CardContent className="p-4">
             <p className="font-retro text-[10px] text-pixel-lavender uppercase tracking-wider mb-1">📅 Tanggal</p>
-            <p className="font-bold text-pixel-white text-sm">{formatDateIndo(currentSelectedSession.session_date)}</p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+             <p className="font-bold text-pixel-white text-sm">{formatDateIndo(currentSelectedSession.session_date)}</p>
+             {dateCounts[currentSelectedSession.session_date] > 1 && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-none bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-mono font-bold">
+               ⚠️ Ganda
+              </span>
+             )}
+            </div>
            </CardContent>
           </Card>
           <Card className="border-pixel-gray/30 shadow-pixel-sm bg-pixel-panel overflow-hidden col-span-2">
@@ -3064,20 +3083,68 @@ export default function RecapManagement() {
         Riwayat Sesi untuk Periode {formatPeriodIndo(selectedSessionGroup.periodKey)}
        </p>
        <div className="space-y-3">
-        {selectedSessionGroup.sessionsList.map((session, sIdx) => (
-         <div key={session.id || sIdx} className="bg-pixel-navy border border-pixel-gray/30 p-4 rounded-none space-y-2">
-          <div className="flex justify-between items-center">
-           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-none bg-pixel-blue/10 text-indigo-700 font-retro text-base font-mono">
-            <Calendar className="w-3.5 h-3.5" />
-            {new Date(session.session_date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-           </span>
-          </div>
-          <div>
-           <p className="text-sm font-bold text-pixel-white">{session.topic || 'Sesi Umum'}</p>
-           <p className="text-xs text-pixel-lavender mt-1 whitespace-pre-line">{session.notes || 'Tidak ada catatan.'}</p>
-          </div>
-         </div>
-        ))}
+        {(() => {
+         const modalDateCounts = (selectedSessionGroup.sessionsList || []).reduce((acc, s) => {
+          if (s.session_date) acc[s.session_date] = (acc[s.session_date] || 0) + 1
+          return acc
+         }, {})
+         return selectedSessionGroup.sessionsList.map((session, sIdx) => {
+          const isDuplicateDate = modalDateCounts[session.session_date] > 1
+          return (
+           <div key={session.id || sIdx} className="bg-pixel-navy border border-pixel-gray/30 p-4 rounded-none space-y-2">
+            <div className="flex justify-between items-center">
+             <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-none bg-pixel-blue/10 text-indigo-700 font-retro text-base font-mono">
+               <Calendar className="w-3.5 h-3.5" />
+               {new Date(session.session_date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </span>
+              {isDuplicateDate && (
+               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-none bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-mono font-bold">
+                ⚠️ Sesi Ganda
+               </span>
+              )}
+             </div>
+             <Button
+              variant="ghost"
+              size="icon"
+              title="Hapus Sesi"
+              onClick={async () => {
+               if (!window.confirm(`Hapus sesi tanggal ${formatDateIndo(session.session_date)} (${session.topic || 'Tanpa topik'})? Data absensi pada sesi ini akan ikut terhapus.`)) return
+               try {
+                const { error } = await supabase.from('sessions').delete().eq('id', session.id)
+                if (error) throw error
+                toast.success('Sesi berhasil dihapus')
+                soundManager.playCoin()
+                
+                // Update data di modal secara langsung
+                const updatedList = selectedSessionGroup.sessionsList.filter(s => s.id !== session.id)
+                if (updatedList.length === 0) {
+                 setSelectedSessionGroup(null)
+                } else {
+                 setSelectedSessionGroup({
+                  ...selectedSessionGroup,
+                  sessionsList: updatedList,
+                  sessionsCount: updatedList.length
+                 })
+                }
+                await fetchRecapData()
+               } catch (err) {
+                toast.error('Gagal menghapus sesi: ' + err.message)
+               }
+              }}
+              className="h-8 w-8 text-pixel-red/80 hover:text-pixel-red hover:bg-pixel-red/10 rounded-none"
+             >
+              <Trash2 className="w-4 h-4" />
+             </Button>
+            </div>
+            <div>
+             <p className="text-sm font-bold text-pixel-white">{session.topic || 'Sesi Umum'}</p>
+             <p className="text-xs text-pixel-lavender mt-1 whitespace-pre-line">{session.notes || 'Tidak ada catatan.'}</p>
+            </div>
+           </div>
+          )
+         })
+        })()}
        </div>
       </div>
 
