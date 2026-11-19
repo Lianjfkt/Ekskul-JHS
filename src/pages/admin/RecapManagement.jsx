@@ -33,7 +33,8 @@ import {
  Minus,
  RefreshCw,
  Award,
- Star
+ Star,
+ Trash2
 } from 'lucide-react'
 import { saveAs } from 'file-saver'
 import { addKopSuratToPDF } from '../../utils/pdfHelper'
@@ -350,6 +351,8 @@ export default function RecapManagement() {
  const [selectedSessionId, setSelectedSessionId] = useState('')
  const [sessionStatusFilter, setSessionStatusFilter] = useState('all') // 'all' | 'alpha' | 'izin' | 'hadir'
  const [sessionSearch, setSessionSearch] = useState('')
+ const [isDeletingSession, setIsDeletingSession] = useState(false)
+ const [sessionDeleteConfirmOpen, setSessionDeleteConfirmOpen] = useState(false)
 
  useEffect(() => {
   fetchData()
@@ -1569,6 +1572,32 @@ export default function RecapManagement() {
   toast.success('File Excel Rekap Sesi berhasil diunduh!', 'Sukses')
  }
 
+ const fetchRecapData = fetchData
+
+ const handleAdminDeleteSession = async (sessionId) => {
+  if (!sessionId) return
+  setIsDeletingSession(true)
+  try {
+   const { error } = await supabase
+    .from('sessions')
+    .delete()
+    .eq('id', sessionId)
+
+   if (error) throw error
+
+   toast.success('Sesi latihan dan data absensi terkait berhasil dihapus.', 'Penghapusan Berhasil')
+   soundManager.playCoin()
+   setSessionDeleteConfirmOpen(false)
+   setSelectedSessionId('')
+   await fetchRecapData()
+  } catch (err) {
+   console.error('Gagal menghapus sesi:', err)
+   toast.error('Gagal menghapus sesi: ' + err.message, 'Terjadi Kesalahan')
+  } finally {
+   setIsDeletingSession(false)
+  }
+ }
+
  // ─── Loading State ─────────────────────────────────────────────────────────
 
  if (loading) {
@@ -2288,6 +2317,15 @@ export default function RecapManagement() {
           >
            <Download className="w-4 h-4" /> Unduh Excel Sesi
           </Button>
+          <Button
+           variant="destructive"
+           size="sm"
+           onClick={() => setSessionDeleteConfirmOpen(true)}
+           className="bg-pixel-red hover:bg-rose-700 text-pixel-white gap-2 text-xs font-semibold rounded-none sm:ml-auto"
+          >
+           <Trash2 className="w-3.5 h-3.5" />
+           Hapus Sesi Ini
+          </Button>
          </div>
 
          {/* Filter Pill + Search */}
@@ -2387,6 +2425,43 @@ export default function RecapManagement() {
           </div>
          </div>
         </>
+       )}
+
+       {/* Modal Konfirmasi Hapus Sesi */}
+       {sessionDeleteConfirmOpen && (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+         <div className="bg-pixel-panel border-2 border-pixel-red p-6 max-w-md w-full shadow-pixel-lg space-y-4">
+          <div className="flex items-center gap-3 text-pixel-red font-bold text-base">
+           <ShieldAlert className="w-6 h-6 flex-shrink-0" />
+           Konfirmasi Hapus Sesi
+          </div>
+          <p className="text-xs text-pixel-lavender leading-relaxed">
+           Apakah Anda yakin ingin menghapus sesi tanggal <strong className="text-pixel-white">{formatDateIndo(currentSelectedSession?.session_date)}</strong> ({currentSelectedSession?.topic || 'Tanpa Materi'})?
+          </p>
+          <p className="text-2xs text-pixel-peach bg-pixel-navy p-3 border border-pixel-gray/30">
+           ⚠️ <strong>Perhatian:</strong> Seluruh {sessionStats.total} data absensi siswa yang tercatat pada sesi ini akan otomatis terhapus secara permanen.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+           <Button
+            type="button"
+            variant="outline"
+            disabled={isDeletingSession}
+            onClick={() => setSessionDeleteConfirmOpen(false)}
+           >
+            Batal
+           </Button>
+           <Button
+            type="button"
+            variant="destructive"
+            disabled={isDeletingSession}
+            onClick={() => handleAdminDeleteSession(currentSelectedSession?.id)}
+            className="bg-pixel-red hover:bg-rose-700 text-pixel-white gap-1.5"
+           >
+            {isDeletingSession ? 'Menghapus...' : 'Ya, Hapus Sesi'}
+           </Button>
+          </div>
+         </div>
+        </div>
        )}
       </div>
      )}
