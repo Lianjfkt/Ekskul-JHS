@@ -740,11 +740,11 @@ export default function AdminDashboard() {
                               )}
                             </td>
                             <td className="p-4">
-                              <div className="flex gap-2 flex-wrap">
+                              <div className="flex gap-2 flex-wrap items-center">
                                 {!hasAccount && (
                                   <Link
                                     to="/admin/users"
-                                    className="font-pixel text-[7px] px-2 py-1 border-2 border-pixel-blue text-pixel-blue hover:bg-pixel-blue/10 whitespace-nowrap"
+                                    className="font-retro text-base font-bold px-2.5 py-1 min-h-[34px] flex items-center border-2 border-pixel-blue text-pixel-blue hover:bg-pixel-blue/15 hover:text-pixel-white transition-colors whitespace-nowrap shadow-pixel-sm active:translate-y-0.5"
                                   >
                                     + Buat Akun
                                   </Link>
@@ -752,13 +752,13 @@ export default function AdminDashboard() {
                                 {!hasEkskul && (
                                   <Link
                                     to="/admin/enrollments"
-                                    className="font-pixel text-[7px] px-2 py-1 border-2 border-pixel-orange text-pixel-orange hover:bg-pixel-orange/10 whitespace-nowrap"
+                                    className="font-retro text-base font-bold px-2.5 py-1 min-h-[34px] flex items-center border-2 border-pixel-orange text-pixel-orange hover:bg-pixel-orange/15 hover:text-pixel-white transition-colors whitespace-nowrap shadow-pixel-sm active:translate-y-0.5"
                                   >
                                     + Daftarkan Ekskul
                                   </Link>
                                 )}
                                 {hasAccount && hasEkskul && (
-                                  <span className="font-pixel text-[7px] text-pixel-green">✓ Lengkap</span>
+                                  <span className="font-retro text-base font-bold text-pixel-green px-2 py-1 bg-pixel-green/10 border border-pixel-green/40">✓ Lengkap</span>
                                 )}
                               </div>
                             </td>

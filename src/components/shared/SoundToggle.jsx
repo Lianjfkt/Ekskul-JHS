@@ -21,7 +21,7 @@ export default function SoundToggle({ className }) {
     <button
       onClick={handleToggle}
       className={cn(
-        "p-2 relative rounded-none border-2 border-transparent hover:border-pixel-gray hover:bg-pixel-panel-light active:translate-x-0.5 active:translate-y-0.5",
+        "p-2 relative rounded-none border-2 border-transparent hover:border-pixel-gray hover:bg-pixel-panel-light active:translate-x-0.5 active:translate-y-0.5 min-w-[40px] min-h-[40px] flex items-center justify-center transition-colors",
         muted ? "text-pixel-lavender/60 hover:text-pixel-lavender" : "text-pixel-green hover:text-pixel-yellow",
         className
       )}

@@ -47,8 +47,9 @@ export default function AnnouncementBanner() {
           </div>
           <button 
             onClick={() => setDismissed(prev => [...prev, ann.id])}
-            className="absolute top-3 right-3 p-1 rounded-none text-pixel-lavender hover:text-pixel-red border-2 border-transparent hover:border-pixel-red"
-            title="Tutup"
+            aria-label="Tutup pengumuman"
+            className="absolute top-3 right-3 p-1.5 rounded-none text-pixel-lavender hover:text-pixel-red border-2 border-transparent hover:border-pixel-red min-w-[32px] min-h-[32px] flex items-center justify-center transition-colors"
+            title="Tutup pengumuman"
           >
             <X className="w-4 h-4" />
           </button>

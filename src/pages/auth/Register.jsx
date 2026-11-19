@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -8,6 +9,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Eye, EyeOff } from 'lucide-react'
+import { soundManager } from '@/utils/soundEffects'
 
 const registerSchema = z.object({
   email: z.string().email({ message: "Email tidak valid" }),
@@ -22,6 +25,7 @@ const registerSchema = z.object({
 export default function Register() {
   const navigate = useNavigate()
   const { login } = useAuthStore()
+  const [showPassword, setShowPassword] = useState(false)
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, setError } = useForm({
     resolver: zodResolver(registerSchema),
@@ -193,12 +197,26 @@ export default function Register() {
               {/* Password */}
               <div className="space-y-2">
                 <Label htmlFor="password" className="font-pixel text-[8px] uppercase tracking-widest text-pixel-lavender">Password Akun</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Min. 6 karakter"
-                  {...register("password")}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Min. 6 karakter"
+                    className="pr-11"
+                    {...register("password")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.playBlip?.()
+                      setShowPassword(!showPassword)
+                    }}
+                    aria-label={showPassword ? "Sembunyikan password" : "Lihat password"}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-pixel-lavender hover:text-pixel-peach focus:outline-none transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
                 <p className="font-retro text-base text-pixel-lavender/60">Password minimal 6 karakter</p>
                 {errors.password && <p className="font-retro text-base text-pixel-red mt-1">! {errors.password.message}</p>}
               </div>

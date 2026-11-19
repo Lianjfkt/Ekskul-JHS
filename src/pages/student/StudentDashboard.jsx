@@ -266,27 +266,30 @@ export default function StudentDashboard() {
  return (
  <div className="space-y-6">
  <AnnouncementBanner />
- {/* Welcome Banner */}
- <div className="relative overflow-hidden bg-pixel-purple rounded-none p-6 text-pixel-white shadow-pixel ">
- <div className="absolute -right-8 -top-8 w-40 h-40 rounded-none bg-pixel-panel/10 blur-2xl"></div>
- <div className="absolute -left-8 -bottom-8 w-32 h-32 rounded-none bg-pixel-panel/10 blur-2xl"></div>
- <div className="relative z-10">
- <p className="text-violet-200 font-retro text-lg mb-1">{greeting()} 👋</p>
- <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
- Halo, {profileLoading ? '...' : (profile?.full_name?.split(' ')[0] || 'Siswa')}!
- </h1>
- <p className="text-violet-200 text-sm mt-1">
- {profile?.class && `Kelas ${profile.class} · `}NIS: {profile?.nis || '—'}
- </p>
- <div className="flex items-center gap-4 mt-4">
- <div className="bg-pixel-panel/20 rounded-none px-3 py-1.5 font-retro text-base">
- 🎯 {enrollments.length} Ekskul Aktif
- </div>
- <div className="bg-pixel-panel/20 rounded-none px-3 py-1.5 font-retro text-base">
- 📅 {upcomingSessions.length} Sesi Minggu Ini
- </div>
- </div>
- </div>
+ {/* Welcome Banner - Compact & Responsive */}
+ <div className="relative overflow-hidden bg-pixel-purple rounded-none p-5 sm:p-6 text-pixel-white shadow-pixel border-2 border-pixel-gray">
+   <div className="absolute -right-8 -top-8 w-36 h-36 rounded-none bg-pixel-panel/10 blur-xl pointer-events-none"></div>
+   <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+     <div>
+       <p className="text-pixel-peach font-retro text-lg mb-0.5">{greeting()} 👋</p>
+       <h1 className="text-xl sm:text-2xl font-bold tracking-tight font-retro text-pixel-white">
+         Halo, <span className="text-pixel-yellow">{profileLoading ? '...' : (profile?.full_name || 'Siswa')}</span>!
+       </h1>
+       <p className="text-pixel-lavender text-sm font-retro mt-0.5">
+         {profile?.class && `Kelas ${profile.class} · `}NIS: {profile?.nis || '—'}
+       </p>
+     </div>
+     <div className="flex items-center gap-3 shrink-0 flex-wrap">
+       <div className="bg-pixel-navy/80 border border-pixel-gray/40 rounded-none px-3.5 py-2 font-retro text-base flex items-center gap-2 shadow-pixel-sm">
+         <span>🎯</span>
+         <span><strong className="text-pixel-green">{enrollments.length}</strong> Ekskul Aktif</span>
+       </div>
+       <div className="bg-pixel-navy/80 border border-pixel-gray/40 rounded-none px-3.5 py-2 font-retro text-base flex items-center gap-2 shadow-pixel-sm">
+         <span>📅</span>
+         <span><strong className="text-pixel-blue">{upcomingSessions.length}</strong> Sesi Minggu Ini</span>
+       </div>
+     </div>
+   </div>
  </div>
 
  {/* Seksi Evaluasi Pelatih Akhir Semester */}
