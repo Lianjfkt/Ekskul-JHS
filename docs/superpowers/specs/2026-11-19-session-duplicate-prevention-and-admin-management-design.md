@@ -89,3 +89,4 @@ Saat ini sering terjadi kasus di mana sesi latihan ekstrakurikuler terinput gand
    * Klik tombol **"Hapus Sesi"**, periksa apakah dialog konfirmasi muncul dengan benar.
    * Konfirmasi penghapusan, pastikan sesi terhapus dari daftar dan data kehadiran terkait bersih dari database.
    * Buka tab **"Sesi Latihan per Pelatih"** -> klik **"Lihat Detail"**, pastikan tombol hapus pada kartu sesi berfungsi sebagaimana mestinya.
+

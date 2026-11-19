@@ -54,7 +54,7 @@ export default {
           yellow: "#FFEC27",
           green: "#00E436",
           blue: "#29ADFF",
-          lavender: "#83769C",
+          lavender: "#A598C4",
           pink: "#FF77A8",
           peach: "#FFCCAA",
           white: "#FFF1E8",

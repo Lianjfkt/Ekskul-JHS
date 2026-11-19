@@ -69,7 +69,8 @@ export default function NotificationBell() {
     <div className="relative">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 relative text-pixel-lavender hover:text-pixel-yellow rounded-none border-2 border-transparent hover:border-pixel-gray hover:bg-pixel-panel-light transition-colors"
+        aria-label="Notifikasi"
+        className="p-2 relative text-pixel-lavender hover:text-pixel-yellow rounded-none border-2 border-transparent hover:border-pixel-gray hover:bg-pixel-panel-light transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center"
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (

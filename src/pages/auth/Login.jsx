@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -7,6 +8,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Eye, EyeOff } from 'lucide-react'
+import { soundManager } from '@/utils/soundEffects'
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Email tidak valid" }),
@@ -16,6 +19,7 @@ const loginSchema = z.object({
 export default function Login() {
   const navigate = useNavigate()
   const { login } = useAuthStore()
+  const [showPassword, setShowPassword] = useState(false)
   
   const { register, handleSubmit, formState: { errors, isSubmitting }, setError } = useForm({
     resolver: zodResolver(loginSchema),
@@ -26,11 +30,13 @@ export default function Login() {
       const loginResult = await login(data.email, data.password)
       const targetRole = loginResult?.role || useAuthStore.getState().role
       if (targetRole) {
+        soundManager.playSuccess?.()
         navigate(`/${targetRole}/dashboard`, { replace: true })
       } else {
         setError("root", { message: "Akun Anda tidak memiliki role yang valid. Hubungi administrator." })
       }
     } catch (error) {
+      soundManager.playError?.()
       setError("root", { message: "Login gagal. Periksa kembali email dan password Anda." })
     }
   }
@@ -108,16 +114,39 @@ export default function Login() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="font-pixel text-[8px] uppercase tracking-widest text-pixel-lavender">
-                  Password
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  {...register("password")}
-                />
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="password" className="font-pixel text-[8px] uppercase tracking-widest text-pixel-lavender">
+                    Password
+                  </Label>
+                  <span className="font-retro text-sm text-pixel-lavender/70">Min. 6 karakter</span>
+                </div>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    className="pr-11"
+                    {...register("password")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.playBlip?.()
+                      setShowPassword(!showPassword)
+                    }}
+                    aria-label={showPassword ? "Sembunyikan password" : "Lihat password"}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-pixel-lavender hover:text-pixel-peach focus:outline-none transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
                 {errors.password && <p className="font-retro text-base text-pixel-red mt-1">! {errors.password.message}</p>}
+              </div>
+
+              <div className="flex justify-end">
+                <span className="font-retro text-sm text-pixel-lavender hover:text-pixel-peach transition-colors">
+                  Lupa password? Hubungi Admin Sekolah
+                </span>
               </div>
 
               {errors.root && (
