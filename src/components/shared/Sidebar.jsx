@@ -161,67 +161,71 @@ export default function Sidebar({
         isOpen ? "translate-x-0" : "-translate-x-full",
         "w-64",
         // Desktop docked state
-        "lg:translate-x-0 lg:static lg:inset-auto h-screen shrink-0",
+        "lg:translate-x-0 lg:static lg:inset-auto h-screen shrink-0 relative",
         isCollapsed ? "lg:w-20" : "lg:w-64"
       )}
     >
       {/* Top Section / Header */}
-      <div className="shrink-0">
+      <div className="shrink-0 relative">
         {/* Header Bar */}
         <div className={cn(
-          "flex items-center h-16 bg-pixel-navy border-b-4 border-pixel-gray px-3",
+          "flex items-center h-16 bg-pixel-navy border-b-4 border-pixel-gray px-3 transition-all",
           isCollapsed ? "lg:justify-center" : "justify-between"
         )}>
-          {/* Logo Brand */}
+          {/* Logo Brand & Title */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 bg-pixel-panel border-2 border-pixel-gray flex items-center justify-center shrink-0 shadow-pixel-sm">
-              <Activity className="w-5 h-5 text-pixel-green" />
+            {/* Logo Ekskul JHS */}
+            <div className="w-9 h-9 bg-white border-2 border-pixel-gray flex items-center justify-center shrink-0 shadow-pixel-sm p-0.5">
+              <img 
+                src="/logo.png" 
+                alt="Logo Ekskul JHS" 
+                className="w-full h-full object-contain"
+              />
             </div>
 
-            {/* Title (Hidden in Collapsed) */}
+            {/* Title (Hidden in Collapsed on Desktop) */}
             <div className={cn(
               "overflow-hidden transition-all duration-200 whitespace-nowrap",
               isCollapsed ? "lg:hidden" : "block"
             )}>
-              <span className="font-pixel text-[10px] text-pixel-blue pixel-text-shadow tracking-wider block">
+              <span className="font-pixel text-[10px] text-pixel-blue pixel-text-shadow tracking-wider block leading-tight">
                 EKSKUL <span className="text-pixel-white">APP</span>
+              </span>
+              <span className="font-retro text-xs text-pixel-lavender tracking-wide block truncate">
+                SMP Global Madani
               </span>
             </div>
           </div>
 
-          {/* Desktop Toggle Button */}
-          <button
-            onClick={handleToggleCollapse}
-            title={isCollapsed ? "Perluas Sidebar" : "Kecilkan Sidebar"}
-            className={cn(
-              "hidden lg:flex items-center justify-center w-7 h-7 bg-pixel-panel hover:bg-pixel-panel-light border-2 border-pixel-gray text-pixel-blue hover:text-pixel-yellow shadow-pixel-sm active:translate-x-0.5 active:translate-y-0.5 transition-colors",
-              isCollapsed ? "hidden" : "flex"
-            )}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-
           {/* Mobile Close Button */}
           <button
             onClick={onClose}
+            aria-label="Tutup Menu"
             className="lg:hidden p-1.5 text-pixel-peach hover:text-pixel-red hover:bg-pixel-panel-light border-2 border-transparent hover:border-pixel-gray transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Collapsed Mode Expand Button */}
-        {isCollapsed && (
-          <div className="hidden lg:flex justify-center pt-2">
-            <button
-              onClick={handleToggleCollapse}
-              title="Perluas Sidebar"
-              className="w-8 h-8 bg-pixel-navy hover:bg-pixel-panel-light border-2 border-pixel-gray text-pixel-blue hover:text-pixel-yellow flex items-center justify-center shadow-pixel-sm active:translate-x-0.5 active:translate-y-0.5 transition-colors"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        {/* 
+          Desktop Toggle Button: 
+          1 Tombol Tunggal untuk < dan > (Collapse & Expand)
+          Diposisikan tepat di border samping header sehingga rapi,
+          tidak menumpuk/bertabrakan dengan logo di mode collapsed,
+          dan tidak memakan baris menu vertikal.
+        */}
+        <button
+          onClick={handleToggleCollapse}
+          title={isCollapsed ? "Perluas Sidebar" : "Kecilkan Sidebar"}
+          aria-label={isCollapsed ? "Perluas Sidebar" : "Kecilkan Sidebar"}
+          className="hidden lg:flex items-center justify-center absolute -right-3.5 top-4.5 w-7 h-7 bg-pixel-panel hover:bg-pixel-panel-light border-2 border-pixel-gray text-pixel-blue hover:text-pixel-yellow shadow-pixel-sm z-40 cursor-pointer active:translate-x-0.5 active:translate-y-0.5 transition-colors"
+        >
+          {isCollapsed ? (
+            <ChevronRight className="w-4 h-4" />
+          ) : (
+            <ChevronLeft className="w-4 h-4" />
+          )}
+        </button>
       </div>
 
       {/* Navigation Links */}
