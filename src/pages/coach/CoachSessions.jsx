@@ -11,10 +11,11 @@ import {
 } from 'lucide-react'
 
 export default function CoachSessions() {
- const { user } = useAuthStore()
- const [loading, setLoading] = useState(false)
- const [errorMsg, setErrorMsg] = useState('')
- const [successMsg, setSuccessMsg] = useState('')
+  const { user } = useAuthStore()
+  const [loading, setLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
 
  // Data States
  const [sessions, setSessions] = useState([])
@@ -151,113 +152,137 @@ export default function CoachSessions() {
   }
 
   const handleSubmit = async (e) => {
-  e.preventDefault()
-  setErrorMsg('')
-  setSuccessMsg('')
+    e.preventDefault()
+    if (isSubmitting) return
+    setErrorMsg('')
+    setSuccessMsg('')
 
-  if (form.coaches_present.length === 0) {
-    setErrorMsg('Harap pilih minimal 1 pelatih yang memimpin sesi latihan.')
-    return
-  }
-
-  if (form.is_special_training) {
-    if (!form.event_name.trim()) {
-      setErrorMsg('Nama event perlombaan wajib diisi untuk sesi latihan khusus.')
+    if (form.coaches_present.length === 0) {
+      setErrorMsg('Harap pilih minimal 1 pelatih yang memimpin sesi latihan.')
       return
     }
-    if (form.selected_students.length === 0) {
-      setErrorMsg('Harap pilih minimal 1 siswa untuk sesi latihan khusus ini.')
-      return
+
+    if (form.is_special_training) {
+      if (!form.event_name.trim()) {
+        setErrorMsg('Nama event perlombaan wajib diisi untuk sesi latihan khusus.')
+        return
+      }
+      if (form.selected_students.length === 0) {
+        setErrorMsg('Harap pilih minimal 1 siswa untuk sesi latihan khusus ini.')
+        return
+      }
     }
-  }
 
-  try {
-  let sessionId = selectedSession?.id
+    setIsSubmitting(true)
 
-  // CEK LIMIT 3 SESI KHUSUS UNTUK EVENT BARU
-  if (form.is_special_training && (!selectedSession || selectedSession.event_name !== form.event_name)) {
-    const { count, error: countErr } = await supabase
-      .from('sessions')
-      .select('*', { count: 'exact', head: true })
-      .eq('extracurricular_id', form.extracurricular_id)
-      .eq('is_special_training', true)
-      .ilike('event_name', form.event_name.trim())
-    
-    if (countErr) throw countErr
-    if (count >= 3) {
-      throw new Error(`Batas maksimal 3 sesi latihan khusus untuk event "${form.event_name}" sudah tercapai.`)
+    try {
+      // Validasi duplikasi tanggal sesi untuk ekskul yang sama
+      let duplicateQuery = supabase
+        .from('sessions')
+        .select('id, session_date, topic')
+        .eq('extracurricular_id', form.extracurricular_id)
+        .eq('session_date', form.session_date)
+
+      if (selectedSession?.id) {
+        duplicateQuery = duplicateQuery.neq('id', selectedSession.id)
+      }
+
+      const { data: existingSessions, error: dupErr } = await duplicateQuery
+      if (dupErr) throw dupErr
+
+      if (existingSessions && existingSessions.length > 0) {
+        setErrorMsg(`Sesi untuk ekstrakurikuler ini pada tanggal ${form.session_date} sudah ada (${existingSessions[0].topic || 'Tanpa topik'}). Setiap ekskul hanya boleh memiliki 1 sesi per hari.`)
+        return
+      }
+
+      let sessionId = selectedSession?.id
+
+      // CEK LIMIT 3 SESI KHUSUS UNTUK EVENT BARU
+      if (form.is_special_training && (!selectedSession || selectedSession.event_name !== form.event_name)) {
+        const { count, error: countErr } = await supabase
+          .from('sessions')
+          .select('*', { count: 'exact', head: true })
+          .eq('extracurricular_id', form.extracurricular_id)
+          .eq('is_special_training', true)
+          .ilike('event_name', form.event_name.trim())
+        
+        if (countErr) throw countErr
+        if (count >= 3) {
+          throw new Error(`Batas maksimal 3 sesi latihan khusus untuk event "${form.event_name}" sudah tercapai.`)
+        }
+      }
+
+      const targetClassStr = form.target_classes && form.target_classes.length > 0 ? form.target_classes.join(',') : 'all';
+
+      if (selectedSession) {
+        // Edit Mode
+        const { error } = await supabase
+          .from('sessions')
+          .update({
+            extracurricular_id: form.extracurricular_id,
+            session_date: form.session_date,
+            topic: form.topic,
+            notes: form.notes,
+            is_special_training: form.is_special_training,
+            event_name: form.is_special_training ? form.event_name : null,
+            target_class: targetClassStr
+          })
+          .eq('id', selectedSession.id)
+        if (error) throw error
+
+        // Hapus relasi pelatih & siswa lama
+        await supabase.from('session_coaches').delete().eq('session_id', selectedSession.id)
+        await supabase.from('special_session_participants').delete().eq('session_id', selectedSession.id)
+
+        setSuccessMsg('Sesi latihan berhasil diperbarui.')
+      } else {
+        // Create Mode
+        const { data: newSession, error } = await supabase
+          .from('sessions')
+          .insert([
+            {
+              extracurricular_id: form.extracurricular_id,
+              session_date: form.session_date,
+              topic: form.topic,
+              notes: form.notes,
+              created_by: user.id,
+              is_special_training: form.is_special_training,
+              event_name: form.is_special_training ? form.event_name : null,
+              target_class: targetClassStr
+            }
+          ])
+          .select()
+          .single()
+        if (error) throw error
+        sessionId = newSession.id
+        setSuccessMsg('Sesi latihan baru berhasil dibuat.')
+      }
+
+      // Insert relasi pelatih baru
+      const coachesToInsert = form.coaches_present.map(cId => ({
+        session_id: sessionId,
+        coach_id: cId
+      }))
+      const { error: insErr } = await supabase.from('session_coaches').insert(coachesToInsert)
+      if (insErr) throw insErr
+
+      // Insert special students jika ada
+      if (form.is_special_training && form.selected_students.length > 0) {
+        const studentsToInsert = form.selected_students.map(sId => ({
+          session_id: sessionId,
+          student_id: sId
+        }))
+        const { error: spErr } = await supabase.from('special_session_participants').insert(studentsToInsert)
+        if (spErr) throw spErr
+      }
+
+      setIsModalOpen(false)
+      fetchData()
+    } catch (err) {
+      setErrorMsg(err.message)
+    } finally {
+      setIsSubmitting(false)
     }
-  }
-
-  const targetClassStr = form.target_classes && form.target_classes.length > 0 ? form.target_classes.join(',') : 'all';
-
-  if (selectedSession) {
-  // Edit Mode
-  const { error } = await supabase
-  .from('sessions')
-  .update({
-  extracurricular_id: form.extracurricular_id,
-  session_date: form.session_date,
-  topic: form.topic,
-  notes: form.notes,
-  is_special_training: form.is_special_training,
-  event_name: form.is_special_training ? form.event_name : null,
-  target_class: targetClassStr
-  })
-  .eq('id', selectedSession.id)
-  if (error) throw error
-
-  // Hapus relasi pelatih & siswa lama
-  await supabase.from('session_coaches').delete().eq('session_id', selectedSession.id)
-  await supabase.from('special_session_participants').delete().eq('session_id', selectedSession.id)
-
-  setSuccessMsg('Sesi latihan berhasil diperbarui.')
-  } else {
-  // Create Mode
-  const { data: newSession, error } = await supabase
-  .from('sessions')
-  .insert([
-  {
-  extracurricular_id: form.extracurricular_id,
-  session_date: form.session_date,
-  topic: form.topic,
-  notes: form.notes,
-  created_by: user.id,
-  is_special_training: form.is_special_training,
-  event_name: form.is_special_training ? form.event_name : null,
-  target_class: targetClassStr
-  }
-  ])
-  .select()
-  .single()
-  if (error) throw error
-  sessionId = newSession.id
-  setSuccessMsg('Sesi latihan baru berhasil dibuat.')
-  }
-
-  // Insert relasi pelatih baru
-  const coachesToInsert = form.coaches_present.map(cId => ({
-    session_id: sessionId,
-    coach_id: cId
-  }))
-  const { error: insErr } = await supabase.from('session_coaches').insert(coachesToInsert)
-  if (insErr) throw insErr
-
-  // Insert special students jika ada
-  if (form.is_special_training && form.selected_students.length > 0) {
-    const studentsToInsert = form.selected_students.map(sId => ({
-      session_id: sessionId,
-      student_id: sId
-    }))
-    const { error: spErr } = await supabase.from('special_session_participants').insert(studentsToInsert)
-    if (spErr) throw spErr
-  }
-
-  setIsModalOpen(false)
-  fetchData()
-  } catch (err) {
-  setErrorMsg(err.message)
-  }
   }
 
  const handleDelete = async (id) => {
@@ -284,16 +309,17 @@ export default function CoachSessions() {
    }
  }
 
- // Cek apakah form sudah diisi (kotor) sebelum menutup modal
- const handleCloseModal = () => {
-   const isDirty = form.topic.trim() !== '' ||
-     form.notes.trim() !== '' ||
-     form.event_name.trim() !== '' ||
-     form.selected_students.length > 0 ||
-     form.target_classes.length > 0
-   if (isDirty && !confirm('Data yang sudah diisi akan hilang. Yakin ingin menutup?')) return
-   setIsModalOpen(false)
- }
+  // Cek apakah form sudah diisi (kotor) sebelum menutup modal
+  const handleCloseModal = () => {
+    if (isSubmitting) return
+    const isDirty = form.topic.trim() !== '' ||
+      form.notes.trim() !== '' ||
+      form.event_name.trim() !== '' ||
+      form.selected_students.length > 0 ||
+      form.target_classes.length > 0
+    if (isDirty && !confirm('Data yang sudah diisi akan hilang. Yakin ingin menutup?')) return
+    setIsModalOpen(false)
+  }
 
  return (
  <div className="space-y-6">
@@ -421,7 +447,7 @@ export default function CoachSessions() {
  <FileText className="w-5 h-5 text-primary" />
  {selectedSession ? 'Ubah Sesi Latihan' : 'Buat Sesi Latihan Baru'}
  </h3>
- <Button onClick={handleCloseModal} variant="ghost" size="icon" className="h-8 w-8 rounded-none">
+ <Button onClick={handleCloseModal} variant="ghost" size="icon" className="h-8 w-8 rounded-none" disabled={isSubmitting}>
  <X className="w-4 h-4" />
  </Button>
  </div>
@@ -619,8 +645,17 @@ export default function CoachSessions() {
  </div>
 
  <div className="pt-4 border-t border-pixel-gray/30 flex justify-end gap-2 sticky bottom-0 bg-pixel-panel mt-2 py-3 z-10 shadow-pixel-sm">
- <Button type="button" onClick={handleCloseModal} variant="outline">Batal</Button>
- <Button type="submit">Simpan Sesi</Button>
+ <Button type="button" onClick={handleCloseModal} variant="outline" disabled={isSubmitting}>Batal</Button>
+ <Button type="submit" disabled={isSubmitting} className="gap-2">
+   {isSubmitting ? (
+     <>
+       <span className="w-3.5 h-3.5 border-2 border-pixel-white border-t-transparent rounded-full animate-spin inline-block" />
+       Menyimpan...
+     </>
+   ) : (
+     'Simpan Sesi'
+   )}
+ </Button>
  </div>
  </form>
  </div>
