@@ -6,17 +6,20 @@
 
 /**
  * Hitung rata-rata dari score sikap, keterampilan, dan keaktifan.
- * Hanya score yang tidak null/undefined yang masuk hitungan.
+ * Nilai 0 adalah nilai sah (valid score).
+ * Hanya nilai null, undefined, atau string kosong ('') yang diabaikan dari hitungan.
  *
- * @param {number|null} attitudeScore
- * @param {number|null} skillScore
- * @param {number|null} activityScore
+ * @param {number|string|null} attitudeScore
+ * @param {number|string|null} skillScore
+ * @param {number|string|null} activityScore
  * @returns {number} Rata-rata dibulatkan ke integer
  */
 export function calculateAvgScore(attitudeScore, skillScore, activityScore) {
-  const scores = [attitudeScore, skillScore, activityScore].filter(
-    (v) => v !== null && v !== undefined
-  )
+  const scores = [attitudeScore, skillScore, activityScore]
+    .filter((v) => v !== null && v !== undefined && v !== '')
+    .map((v) => Number(v))
+    .filter((v) => !isNaN(v))
+
   if (scores.length === 0) return 0
   return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
 }

@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { 
- GraduationCap, ShieldAlert, Check, Users, Save, Info
+  GraduationCap, ShieldAlert, Check, Users, Save, Info, History, Sparkles
 } from 'lucide-react'
 import { toast } from '@/stores/toastStore'
 import { soundManager } from '@/utils/soundEffects'
 import XpFloat from '@/components/ui/XpFloat'
+import StudentGradeHistoryModal from '@/components/coach/StudentGradeHistoryModal'
 
 // Auto-hitung tahun ajaran: Juli-Des = tahun ajaran baru, Jan-Jun = tahun ajaran lama
 // Didefinisikan di luar komponen agar tidak dibuat ulang setiap render.
@@ -40,6 +41,7 @@ export default function CoachGrades() {
  
  // Grades sheet state: { [studentId]: { attitude_score: '', skill_score: '', activity_score: '', notes: '' } }
  const [gradesSheet, setGradesSheet] = useState({})
+ const [selectedHistoryStudent, setSelectedHistoryStudent] = useState(null)
 
  useEffect(() => {
  if (user) {
@@ -183,16 +185,22 @@ export default function CoachGrades() {
  }
 
  const handleScoreChange = useCallback((studentId, field, value) => {
- // Client-side score validation: must be a number between 0 and 100 or empty
- if (value !== '') {
- const num = parseInt(value)
- if (isNaN(num) || num < 0 || num > 100) return
- }
- setGradesSheet(sheet => ({
- ...sheet,
- [studentId]: { ...sheet[studentId], [field]: value }
- }))
+   // Validasi skor 0 - 100 atau kosong
+   if (value !== '') {
+     if (!/^\d+$/.test(value)) return
+     const num = parseInt(value, 10)
+     if (isNaN(num) || num < 0 || num > 100) return
+   }
+   setGradesSheet(sheet => ({
+     ...sheet,
+     [studentId]: { ...sheet[studentId], [field]: value }
+   }))
  }, [])
+
+ const applyAttendanceToActivity = (studentId, attendancePercentage) => {
+   handleScoreChange(studentId, 'activity_score', attendancePercentage.toString())
+   toast.success('Nilai aktivitas disesuaikan dengan kehadiran (' + attendancePercentage + ')')
+ }
 
  const handleNotesChange = useCallback((studentId, notes) => {
  setGradesSheet(sheet => ({
@@ -213,10 +221,16 @@ export default function CoachGrades() {
  const recordsToUpsert = students.map(student => {
  const sheet = gradesSheet[student.id] || {}
 
- // Parse score strings to integers or set to null
- const att = sheet.attitude_score !== '' ? parseInt(sheet.attitude_score) : null
- const sk = sheet.skill_score !== '' ? parseInt(sheet.skill_score) : null
- const act = sheet.activity_score !== '' ? parseInt(sheet.activity_score) : null
+ // Parse score strings to integers or set to null. Note: '0' must become 0, NOT null!
+ const att = sheet.attitude_score !== '' && sheet.attitude_score !== null && sheet.attitude_score !== undefined
+   ? parseInt(sheet.attitude_score, 10)
+   : null
+ const sk = sheet.skill_score !== '' && sheet.skill_score !== null && sheet.skill_score !== undefined
+   ? parseInt(sheet.skill_score, 10)
+   : null
+ const act = sheet.activity_score !== '' && sheet.activity_score !== null && sheet.activity_score !== undefined
+   ? parseInt(sheet.activity_score, 10)
+   : null
 
  return {
  student_id: student.id,
@@ -355,8 +369,9 @@ export default function CoachGrades() {
  <th className="px-4 py-4 w-24 text-center">Absensi</th>
  <th className="px-4 py-4 w-28 text-center">Nilai Sikap</th>
  <th className="px-4 py-4 w-28 text-center">Nilai Keterampilan</th>
- <th className="px-4 py-4 w-28 text-center">Nilai Aktivitas</th>
- <th className="px-6 py-4 w-1/3">Catatan / Rekomendasi Pelatih</th>
+ <th className="px-4 py-4 w-36 text-center">Nilai Aktivitas</th>
+ <th className="px-6 py-4 min-w-[200px]">Catatan / Rekomendasi Pelatih</th>
+ <th className="px-4 py-4 w-28 text-center">Aksi</th>
  </tr>
  </thead>
  <tbody className="divide-y-2 divide-pixel-gray/30 text-sm text-pixel-peach">
@@ -393,6 +408,7 @@ export default function CoachGrades() {
  />
  </td>
  <td className="px-4 py-4">
+ <div className="flex items-center gap-1.5">
  <Input
  type="text"
  value={studentGr.activity_score}
@@ -400,6 +416,17 @@ export default function CoachGrades() {
  placeholder="0-100"
  className="text-center font-mono font-bold text-pixel-white"
  />
+ <Button
+ type="button"
+ variant="outline"
+ size="icon"
+ onClick={() => applyAttendanceToActivity(student.id, student.attendancePercentage)}
+ className="h-10 w-10 shrink-0 border-pixel-gray/40 hover:bg-pixel-yellow/20 text-pixel-yellow hover:text-pixel-white transition-colors"
+ title={`Salin Absensi (${student.attendancePercentage}%) ke Aktivitas`}
+ >
+ <Sparkles className="w-4 h-4" />
+ </Button>
+ </div>
  </td>
  <td className="px-6 py-4">
  <Input
@@ -409,6 +436,18 @@ export default function CoachGrades() {
  onChange={(e) => handleNotesChange(student.id, e.target.value)}
  className="w-full"
  />
+ </td>
+ <td className="px-4 py-4 text-center">
+ <Button
+ variant="outline"
+ size="sm"
+ onClick={() => setSelectedHistoryStudent(student)}
+ className="gap-1 text-xs"
+ title="Lihat Rekam Jejak & Riwayat Nilai"
+ >
+ <History className="w-3.5 h-3.5 text-pixel-peach" />
+ Riwayat
+ </Button>
  </td>
  </tr>
  )
@@ -425,6 +464,15 @@ export default function CoachGrades() {
  <span>Silakan hubungi admin untuk mendaftarkan Anda ke ekstrakurikuler terlebih dahulu.</span>
  </div>
  )}
+
+ {/* Modal Riwayat Nilai Siswa */}
+ <StudentGradeHistoryModal
+   isOpen={!!selectedHistoryStudent}
+   onClose={() => setSelectedHistoryStudent(null)}
+   student={selectedHistoryStudent}
+   extracurricularId={selectedEkskul}
+   extracurricularName={managedEkskuls.find(e => e.id === selectedEkskul)?.name || ''}
+ />
  </div>
  )
 }
