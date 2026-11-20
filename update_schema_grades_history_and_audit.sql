@@ -21,7 +21,7 @@ ALTER TABLE public.grades
 -- 2. Buat Tabel Log Audit Nilai (grade_audit_logs)
 CREATE TABLE IF NOT EXISTS public.grade_audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    grade_id UUID REFERENCES public.grades(id) ON DELETE CASCADE,
+    grade_id UUID,
     student_id UUID REFERENCES public.students(id) ON DELETE CASCADE,
     extracurricular_id UUID REFERENCES public.extracurriculars(id) ON DELETE CASCADE,
     semester TEXT NOT NULL,
@@ -43,6 +43,7 @@ CREATE OR REPLACE FUNCTION public.trg_log_grade_changes()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
     v_user_id UUID;
