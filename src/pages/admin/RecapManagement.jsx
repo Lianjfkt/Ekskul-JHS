@@ -34,8 +34,11 @@ import {
  RefreshCw,
  Award,
  Star,
- Trash2
+ Trash2,
+ History
 } from 'lucide-react'
+import StudentFullGradeHistoryModal from '../../components/admin/StudentFullGradeHistoryModal'
+import GradeAuditLogsModal from '../../components/admin/GradeAuditLogsModal'
 import { saveAs } from 'file-saver'
 import { addKopSuratToPDF } from '../../utils/pdfHelper'
 import { isSessionApplicableToStudent, evaluateAttendanceRisk } from '../../utils/attendanceRiskEngine'
@@ -322,6 +325,8 @@ export default function RecapManagement() {
  const [activeTab, setActiveTab] = useState('overview')
  const [errorMsg, setErrorMsg] = useState('')
  const [selectedSessionGroup, setSelectedSessionGroup] = useState(null)
+ const [auditLogsOpen, setAuditLogsOpen] = useState(false)
+ const [selectedHistoryStudent, setSelectedHistoryStudent] = useState(null)
 
  // Raw data
  const [extracurriculars, setExtracurriculars] = useState([])
@@ -758,12 +763,21 @@ export default function RecapManagement() {
   return grades.map(g => {
    const { avg, predikat } = enrichGradeStats(g)
    return {
-    id: g.id, nis: g.student?.nis || '-', studentName: g.student?.full_name || 'Unknown',
-    class: g.student?.class || '-', ekskulId: g.extracurricular_id,
+    id: g.id,
+    studentId: g.student?.id || g.student_id,
+    nis: g.student?.nis || '-',
+    studentName: g.student?.full_name || 'Unknown',
+    class: g.student?.class || '-',
+    ekskulId: g.extracurricular_id,
     ekskulName: g.extracurricular?.name || 'Deleted Ekskul',
-    semester: g.semester, academicYear: g.academic_year,
-    attitude: g.attitude_score || 0, skill: g.skill_score || 0, activity: g.activity_score || 0,
-    avg, predikat, notes: g.notes || '-'
+    semester: g.semester,
+    academicYear: g.academic_year,
+    attitude: g.attitude_score !== null && g.attitude_score !== undefined ? g.attitude_score : '-',
+    skill: g.skill_score !== null && g.skill_score !== undefined ? g.skill_score : '-',
+    activity: g.activity_score !== null && g.activity_score !== undefined ? g.activity_score : '-',
+    avg,
+    predikat,
+    notes: g.notes || '-'
    }
   }).filter(row => {
    const matchEkskul = selectedEkskul ? row.ekskulId === selectedEkskul : true
@@ -2022,6 +2036,16 @@ export default function RecapManagement() {
         PDF Frekuensi
        </Button>
       )}
+      {activeTab === 'grades' && (
+       <Button
+        type="button"
+        onClick={() => setAuditLogsOpen(true)}
+        className="bg-pixel-navy border-2 border-pixel-peach text-pixel-peach hover:bg-pixel-peach/10 shadow-pixel-sm flex items-center gap-2 w-full md:w-auto"
+       >
+        <ShieldAlert className="w-4 h-4" />
+        Log Audit Nilai
+       </Button>
+      )}
       <Button
        onClick={
         activeTab === 'overview' ? exportEkskulToExcel :
@@ -2860,12 +2884,13 @@ export default function RecapManagement() {
           <th className="p-4 text-center">Pengetahuan</th>
           <th className="p-4 text-center">Rata-rata</th>
           <th className="p-4 text-center">Predikat</th>
-          <th className="p-4 pr-6 max-w-[200px]">Catatan</th>
+          <th className="p-4 max-w-[200px]">Catatan</th>
+          <th className="p-4 pr-6 text-center">Aksi</th>
          </tr>
         </thead>
         <tbody className="divide-y-2 divide-pixel-gray/30">
          {gradeReportRows.length === 0 ? (
-          <tr><td colSpan="10" className="p-8 text-center text-pixel-lavender">Tidak ada laporan nilai yang cocok.</td></tr>
+          <tr><td colSpan="11" className="p-8 text-center text-pixel-lavender">Tidak ada laporan nilai yang cocok.</td></tr>
          ) : gradeReportRows.map(r => (
           <tr key={r.id} className="hover:bg-pixel-navy/30">
            <td className="p-4 pl-6 font-mono text-pixel-lavender">{r.nis}</td>
@@ -2884,7 +2909,24 @@ export default function RecapManagement() {
              'bg-pixel-red/10 text-pixel-red border border-rose-200'
             }`}>{r.predikat}</span>
            </td>
-           <td className="p-4 text-pixel-lavender italic text-xs pr-6 truncate max-w-[200px]" title={r.notes}>{r.notes}</td>
+           <td className="p-4 text-pixel-lavender italic text-xs truncate max-w-[200px]" title={r.notes}>{r.notes}</td>
+           <td className="p-4 pr-6 text-center">
+            <Button
+             variant="outline"
+             size="sm"
+             onClick={() => setSelectedHistoryStudent({
+              id: r.studentId,
+              full_name: r.studentName,
+              nis: r.nis,
+              class: r.class
+             })}
+             className="gap-1 text-xs text-pixel-peach border-pixel-gray/40 hover:bg-pixel-peach/10"
+             title="Lihat Riwayat Nilai Siswa"
+            >
+             <History className="w-3.5 h-3.5" />
+             Riwayat
+            </Button>
+           </td>
           </tr>
          ))}
         </tbody>
@@ -3231,6 +3273,19 @@ export default function RecapManagement() {
      </div>
     </div>
    )}
+
+   {/* Student Full Grade History Modal (Admin) */}
+   <StudentFullGradeHistoryModal
+    isOpen={!!selectedHistoryStudent}
+    onClose={() => setSelectedHistoryStudent(null)}
+    student={selectedHistoryStudent}
+   />
+
+   {/* Grade Audit Logs Modal (Admin) */}
+   <GradeAuditLogsModal
+    isOpen={auditLogsOpen}
+    onClose={() => setAuditLogsOpen(false)}
+   />
   </div>
  )
 }
